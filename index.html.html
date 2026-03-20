@@ -1227,6 +1227,23 @@ html, body {
           <span class="qa-label">Promo</span>
         </button>
       </div>
+            <!-- Artists -->
+      <div class="section-pad" style="padding-bottom:8px">
+        <div class="section-title">
+          <span>🎙 Artists</span>
+          <button class="section-title-see">See all →</button>
+        </div>
+      </div>
+      <div class="artists-scroll" id="artistsScroll"></div>
+
+      <!-- New This Week -->
+      <div class="section-pad" style="padding-top:16px;padding-bottom:8px">
+        <div class="section-title">
+          <span>✨ New This Week</span>
+          <button class="section-title-see">See all →</button>
+        </div>
+      </div>
+      <div class="content-scroll" id="contentScroll"></div>
 
       <!-- Artists -->
       <div class="section-pad" style="padding-bottom:8px">
@@ -1898,7 +1915,7 @@ const upNextVideos = [
 function openVideo(title, artist, initials, grad) {
   const playerWrap = document.getElementById('videoPlayerWrap');
   
-  // Заменяем фейковый плеер на реальный iframe
+  // 🔥 Замена фейкового плеера на реальный iframe + водяной знак
   playerWrap.innerHTML = `
     <iframe
       src="https://iframe.mediadelivery.net/embed/621300/70afb6f8-5037-4074-a31c-58aa4e255ab4?autoplay=true"
@@ -1911,17 +1928,12 @@ function openVideo(title, artist, initials, grad) {
 
   startWatermark('@sofiareinholt');
 
-  // Обновляем только то, что осталось (ниже плеера)
+  // Обновляем информацию под видео
+  document.getElementById('videoTopTitle').textContent = title;
   document.getElementById('viTitle').textContent = title + ' ASMR';
   document.getElementById('viArtist').textContent = artist;
   document.getElementById('viAv').textContent = initials;
   document.getElementById('viAv').style.background = `linear-gradient(135deg, ${grad[0]}50, ${grad[1]}30)`;
-  document.getElementById('videoTopTitle').textContent = title; // если вдруг понадобится позже
-
-  // Сброс состояний
-  isPlaying = true;
-  isSaved = false;
-  isLiked = false;
 
   // Теги
   const tagEl = document.getElementById('viTags');
@@ -1941,6 +1953,40 @@ function openVideo(title, artist, initials, grad) {
     };
     reactEl.appendChild(btn);
   });
+
+  // Up Next
+  const upEl = document.getElementById('upNextList');
+  upEl.innerHTML = upNextVideos.map((v, i) => `
+    <div class="up-next-item" onclick="openVideo('${v.title}','${v.artist}','${v.initials}',['${v.grad[0]}','${v.grad[1]}'])">
+      <div class="up-next-num">${i + 1}</div>
+      <div class="up-next-thumb" style="background:linear-gradient(135deg,${v.grad[0]}22,${v.grad[1]}0a)">
+        ${v.initials}
+        <div class="up-next-dur">${v.dur}</div>
+      </div>
+      <div class="up-next-info">
+        <div class="up-next-title">${v.title}</div>
+        <div class="up-next-artist">${v.artist}</div>
+      </div>
+    </div>`).join('');
+
+  // Сброс состояний кнопок
+  isPlaying = true;
+  isSaved = false;
+  isLiked = false;
+  document.getElementById('viLikeIcon').textContent = '♡';
+  document.getElementById('viSaveIcon').textContent = '☆';
+  document.getElementById('videoSaveBtn').textContent = '♡';
+  document.getElementById('viLikeBtn').classList.remove('liked');
+  document.getElementById('viSaveBtn2').classList.remove('saved');
+
+  // Открываем экран видео
+  document.getElementById('screen-video').classList.remove('hidden');
+  document.getElementById('backBtn').classList.add('visible');
+  screenHistory.push('video');
+
+  // Убираем старый фейковый прогресс
+  clearInterval(progressInterval);
+};
 
   // Up Next
   const upEl = document.getElementById('upNextList');
