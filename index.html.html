@@ -896,7 +896,7 @@ html, body {
   color: rgba(255,255,255,0.055);
   letter-spacing: 1px;
   pointer-events: none;
-  z-index: 5;
+  z-index: 160;  /* ← Поднял выше iframe */
   white-space: nowrap;
   transition: opacity 1.5s ease;
   user-select: none;
@@ -911,8 +911,9 @@ html, body {
   width: 100%;
   aspect-ratio: 16/9;
   background: #000;
-  overflow: hidden;
+  overflow: visible;  /* ← ВАЖНО: было hidden */
   flex-shrink: 0;
+  z-index: 100;
 }
 
 .video-bg {
@@ -1900,11 +1901,6 @@ function openVideo(title, artist, initials, grad) {
   
   // Очищаем контейнер полностью и делаем его просто контейнером для iframe
   playerWrap.innerHTML = '';
-  playerWrap.style.position = 'relative';
-  playerWrap.style.width = '100%';
-  playerWrap.style.aspectRatio = '16/9';
-  playerWrap.style.background = '#000';
-  playerWrap.style.zIndex = '100';
   
   const iframe = document.createElement('iframe');
   iframe.src = 'https://player.mediadelivery.net/embed/621300/70afb6f8-5037-4074-a31c-58aa4e255ab4?autoplay=true';
@@ -1916,11 +1912,10 @@ function openVideo(title, artist, initials, grad) {
 
   // Добавляем watermark
   const wm = document.createElement('div');
-  wm.className = 'ghost-watermark';
-  wm.id = 'ghostWatermark';
-  wm.textContent = '@sofiareinholt';
-  wm.style.zIndex = '140';
-  playerWrap.appendChild(wm);
+wm.className = 'ghost-watermark';
+wm.id = 'ghostWatermark';
+wm.textContent = '@sofiareinholt';
+playerWrap.appendChild(wm);
 
   startWatermark('@sofiareinholt');
 
