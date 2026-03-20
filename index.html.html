@@ -1896,47 +1896,39 @@ const upNextVideos = [
 ];
 
 function openVideo(title, artist, initials, grad) {
-  // Set content
-  document.getElementById('videoBg').textContent = initials;
   const playerWrap = document.getElementById('videoPlayerWrap');
-playerWrap.innerHTML = `
-  <iframe
-    src="https://iframe.mediadelivery.net/embed/621300/70afb6f8-5037-4074-a31c-58aa4e255ab4?autoplay=true"
-    style="position:absolute;inset:0;width:100%;height:100%;border:none"
-    allow="autoplay; fullscreen"
-    allowfullscreen
-  ></iframe>
-  <div class="ghost-watermark" id="ghostWatermark">@sofiareinholt</div>
-`;
-startWatermark('@sofiareinholt');
-  document.getElementById('videoBg').style.background = `linear-gradient(135deg, ${grad[0]}30, ${grad[1]}15)`;
-  document.getElementById('videoTopTitle').textContent = title;
+  
+  // Заменяем фейковый плеер на реальный iframe
+  playerWrap.innerHTML = `
+    <iframe
+      src="https://iframe.mediadelivery.net/embed/621300/70afb6f8-5037-4074-a31c-58aa4e255ab4?autoplay=true"
+      style="position:absolute;inset:0;width:100%;height:100%;border:none"
+      allow="autoplay; fullscreen"
+      allowfullscreen
+    ></iframe>
+    <div class="ghost-watermark" id="ghostWatermark">@sofiareinholt</div>
+  `;
+
+  startWatermark('@sofiareinholt');
+
+  // Обновляем только то, что осталось (ниже плеера)
   document.getElementById('viTitle').textContent = title + ' ASMR';
   document.getElementById('viArtist').textContent = artist;
   document.getElementById('viAv').textContent = initials;
   document.getElementById('viAv').style.background = `linear-gradient(135deg, ${grad[0]}50, ${grad[1]}30)`;
+  document.getElementById('videoTopTitle').textContent = title; // если вдруг понадобится позже
 
-  // Reset state
+  // Сброс состояний
   isPlaying = true;
   isSaved = false;
   isLiked = false;
-  currentProgress = 0;
-  document.getElementById('playBtn').textContent = '⏸';
-  document.getElementById('playBtn').classList.remove('playing');
-  document.getElementById('progressFill').style.width = '0%';
-  document.getElementById('progressThumb').style.left = '0%';
-  document.getElementById('viLikeIcon').textContent = '♡';
-  document.getElementById('viSaveIcon').textContent = '☆';
-  document.getElementById('videoSaveBtn').textContent = '♡';
-  document.getElementById('viLikeBtn').classList.remove('liked');
-  document.getElementById('viSaveBtn2').classList.remove('saved');
 
-  // Tags
+  // Теги
   const tagEl = document.getElementById('viTags');
   const tags = ['👂 Ear Licking','🎤 Whispering','💆 Personal Attention','😴 Sleep','Binaural'];
   tagEl.innerHTML = tags.map(t => `<span class="vi-tag">${t}</span>`).join('');
 
-  // Reactions
+  // Реакции
   const reactEl = document.getElementById('viReactions');
   reactEl.innerHTML = '';
   reactionData.forEach(r => {
@@ -1949,6 +1941,30 @@ startWatermark('@sofiareinholt');
     };
     reactEl.appendChild(btn);
   });
+
+  // Up Next
+  const upEl = document.getElementById('upNextList');
+  upEl.innerHTML = upNextVideos.map((v, i) => `
+    <div class="up-next-item" onclick="openVideo('${v.title}','${v.artist}','${v.initials}',['${v.grad[0]}','${v.grad[1]}'])">
+      <div class="up-next-num">${i + 1}</div>
+      <div class="up-next-thumb" style="background:linear-gradient(135deg,${v.grad[0]}22,${v.grad[1]}0a)">
+        ${v.initials}
+        <div class="up-next-dur">${v.dur}</div>
+      </div>
+      <div class="up-next-info">
+        <div class="up-next-title">${v.title}</div>
+        <div class="up-next-artist">${v.artist}</div>
+      </div>
+    </div>`).join('');
+
+  // Открываем экран видео
+  document.getElementById('screen-video').classList.remove('hidden');
+  document.getElementById('backBtn').classList.add('visible');
+  screenHistory.push('video');
+
+  // Убираем фейковый прогресс (он больше не нужен)
+  clearInterval(progressInterval);
+}
 
   // Up next
   const upEl = document.getElementById('upNextList');
