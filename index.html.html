@@ -23,64 +23,39 @@
   --success: #4ADE80;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+* { 
+  margin: 0; 
+  padding: 0; 
+  box-sizing: border-box; 
+  -webkit-tap-highlight-color: transparent; 
+}
 
 html, body {
-  background: #111;
+  background: var(--dark);
   color: var(--text);
   font-family: 'DM Sans', sans-serif;
-  height: 100vh;
-  overflow: hidden;
+  height: 100%;
+  overflow-x: hidden;
   user-select: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-/* ── PHONE MOCKUP ── */
-.phone-frame {
-  width: 390px;
-  height: 844px;
-  border-radius: 44px;
-  border: 8px solid #1a1a1a;
-  box-shadow: 0 0 0 1px #333, 0 40px 80px rgba(0,0,0,0.8);
-  overflow: hidden;
-  position: relative;
-  background: var(--dark);
+body {
   display: flex;
   flex-direction: column;
 }
 
-.phone-notch {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 150px;
-  height: 28px;
-  background: #1a1a1a;
-  border-radius: 0 0 20px 20px;
-  z-index: 200;
-}
-
-.phone-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* ���─ HEADER ── */
+/* ── HEADER ── */
 .header {
   background: var(--dark2);
   border-bottom: 1px solid var(--border);
-  padding: 12px 16px 10px;
+  padding: 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 32px;
   flex-shrink: 0;
   z-index: 100;
+  position: sticky;
+  top: 0;
 }
 
 .header-left {
@@ -136,20 +111,29 @@ html, body {
   color: rgba(200,255,68,0.6);
 }
 
-/* ── SCROLLABLE CONTENT ── */
-.scroll-content {
+/* ── MAIN CONTAINER ── */
+.main-container {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-width: none;
-  padding-bottom: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
 }
 
-.scroll-content::-webkit-scrollbar {
-  display: none;
+.main-container::-webkit-scrollbar {
+  width: 6px;
 }
 
-/* ── MAIN CONTENT ── */
+.main-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.main-container::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+}
+
+/* ── CONTENT ── */
 .content {
   padding: 16px;
   display: flex;
@@ -241,10 +225,6 @@ html, body {
   opacity: 0.9;
 }
 
-.btn-secondary:active {
-  background: var(--dark4);
-}
-
 .btn-favorites {
   background: linear-gradient(135deg, var(--pink), #FF4A9E);
   color: #0E0E0F;
@@ -297,6 +277,7 @@ html, body {
   overflow-x: auto;
   scrollbar-width: none;
   scroll-behavior: smooth;
+  padding-bottom: 8px;
 }
 
 .artists-scroll::-webkit-scrollbar {
@@ -348,6 +329,7 @@ html, body {
   overflow-x: auto;
   scrollbar-width: none;
   scroll-behavior: smooth;
+  padding-bottom: 8px;
 }
 
 .videos-scroll::-webkit-scrollbar {
@@ -406,8 +388,14 @@ html, body {
 .page-container {
   display: none;
   flex-direction: column;
-  position: relative;
-  height: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--dark);
+  height: 100vh;
+  z-index: 150;
 }
 
 .page-container.active {
@@ -416,7 +404,7 @@ html, body {
 
 .artist-page-back {
   position: absolute;
-  top: 32px;
+  top: 16px;
   left: 16px;
   background: rgba(0,0,0,0.6);
   border: none;
@@ -427,7 +415,7 @@ html, body {
   border-radius: 8px;
   font-family: 'DM Sans', sans-serif;
   transition: all 0.15s;
-  z-index: 110;
+  z-index: 160;
   backdrop-filter: blur(4px);
 }
 
@@ -459,6 +447,7 @@ html, body {
     url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" /></filter><rect width="400" height="300" filter="url(%23noise)" opacity="0.08"/></svg>');
   mix-blend-mode: multiply;
 }
+
 .artist-content {
   position: relative;
   z-index: 2;
@@ -510,9 +499,8 @@ html, body {
 }
 
 /* ── MODAL ── */
-/* ── MODAL ── */
 .modal {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
@@ -522,9 +510,8 @@ html, body {
   align-items: flex-end;
   z-index: 200;
   backdrop-filter: blur(4px);
-  width: 390px;
-  height: 844px;
-  border-radius: 44px;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -554,7 +541,7 @@ html, body {
 .modal-close {
   position: absolute;
   top: -40px;
-  right: 0;
+  right: 16px;
   width: 32px;
   height: 32px;
   background: var(--dark3);
@@ -655,76 +642,84 @@ html, body {
 .toast.show {
   transform: translateX(-50%) translateY(0);
 }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 480px) {
+  .content {
+    padding: 12px;
+    gap: 12px;
+  }
+  
+  .header {
+    padding: 12px;
+  }
+}
 </style>
 </head>
 <body>
 
-<div class="phone-frame">
-  <div class="phone-notch"></div>
-  
-  <div class="phone-content">
-    <!-- HEADER -->
-    <div class="header">
-      <div class="header-left">
-        <div class="avatar">SR</div>
-        <div class="user-info">
-          <h3>Sofia Reinholt</h3>
-          <p>@sofiareinholt</p>
-        </div>
-      </div>
-      <div class="days-left">
-        <div class="days-left-num">27</div>
-        <div class="days-left-label">days</div>
-      </div>
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="avatar">SR</div>
+    <div class="user-info">
+      <h3>Sofia Reinholt</h3>
+      <p>@sofiareinholt</p>
+    </div>
+  </div>
+  <div class="days-left">
+    <div class="days-left-num">27</div>
+    <div class="days-left-label">days</div>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main-container" id="homePage">
+  <div class="content">
+
+    <!-- PREVIEW SECTION -->
+    <div class="preview-section">
+      <h2>Page Preview</h2>
+      <div class="preview-placeholder">🎬</div>
+      <p class="preview-text">Insert your group preview video here</p>
     </div>
 
-    <!-- HOME PAGE -->
-    <div class="scroll-content" id="homePage">
-      <div class="content">
-
-        <!-- PREVIEW SECTION -->
-        <div class="preview-section">
-          <h2>Page Preview</h2>
-          <div class="preview-placeholder">🎬</div>
-          <p class="preview-text">Insert your group preview video here</p>
-        </div>
-
-        <!-- CTA BUTTONS -->
-        <div class="cta-section" id="ctaSection">
-          <button class="btn btn-primary" id="subscribeBtnMain" onclick="openSubscribeModal()">
-            💳 Subscribe Now
-          </button>
-          <button class="btn btn-secondary" id="freeBtnMain" onclick="tryFree()">
-            🎁 Try 3 Days Free
-          </button>
-          <button class="btn btn-favorites hidden" id="favoritesBtnMain">
-            ⭐ My Favorites
-          </button>
-        </div>
-
-        <!-- ARTISTS SECTION -->
-        <div>
-          <div class="section-header">
-            <div class="section-title">🎙 Artists</div>
-            <button class="see-all-btn" onclick="showToast('See all artists')">See all →</button>
-          </div>
-          <div class="artists-scroll" id="artistsScroll"></div>
-        </div>
-
-        <!-- NEW VIDEOS SECTION -->
-        <div>
-          <div class="section-header">
-            <div class="section-title">✨ New Videos</div>
-            <button class="see-all-btn" onclick="showToast('See all videos')">See all →</button>
-          </div>
-          <div class="videos-scroll" id="videosScroll"></div>
-        </div>
-
-      </div>
+    <!-- CTA BUTTONS -->
+    <div class="cta-section" id="ctaSection">
+      <button class="btn btn-primary" id="subscribeBtnMain" onclick="openSubscribeModal()">
+        💳 Subscribe Now
+      </button>
+      <button class="btn btn-secondary" id="freeBtnMain" onclick="tryFree()">
+        🎁 Try 3 Days Free
+      </button>
+      <button class="btn btn-favorites hidden" id="favoritesBtnMain">
+        ⭐ My Favorites
+      </button>
     </div>
 
-    <!-- ARTIST PAGE -->
-    <div class="page-container" id="artistPage">
+    <!-- ARTISTS SECTION -->
+    <div>
+      <div class="section-header">
+        <div class="section-title">🎙 Artists</div>
+        <button class="see-all-btn" onclick="showToast('See all artists')">See all →</button>
+      </div>
+      <div class="artists-scroll" id="artistsScroll"></div>
+    </div>
+
+    <!-- NEW VIDEOS SECTION -->
+    <div>
+      <div class="section-header">
+        <div class="section-title">✨ New Videos</div>
+        <button class="see-all-btn" onclick="showToast('See all videos')">See all →</button>
+      </div>
+      <div class="videos-scroll" id="videosScroll"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ARTIST PAGE -->
+<div class="page-container" id="artistPage">
   <button class="artist-page-back" onclick="goBack()">‹ Back</button>
   <div class="artist-bg" id="artistBg"></div>
   <div class="artist-content">
@@ -778,11 +773,6 @@ const videos = [
   { title: 'Binaural ASMR', artist: 'Trinki ASMR', duration: '48:07', emoji: '👂' },
 ];
 
-const gradients = [
-  '#FF7EC8', '#C8FF44', '#44C8FF', '#FF9F44',
-  '#C86BFF', '#44FFB3'
-];
-
 const artistPhoto = 'https://images.unsplash.com/photo-1544717278-ca5e3cff53d7?w=500&h=600&fit=crop';
 
 // ── STATE ──
@@ -834,8 +824,8 @@ function renderVideos() {
 function openArtistPage(name, photos, videos_count) {
   document.getElementById('homePage').style.display = 'none';
   document.getElementById('artistPage').classList.add('active');
+  document.body.style.overflow = 'hidden';
   
-  // Замени на URL твоей фотки
   const mooonaPhotoUrl = 'https://i.ibb.co/7xjYTFQn/photo-2026-01-14-07-10-54.jpg';
   
   document.getElementById('artistBg').style.backgroundImage = `url('${mooonaPhotoUrl}')`;
@@ -846,6 +836,7 @@ function openArtistPage(name, photos, videos_count) {
 function goBack() {
   document.getElementById('artistPage').classList.remove('active');
   document.getElementById('homePage').style.display = 'block';
+  document.body.style.overflow = 'auto';
 }
 
 // ── PRICING ──
@@ -893,10 +884,7 @@ function updateUI() {
   const freeBtnMain = document.getElementById('freeBtnMain');
   const favoritesBtnMain = document.getElementById('favoritesBtnMain');
 
-  // Скрываем только кнопку Free Trial
   freeBtnMain.classList.add('hidden');
-
-  // Показываем кнопку Favorites
   favoritesBtnMain.classList.remove('hidden');
 }
 
