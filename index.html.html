@@ -1691,65 +1691,38 @@ const upNextVideos = [
 ];
 
 function openVideo(title, artist, initials, grad) {
+  const screenVideo = document.getElementById('screen-video');
   const playerWrap = document.getElementById('videoPlayerWrap');
   
+  // Скрываем все остальные экраны
+  document.querySelectorAll('.screen').forEach(s => {
+    s.style.display = 'none';
+  });
+  
+  // Показываем экран видео
+  screenVideo.style.display = 'block';
+  screenVideo.classList.remove('hidden');
+  
+  // Очищаем и создаём iframe
   playerWrap.innerHTML = '';
-  playerWrap.style.position = 'relative';
-  playerWrap.style.width = '100%';
-  playerWrap.style.aspectRatio = '16/9';
-  playerWrap.style.background = '#000';
-  playerWrap.style.zIndex = '100';
   
   const iframe = document.createElement('iframe');
   iframe.src = 'https://player.mediadelivery.net/embed/621300/70afb6f8-5037-4074-a31c-58aa4e255ab4?autoplay=true';
-  iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:none;z-index:150;';
+  iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:none;';
   iframe.allow = 'autoplay; fullscreen; encrypted-media';
   iframe.allowFullscreen = true;
-  
   playerWrap.appendChild(iframe);
 
-  // Восстанавливаем watermark
+  // Watermark
   const wm = document.createElement('div');
   wm.className = 'ghost-watermark';
   wm.id = 'ghostWatermark';
   wm.textContent = '@sofiareinholt';
-  wm.style.zIndex = '160';
   playerWrap.appendChild(wm);
-
-  // Восстанавливаем top bar
-  const topBar = document.createElement('div');
-  topBar.className = 'video-top-bar';
-  topBar.innerHTML = `
-    <button class="video-ctrl-btn" onclick="closeVideo()">‹</button>
-    <div class="video-top-title">${title}</div>
-    <button class="video-ctrl-btn" onclick="toggleSave()">♡</button>
-  `;
-  playerWrap.appendChild(topBar);
-
-  // Восстанавливаем bottom bar
-  const bottomBar = document.createElement('div');
-  bottomBar.className = 'video-bottom-bar';
-  bottomBar.innerHTML = `
-    <div class="video-progress-wrap" onclick="seekVideo(event)">
-      <div class="video-progress-bg"></div>
-      <div class="video-progress-fill" id="progressFill" style="width:0%"></div>
-      <div class="video-progress-thumb" id="progressThumb" style="left:0%"></div>
-    </div>
-    <div class="video-controls-row">
-      <div class="video-time" id="videoTime">00:00 / 41:07</div>
-      <div class="video-ctrl-row-right">
-        <button class="video-ctrl-sm">⏮</button>
-        <button class="video-ctrl-sm" onclick="togglePlay()" id="playPauseBtn">⏸</button>
-        <button class="video-ctrl-sm">⏭</button>
-        <button class="video-ctrl-sm" onclick="toggleMute()" id="muteBtn">🔊</button>
-        <button class="video-ctrl-sm" onclick="toggleFullscreen()">⛶</button>
-      </div>
-    </div>
-  `;
-  playerWrap.appendChild(bottomBar);
 
   startWatermark('@sofiareinholt');
 
+  // Обновляем инфо
   document.getElementById('videoTopTitle').textContent = title;
   document.getElementById('viTitle').textContent = title + ' ASMR';
   document.getElementById('viArtist').textContent = artist;
@@ -1796,7 +1769,6 @@ function openVideo(title, artist, initials, grad) {
   document.getElementById('viLikeBtn').classList.remove('liked');
   document.getElementById('viSaveBtn2').classList.remove('saved');
 
-  document.getElementById('screen-video').classList.remove('hidden');
   document.getElementById('backBtn').classList.add('visible');
   screenHistory.push('video');
 
@@ -1806,14 +1778,18 @@ function openVideo(title, artist, initials, grad) {
 function closeVideo() {
   clearInterval(progressInterval);
   stopWatermark();
-  document.getElementById('screen-video').classList.add('hidden');
+  
+  const screenVideo = document.getElementById('screen-video');
+  screenVideo.style.display = 'none';
+  screenVideo.classList.add('hidden');
+  
   screenHistory.pop();
   const prev = screenHistory[screenHistory.length - 1];
+  
+  document.getElementById(`screen-${prev}`).style.display = 'block';
+  document.getElementById(`screen-${prev}`).classList.remove('hidden');
+  
   document.getElementById('backBtn').classList.toggle('visible', screenHistory.length > 1);
-  screens.forEach(s => {
-    const btn = document.getElementById(`nav-${s}`);
-    if(btn) btn.classList.toggle('active', s === prev);
-  });
 }
 
 function togglePlay() {
