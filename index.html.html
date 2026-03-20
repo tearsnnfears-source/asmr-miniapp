@@ -1865,14 +1865,25 @@ document.querySelectorAll('.content-mini-card').forEach((card, i) => {
   const artist = artists[i % artists.length];
   const title = videoTitles[i];
   const initials = artist.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  card.addEventListener('click', () => openVideo(title, artist, initials, g));
+  card.style.cursor = 'pointer';
+  card.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('Card clicked');
+    openVideo(title, artist, initials, g);
+  });
 });
 
 document.querySelectorAll('.artist-mini-card').forEach((card, i) => {
   const g = grads[i % grads.length];
   const artist = artists[i];
   const initials = artist.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  card.addEventListener('click', () => openVideo('Personal Attention', artist, initials, g));
+  card.style.cursor = 'pointer';
+  card.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    openVideo('Personal Attention', artist, initials, g);
+  });
 });
 
 let screenHistory = ['home'];
