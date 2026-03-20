@@ -46,7 +46,6 @@ html, body {
   height: 80px;
 }
 
-/* Top row: logo + close */
 .tg-top-row {
   display: flex;
   align-items: center;
@@ -81,7 +80,6 @@ html, body {
   line-height: 1; min-width: 48px; text-align: right;
 }
 
-/* User bar */
 .user-bar {
   display: flex;
   align-items: center;
@@ -121,6 +119,7 @@ html, body {
   border: 1px solid rgba(200,255,68,0.2);
   border-radius: 50px;
   padding: 5px 12px;
+  cursor: pointer;
 }
 
 .user-bar-days {
@@ -134,7 +133,6 @@ html, body {
   letter-spacing: 0.5px;
 }
 
-/* ── App container ── */
 .app {
   height: calc(100vh - 80px);
   display: flex;
@@ -143,7 +141,6 @@ html, body {
   position: relative;
 }
 
-/* ── Screen ── */
 .screen {
   position: absolute;
   top: 0; left: 0; right: 0;
@@ -161,23 +158,6 @@ html, body {
 .screen.hidden { transform: translateX(100%); opacity: 0; pointer-events: none; }
 .screen.slide-left { transform: translateX(-30%); opacity: 0; pointer-events: none; }
 
-/* Sub-screen (slide from right) */
-.subscreen {
-  position: absolute;
-  inset: 0;
-  overflow-y: auto;
-  padding-bottom: 80px;
-  background: var(--dark);
-  transform: translateX(100%);
-  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
-  z-index: 10;
-  scrollbar-width: none;
-}
-
-.subscreen::-webkit-scrollbar { display: none; }
-.subscreen.active { transform: translateX(0); }
-
-/* ── Bottom nav ── */
 .bottom-nav {
   height: 80px;
   background: var(--dark2);
@@ -211,7 +191,6 @@ html, body {
 .nav-btn.active .nav-label { color: var(--pink); }
 .nav-btn.active .nav-icon { filter: drop-shadow(0 0 6px rgba(255,126,200,0.6)); }
 
-/* Center subscribe button */
 .nav-btn-center {
   flex: 1;
   display: flex;
@@ -252,15 +231,6 @@ html, body {
   color: var(--pink); letter-spacing: 0.3px;
 }
 
-.nav-dot {
-  position: absolute;
-  width: 4px; height: 4px;
-  background: var(--pink);
-  border-radius: 50%;
-  top: 8px; right: 8px;
-}
-
-/* ── Common components ── */
 .section-pad { padding: 16px; }
 
 .card {
@@ -340,7 +310,6 @@ html, body {
 .row-arrow { color: rgba(255,255,255,0.2); font-size: 12px; }
 .row-value { font-size: 13px; color: var(--muted); }
 
-/* ── HOME screen ── */
 .home-hero {
   background: linear-gradient(145deg, #1a0812, #0e0e1a);
   padding: 20px 16px 24px;
@@ -357,46 +326,6 @@ html, body {
 .home-greeting { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
 .home-name { font-family: 'Bebas Neue', sans-serif; font-size: 32px; letter-spacing: 1px; }
 
-.sub-card {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,126,200,0.2);
-  border-radius: 16px;
-  padding: 16px;
-  margin-top: 16px;
-  display: flex; align-items: center; gap: 16px;
-}
-
-.sub-days-big {
-  text-align: center;
-}
-
-.sub-days-num {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 52px; letter-spacing: 1px; line-height: 1;
-  color: var(--lime);
-}
-
-.sub-days-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
-
-.sub-info { flex: 1; }
-.sub-status-label { font-size: 12px; font-weight: 500; color: var(--success); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
-.sub-status-label::before { content:''; width:7px;height:7px;background:var(--success);border-radius:50%;animation:pulse 2s infinite; }
-
-@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
-
-.sub-expire { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
-
-.btn-renew-sm {
-  background: var(--pink);
-  color: #0E0E0F;
-  border: none; border-radius: 8px;
-  padding: 8px 16px;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 12px; font-weight: 500;
-  cursor: pointer;
-}
-
-/* Quick actions */
 .quick-actions {
   display: grid; grid-template-columns: repeat(4,1fr);
   gap: 10px; padding: 16px;
@@ -409,14 +338,13 @@ html, body {
   border: 1px solid var(--border);
   border-radius: 14px;
   cursor: pointer; transition: all 0.15s;
-  border: none; font-family: 'DM Sans', sans-serif;
+  font-family: 'DM Sans', sans-serif;
 }
 
 .qa-btn:active { transform: scale(0.94); }
 .qa-icon { font-size: 22px; }
 .qa-label { font-size: 10px; font-weight: 500; color: var(--muted); }
 
-/* Artist row */
 .artists-scroll {
   display: flex; gap: 10px;
   padding: 0 16px 4px;
@@ -444,7 +372,6 @@ html, body {
 .artist-mini-card:active .artist-mini-av { border-color: rgba(255,126,200,0.4); }
 .artist-mini-name { font-size: 10px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Content row */
 .content-scroll {
   display: flex; gap: 10px;
   padding: 0 16px 4px;
@@ -476,102 +403,6 @@ html, body {
 .content-mini-title { font-size: 11px; font-weight: 500; color: var(--text); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .content-mini-artist { font-size: 10px; color: var(--pink); }
 
-/* ── REFERRAL screen ── */
-.ref-hero {
-  background: linear-gradient(145deg, #0a0f05, #0e0e1a);
-  padding: 24px 16px;
-  text-align: center;
-  position: relative; overflow: hidden;
-}
-
-.ref-hero::before {
-  content: '';
-  position: absolute; inset: 0;
-  background: radial-gradient(ellipse at 50% 60%, rgba(200,255,68,0.15) 0%, transparent 60%);
-}
-
-.ref-title {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 36px; letter-spacing: 1.5px;
-  margin-bottom: 8px; position: relative;
-}
-
-.ref-title span { color: var(--lime); }
-.ref-desc { font-size: 13px; font-weight: 300; color: var(--muted); line-height: 1.6; position: relative; }
-
-.ref-stats {
-  display: grid; grid-template-columns: repeat(3,1fr);
-  gap: 10px; padding: 16px;
-}
-
-.ref-stat {
-  background: var(--dark2); border: 1px solid var(--border);
-  border-radius: 14px; padding: 14px 10px; text-align: center;
-}
-
-.ref-stat-val { font-family: 'Bebas Neue', sans-serif; font-size: 32px; letter-spacing: 1px; color: var(--lime); }
-.ref-stat-label { font-size: 10px; color: var(--muted); letter-spacing: 0.5px; }
-
-.ref-link-box {
-  margin: 0 16px 16px;
-  background: var(--dark3);
-  border: 1px solid rgba(200,255,68,0.2);
-  border-radius: 14px; padding: 14px 16px;
-}
-
-.ref-link-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
-.ref-link-val { font-size: 13px; font-weight: 500; color: var(--lime); word-break: break-all; margin-bottom: 12px; }
-
-.ref-copy-btn {
-  width: 100%;
-  background: rgba(200,255,68,0.1);
-  border: 1px solid rgba(200,255,68,0.25);
-  border-radius: 10px; padding: 11px;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 13px; font-weight: 500;
-  color: var(--lime); cursor: pointer;
-  transition: background 0.2s;
-}
-
-.ref-copy-btn:active { background: rgba(200,255,68,0.2); }
-
-.ref-how { padding: 0 16px 16px; }
-.ref-how-title { font-size: 13px; font-weight: 500; margin-bottom: 12px; }
-
-.ref-step {
-  display: flex; align-items: flex-start; gap: 12px;
-  margin-bottom: 14px;
-}
-
-.ref-step-num {
-  width: 28px; height: 28px; border-radius: 50%;
-  background: rgba(200,255,68,0.1);
-  border: 1px solid rgba(200,255,68,0.25);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 500; color: var(--lime);
-  flex-shrink: 0;
-}
-
-.ref-step-text { font-size: 13px; font-weight: 300; color: rgba(255,255,255,0.7); line-height: 1.5; padding-top: 4px; }
-.ref-step-text strong { color: var(--text); font-weight: 500; }
-
-/* Leaderboard */
-.lb-item {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 16px;
-}
-
-.lb-rank { font-family: 'Bebas Neue', sans-serif; font-size: 20px; width: 28px; color: var(--muted); text-align: center; }
-.lb-rank.gold { color: #FFD700; }
-.lb-rank.silver { color: #C0C0C0; }
-.lb-rank.bronze { color: #CD7F32; }
-
-.lb-av { width: 36px; height: 36px; border-radius: 50%; background: var(--dark3); display: flex; align-items: center; justify-content: center; font-size: 14px; border: 1px solid var(--border); }
-.lb-name { flex: 1; font-size: 13px; font-weight: 500; }
-.lb-invites { font-size: 12px; color: var(--lime); font-weight: 500; }
-.lb-bonus { font-size: 10px; color: var(--muted); }
-
-/* ── SUPPORT screen ── */
 .support-options { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
 
 .support-card {
@@ -612,7 +443,6 @@ html, body {
 
 .faq-item-m.open .faq-a-m { max-height: 200px; padding: 0 16px 14px; }
 
-/* ── PROFILE screen ── */
 .profile-header {
   background: linear-gradient(145deg, #0e0814, #0e0e0e);
   padding: 24px 16px 20px;
@@ -649,7 +479,6 @@ html, body {
 .pms-val span { color: var(--lime); }
 .pms-label { font-size: 10px; color: var(--muted); }
 
-/* Toggle */
 .toggle {
   width: 42px; height: 24px;
   background: var(--dark4);
@@ -672,7 +501,6 @@ html, body {
 
 .toggle.on::after { transform: translateX(18px); background: var(--lime); }
 
-/* ── PAYMENT screen ── */
 .pay-plans { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
 
 .plan-card-m {
@@ -762,7 +590,6 @@ html, body {
   color: var(--muted); cursor: pointer;
 }
 
-/* ── FAVORITES ── */
 .fav-sort-btn {
   padding: 5px 12px;
   background: var(--dark3); border: 1px solid var(--border);
@@ -864,7 +691,6 @@ html, body {
 
 .fav-empty.hidden { display: none; }
 
-/* ── Ghost watermark ── */
 .ghost-watermark {
   position: absolute;
   font-size: 11px;
@@ -882,7 +708,6 @@ html, body {
   mix-blend-mode: overlay;
 }
 
-/* ── VIDEO PLAYER ── */
 .video-player-wrap {
   position: relative;
   width: 100%;
@@ -921,7 +746,6 @@ html, body {
 .video-play-btn.playing { opacity: 0; }
 .video-player-wrap:hover .video-play-btn.playing { opacity: 1; }
 
-/* Top bar */
 .video-top-bar {
   position: absolute; top: 0; left: 0; right: 0;
   display: flex; align-items: center; justify-content: space-between;
@@ -950,7 +774,6 @@ html, body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-/* Bottom progress */
 .video-bottom-bar {
   position: absolute; bottom: 0; left: 0; right: 0;
   padding: 10px 12px 12px;
@@ -1000,7 +823,6 @@ html, body {
   font-size: 14px; cursor: pointer; padding: 4px; line-height: 1;
 }
 
-/* Video info */
 .video-info-wrap { background: var(--dark); }
 
 .vi-header { padding: 14px 16px 10px; }
@@ -1038,7 +860,6 @@ html, body {
   cursor: pointer;
 }
 
-/* Actions */
 .vi-actions {
   display: flex; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
   margin-bottom: 12px;
@@ -1060,7 +881,6 @@ html, body {
 .vi-action.liked { color: var(--pink); }
 .vi-action.saved { color: var(--lime); }
 
-/* Tags */
 .vi-tags {
   display: flex; gap: 6px; flex-wrap: wrap;
   padding: 0 16px 14px;
@@ -1073,7 +893,6 @@ html, body {
   cursor: pointer;
 }
 
-/* Reactions */
 .vi-reactions-wrap { padding: 0 16px 14px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
 .vi-section-label { font-size: 10px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
 .vi-reactions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -1090,7 +909,6 @@ html, body {
 .vi-reaction.reacted { background: rgba(255,126,200,0.1); border-color: rgba(255,126,200,0.3); }
 .vi-reaction-count { font-size: 11px; font-weight: 500; color: var(--text); font-family: 'DM Sans', sans-serif; }
 
-/* Up next */
 .up-next-item {
   display: flex; align-items: center; gap: 10px;
   padding: 8px 16px; cursor: pointer;
@@ -1120,14 +938,6 @@ html, body {
 .up-next-title { font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
 .up-next-artist { font-size: 10px; color: var(--pink); }
 
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.animate-in { animation: slideUp 0.4s ease both; }
-
-/* Toast */
 .toast {
   position: absolute;
   bottom: 90px; left: 16px; right: 16px;
@@ -1162,7 +972,7 @@ html, body {
           <div class="user-bar-handle">@sofiareinholt</div>
         </div>
       </div>
-      <div class="user-bar-right" onclick="openScreen('payment')" style="cursor:pointer">
+      <div class="user-bar-right" onclick="openScreen('payment')">
         <div class="user-bar-days">27</div>
         <div class="user-bar-days-label">days left</div>
       </div>
@@ -1309,4 +1119,156 @@ html, body {
     <div class="screen hidden" id="screen-payment">
       <div style="padding:20px 16px 8px;text-align:center">
         <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1.5px;margin-bottom:6px">Choose <span style="color:var(--pink)">Plan</span></div>
-        <div style="font-size:13px;color:var(--muted);font-weight:300">Cancel anytime · No auto-renewal
+        <div style="font-size:13px;color:var(--muted);font-weight:300">Cancel anytime · No auto-renewal</div>
+      </div>
+
+      <div style="background:rgba(200,255,68,0.07);border:1px solid rgba(200,255,68,0.18);border-radius:12px;margin:0 16px 16px;padding:10px 14px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:18px">🎁</span>
+        <span style="font-size:12px;color:var(--lime)">New? Try <strong>3 days free</strong> — no payment needed</span>
+      </div>
+
+      <div class="pay-plans" id="payPlans"></div>
+
+      <div style="padding:0 16px 8px">
+        <div class="section-title">Payment Method</div>
+      </div>
+      <div class="pay-methods" id="payMethods"></div>
+
+      <div class="promo-wrap">
+        <div class="section-title" style="margin-bottom:8px">Promo Code</div>
+        <div class="promo-input-wrap">
+          <input type="text" class="promo-input" placeholder="Enter promo code" id="promoInput" oninput="this.value=this.value.toUpperCase()">
+          <button class="promo-apply" onclick="applyPromo()">Apply</button>
+        </div>
+      </div>
+
+      <div style="padding:0 16px 16px">
+        <button class="btn-primary" id="payBtn" onclick="processPay()">
+          💳 Subscribe — €15 / 30 days
+        </button>
+      </div>
+    </div>
+
+    <!-- ── PROFILE ── -->
+    <div class="screen hidden" id="screen-profile">
+      <div class="profile-header">
+        <div class="profile-av-wrap">
+          <div class="profile-av">SR</div>
+          <div class="profile-online"></div>
+        </div>
+        <div class="profile-name">Sofia Reinholt</div>
+        <div class="profile-handle">@sofiareinholt</div>
+        <div class="profile-mini-stats">
+          <div class="pms-item">
+            <div class="pms-val">27<span>d</span></div>
+            <div class="pms-label">Days Left</div>
+          </div>
+          <div class="pms-item">
+            <div class="pms-val">143</div>
+            <div class="pms-label">Watched</div>
+          </div>
+          <div class="pms-item">
+            <div class="pms-val">24</div>
+            <div class="pms-label">Saved</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:16px 0">
+        <div class="section-title" style="padding:0 16px;margin-bottom:6px">Subscription</div>
+        <div class="card" style="margin:0 16px">
+          <div class="row-item" onclick="openScreen('payment')">
+            <div class="row-icon" style="background:rgba(255,126,200,0.1)">🔄</div>
+            <div class="row-label">Renew Subscription</div>
+            <div class="row-arrow">›</div>
+          </div>
+          <div class="divider"></div>
+          <div class="row-item" onclick="openScreen('favorites')">
+            <div class="row-icon" style="background:rgba(255,126,200,0.1)">⭐</div>
+            <div class="row-label">My Favorites</div>
+            <div style="background:rgba(255,126,200,0.1);color:var(--pink);font-size:10px;padding:2px 8px;border-radius:4px;font-weight:500">24 saved</div>
+          </div>
+        </div>
+
+        <div class="section-title" style="padding:16px 16px 6px">Notifications</div>
+        <div class="card" style="margin:0 16px">
+          <div class="row-item">
+            <div class="row-icon" style="background:rgba(68,200,255,0.1)">🔔</div>
+            <div><div class="row-label">New content</div><div class="row-sublabel">When artists upload</div></div>
+            <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div class="divider"></div>
+          <div class="row-item">
+            <div class="row-icon" style="background:rgba(255,224,68,0.1)">⏰</div>
+            <div><div class="row-label">Expiry reminder</div><div class="row-sublabel">3 days before end</div></div>
+            <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div class="divider"></div>
+          <div class="row-item">
+            <div class="row-icon" style="background:rgba(200,107,255,0.1)">🌙</div>
+            <div><div class="row-label">Night mode (23:00–08:00)</div><div class="row-sublabel">No alerts at night</div></div>
+            <div class="toggle" onclick="this.classList.toggle('on')"></div>
+          </div>
+        </div>
+
+        <div class="section-title" style="padding:16px 16px 6px">Settings</div>
+        <div class="card" style="margin:0 16px">
+          <div class="row-item">
+            <div class="row-icon" style="background:rgba(255,255,255,0.05)">🌐</div>
+            <div class="row-label">Language</div>
+            <div class="row-value">English</div>
+            <div class="row-arrow">›</div>
+          </div>
+          <div class="divider"></div>
+          <div class="row-item" onclick="openScreen('support')">
+            <div class="row-icon" style="background:rgba(255,126,200,0.1)">💬</div>
+            <div class="row-label">Support</div>
+            <div class="row-arrow">›</div>
+          </div>
+          <div class="divider"></div>
+          <div class="row-item">
+            <div class="row-icon" style="background:rgba(255,255,255,0.05)">📋</div>
+            <div class="row-label">Terms & Privacy</div>
+            <div class="row-arrow">›</div>
+          </div>
+        </div>
+
+        <div style="padding:20px 16px 0">
+          <button class="btn-secondary" style="color:rgba(255,80,80,0.7);border-color:rgba(255,80,80,0.15)">↩ Sign Out</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom nav -->
+    <div class="bottom-nav">
+      <button class="nav-btn active" id="nav-home" onclick="openScreen('home')">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Home</span>
+      </button>
+      <button class="nav-btn" id="nav-favorites" onclick="openScreen('favorites')">
+        <span class="nav-icon">⭐</span>
+        <span class="nav-label">Favorites</span>
+      </button>
+      <button class="nav-btn-center" id="nav-payment" onclick="openScreen('payment')">
+        <div class="nav-center-circle">💳</div>
+        <span class="nav-center-label">Subscribe</span>
+      </button>
+      <button class="nav-btn" id="nav-support" onclick="openScreen('support')">
+        <span class="nav-icon">💬</span>
+        <span class="nav-label">Support</span>
+      </button>
+      <button class="nav-btn" id="nav-profile" onclick="openScreen('profile')">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">Profile</span>
+      </button>
+    </div>
+
+    <!-- ── VIDEO PLAYER SCREEN ── -->
+    <div class="screen hidden" id="screen-video" style="bottom:0;padding-bottom:0;z-index:20">
+
+      <!-- Player area -->
+      <div class="video-player-wrap" id="videoPlayerWrap">
+        <div class="video-bg" id="videoBg">MA</div>
+        <div class="ghost-watermark" id="ghostWatermark">@sofiareinholt</div>
+        <div class="video-play-overlay" id="playOverlay" onclick="togglePlay()">
+          <div class="video-play
