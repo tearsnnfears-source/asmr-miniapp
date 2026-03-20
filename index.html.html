@@ -1289,316 +1289,21 @@ html, body {
       </button>
     </div>
 
-    <!-- ── VIDEO
-
-   App -->
-  <div class="app" style="position:relative">
-
-    <!-- ── HOME ── -->
-    <div class="screen" id="screen-home">
-
-      <div class="home-hero">
-        <div class="home-hero-glow"></div>
-        <div class="home-greeting">Good evening 🌙</div>
-        <div class="home-name">SOFIA</div>
-        <div style="margin-top:10px;font-size:13px;font-weight:300;color:var(--muted)">Subscription active · expires Apr 16</div>
-      </div>
-
-      <!-- Quick actions -->
-      <div class="quick-actions">
-        <button class="qa-btn" onclick="openScreen('payment')">
-          <span class="qa-icon">💳</span>
-          <span class="qa-label">Subscribe</span>
-        </button>
-        <button class="qa-btn" onclick="openScreen('favorites')">
-          <span class="qa-icon">⭐</span>
-          <span class="qa-label">Favorites</span>
-        </button>
-        <button class="qa-btn" onclick="openScreen('support')">
-          <span class="qa-icon">💬</span>
-          <span class="qa-label">Support</span>
-        </button>
-        <button class="qa-btn" onclick="openSubscreen('promo')">
-          <span class="qa-icon">🎟</span>
-          <span class="qa-label">Promo</span>
-        </button>
-      </div>
-
-      <!-- Artists -->
-      <div class="section-pad" style="padding-bottom:8px">
-        <div class="section-title">
-          <span>🎙 Artists</span>
-          <button class="section-title-see">See all →</button>
-        </div>
-      </div>
-      <div class="artists-scroll" id="artistsScroll"></div>
-
-      <!-- New content -->
-      <div class="section-pad" style="padding-top:16px;padding-bottom:8px">
-        <div class="section-title">
-          <span>✨ New This Week</span>
-          <button class="section-title-see">See all →</button>
-        </div>
-      </div>
-      <div class="content-scroll" id="contentScroll"></div>
-
-      <!-- Favorites shortcut -->
-      <div style="padding:16px">
-        <div style="background:rgba(255,126,200,0.07);border:1px solid rgba(255,126,200,0.18);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px" onclick="openScreen('favorites')" >
-          <span style="font-size:24px">⭐</span>
-          <div style="flex:1">
-            <div style="font-size:13px;font-weight:500;margin-bottom:2px">My Favorites</div>
-            <div style="font-size:11px;color:var(--muted);font-weight:300">24 saved videos · quick access</div>
-          </div>
-          <span style="color:var(--pink);font-size:18px">›</span>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- ── REFERRAL ── -->
-    <!-- ── FAVORITES ── -->
-    <div class="screen hidden" id="screen-favorites">
-
-      <!-- Header -->
-      <div style="padding:18px 16px 12px;display:flex;align-items:center;justify-content:space-between">
-        <div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1.5px">My <span style="color:var(--pink)">Favorites</span></div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px" id="favCount">24 saved videos</div>
-        </div>
-        <div style="display:flex;gap:8px">
-          <button class="fav-sort-btn active" id="sortAll" onclick="filterFavs('all',this)">All</button>
-          <button class="fav-sort-btn" id="sortArtist" onclick="filterFavs('artist',this)">Artist</button>
-          <button class="fav-sort-btn" id="sortRecent" onclick="filterFavs('recent',this)">Recent</button>
-        </div>
-      </div>
-
-      <!-- Artist filter chips -->
-      <div class="fav-artists-scroll" id="favArtistsScroll"></div>
-
-      <!-- Grid -->
-      <div class="fav-grid" id="favGrid"></div>
-
-      <!-- Empty state -->
-      <div class="fav-empty hidden" id="favEmpty">
-        <div style="font-size:48px;margin-bottom:12px">🎧</div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;margin-bottom:8px">No Favorites Yet</div>
-        <div style="font-size:13px;color:var(--muted);font-weight:300;line-height:1.6">Tap ☆ on any video to save it here for quick access</div>
-      </div>
-
-    </div>
-
-    <!-- ── SUPPORT ── -->
-    <div class="screen hidden" id="screen-support">
-      <div style="padding:20px 16px 8px;text-align:center">
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1.5px;margin-bottom:6px">How can we <span style="color:var(--pink)">Help?</span></div>
-        <div style="font-size:13px;color:var(--muted);font-weight:300">Usually respond within a few hours</div>
-      </div>
-
-      <div class="support-options">
-        <div class="support-card" onclick="openTG()">
-          <div class="support-icon">💬</div>
-          <div>
-            <div class="support-title">Chat with Support</div>
-            <div class="support-desc">Open Telegram chat with our team</div>
-          </div>
-          <div style="color:var(--muted);font-size:12px">→</div>
-        </div>
-        <div class="support-card">
-          <div class="support-icon">🐛</div>
-          <div>
-            <div class="support-title">Report a Bug</div>
-            <div class="support-desc">Something not working? Tell us</div>
-          </div>
-          <div style="color:var(--muted);font-size:12px">→</div>
-        </div>
-        <div class="support-card">
-          <div class="support-icon">💡</div>
-          <div>
-            <div class="support-title">Suggest a Feature</div>
-            <div class="support-desc">We read every suggestion</div>
-          </div>
-          <div style="color:var(--muted);font-size:12px">→</div>
-        </div>
-      </div>
-
-      <div style="padding:0 16px 12px">
-        <div class="section-title">FAQ</div>
-      </div>
-      <div class="faq-accordion" id="faqAccordion"></div>
-    </div>
-
-    <!-- ── PAYMENT ── -->
-    <div class="screen hidden" id="screen-payment">
-      <div style="padding:20px 16px 8px;text-align:center">
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1.5px;margin-bottom:6px">Choose <span style="color:var(--pink)">Plan</span></div>
-        <div style="font-size:13px;color:var(--muted);font-weight:300">Cancel anytime · No auto-renewal</div>
-      </div>
-
-      <div style="background:rgba(200,255,68,0.07);border:1px solid rgba(200,255,68,0.18);border-radius:12px;margin:0 16px 16px;padding:10px 14px;display:flex;align-items:center;gap:10px">
-        <span style="font-size:18px">🎁</span>
-        <span style="font-size:12px;color:var(--lime)">New? Try <strong>3 days free</strong> — no payment needed</span>
-      </div>
-
-      <div class="pay-plans" id="payPlans"></div>
-
-      <div style="padding:0 16px 8px">
-        <div class="section-title">Payment Method</div>
-      </div>
-      <div class="pay-methods" id="payMethods"></div>
-
-      <div class="promo-wrap">
-        <div class="section-title" style="margin-bottom:8px">Promo Code</div>
-        <div class="promo-input-wrap">
-          <input type="text" class="promo-input" placeholder="Enter promo code" id="promoInput" oninput="this.value=this.value.toUpperCase()">
-          <button class="promo-apply" onclick="applyPromo()">Apply</button>
-        </div>
-      </div>
-
-      <div style="padding:0 16px 16px">
-        <button class="btn-primary" id="payBtn" onclick="processPay()">
-          💳 Subscribe — €15 / 30 days
-        </button>
-      </div>
-    </div>
-
-    <!-- ── PROFILE ── -->
-    <div class="screen hidden" id="screen-profile">
-      <div class="profile-header">
-        <div class="profile-av-wrap">
-          <div class="profile-av">SR</div>
-          <div class="profile-online"></div>
-        </div>
-        <div class="profile-name">Sofia Reinholt</div>
-        <div class="profile-handle">@sofiareinholt</div>
-        <div class="profile-mini-stats">
-          <div class="pms-item">
-            <div class="pms-val">27<span>d</span></div>
-            <div class="pms-label">Days Left</div>
-          </div>
-          <div class="pms-item">
-            <div class="pms-val">143</div>
-            <div class="pms-label">Watched</div>
-          </div>
-          <div class="pms-item">
-            <div class="pms-val">24</div>
-            <div class="pms-label">Saved</div>
-          </div>
-        </div>
-      </div>
-
-      <div style="padding:16px 0">
-        <div class="section-title" style="padding:0 16px;margin-bottom:6px">Subscription</div>
-        <div class="card" style="margin:0 16px">
-          <div class="row-item" onclick="openScreen('payment')">
-            <div class="row-icon" style="background:rgba(255,126,200,0.1)">🔄</div>
-            <div class="row-label">Renew Subscription</div>
-            <div class="row-arrow">›</div>
-          </div>
-          <div class="divider"></div>
-          <div class="row-item" onclick="openScreen('favorites')">
-            <div class="row-icon" style="background:rgba(255,126,200,0.1)">⭐</div>
-            <div class="row-label">My Favorites</div>
-            <div style="background:rgba(255,126,200,0.1);color:var(--pink);font-size:10px;padding:2px 8px;border-radius:4px;font-weight:500">24 saved</div>
-          </div>
-        </div>
-
-        <div class="section-title" style="padding:16px 16px 6px">Notifications</div>
-        <div class="card" style="margin:0 16px">
-          <div class="row-item">
-            <div class="row-icon" style="background:rgba(68,200,255,0.1)">🔔</div>
-            <div><div class="row-label">New content</div><div class="row-sublabel">When artists upload</div></div>
-            <div class="toggle on" onclick="this.classList.toggle('on')"></div>
-          </div>
-          <div class="divider"></div>
-          <div class="row-item">
-            <div class="row-icon" style="background:rgba(255,224,68,0.1)">⏰</div>
-            <div><div class="row-label">Expiry reminder</div><div class="row-sublabel">3 days before end</div></div>
-            <div class="toggle on" onclick="this.classList.toggle('on')"></div>
-          </div>
-          <div class="divider"></div>
-          <div class="row-item">
-            <div class="row-icon" style="background:rgba(200,107,255,0.1)">🌙</div>
-            <div><div class="row-label">Night mode (23:00–08:00)</div><div class="row-sublabel">No alerts at night</div></div>
-            <div class="toggle" onclick="this.classList.toggle('on')"></div>
-          </div>
-        </div>
-
-        <div class="section-title" style="padding:16px 16px 6px">Settings</div>
-        <div class="card" style="margin:0 16px">
-          <div class="row-item">
-            <div class="row-icon" style="background:rgba(255,255,255,0.05)">🌐</div>
-            <div class="row-label">Language</div>
-            <div class="row-value">English</div>
-            <div class="row-arrow">›</div>
-          </div>
-          <div class="divider"></div>
-          <div class="row-item" onclick="openScreen('support')">
-            <div class="row-icon" style="background:rgba(255,126,200,0.1)">💬</div>
-            <div class="row-label">Support</div>
-            <div class="row-arrow">›</div>
-          </div>
-          <div class="divider"></div>
-          <div class="row-item">
-            <div class="row-icon" style="background:rgba(255,255,255,0.05)">📋</div>
-            <div class="row-label">Terms & Privacy</div>
-            <div class="row-arrow">›</div>
-          </div>
-        </div>
-
-        <div style="padding:20px 16px 0">
-          <button class="btn-secondary" style="color:rgba(255,80,80,0.7);border-color:rgba(255,80,80,0.15)">↩ Sign Out</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Bottom nav -->
-    <div class="bottom-nav">
-      <button class="nav-btn active" id="nav-home" onclick="openScreen('home')">
-        <span class="nav-icon">🏠</span>
-        <span class="nav-label">Home</span>
-      </button>
-      <button class="nav-btn" id="nav-favorites" onclick="openScreen('favorites')">
-        <span class="nav-icon">⭐</span>
-        <span class="nav-label">Favorites</span>
-      </button>
-      <button class="nav-btn-center" id="nav-payment" onclick="openScreen('payment')">
-        <div class="nav-center-circle">💳</div>
-        <span class="nav-center-label">Subscribe</span>
-      </button>
-      <button class="nav-btn" id="nav-support" onclick="openScreen('support')">
-        <span class="nav-icon">💬</span>
-        <span class="nav-label">Support</span>
-      </button>
-      <button class="nav-btn" id="nav-profile" onclick="openScreen('profile')">
-        <span class="nav-icon">👤</span>
-        <span class="nav-label">Profile</span>
-      </button>
-    </div>
-
-    <!-- ── VIDEO PLAYER SCREEN ── -->
+    <    <!-- ── VIDEO PLAYER SCREEN ── -->
     <div class="screen hidden" id="screen-video" style="bottom:0;padding-bottom:0;z-index:20">
 
       <!-- Player area -->
       <div class="video-player-wrap" id="videoPlayerWrap">
         <div class="video-bg" id="videoBg">MA</div>
-
-        <!-- Ghost watermark -->
         <div class="ghost-watermark" id="ghostWatermark">@sofiareinholt</div>
-
-        <!-- Play overlay -->
         <div class="video-play-overlay" id="playOverlay" onclick="togglePlay()">
           <div class="video-play-btn" id="playBtn">▶</div>
         </div>
-
-        <!-- Top controls (back + save) -->
         <div class="video-top-bar">
           <button class="video-ctrl-btn" onclick="closeVideo()">‹</button>
           <div class="video-top-title" id="videoTopTitle">Ear Eating ASMR</div>
           <button class="video-ctrl-btn" id="videoSaveBtn" onclick="toggleSave()">♡</button>
         </div>
-
-        <!-- Progress -->
         <div class="video-bottom-bar">
           <div class="video-progress-wrap" onclick="seekVideo(event)">
             <div class="video-progress-bg"></div>
@@ -1676,7 +1381,7 @@ html, body {
     <div class="toast" id="toast"></div>
 
   </div>
-</div>
+</body>
 
 <script>
 // ── Data ──
@@ -1909,7 +1614,6 @@ function startWatermark(username) {
   const wm = document.getElementById('ghostWatermark');
   wm.textContent = username;
 
-  // Positions: [top%, left%] — avoiding edges and controls
   const positions = [
     [15, 10], [15, 55], [15, 35],
     [35, 8],  [35, 50], [35, 70],
@@ -1917,7 +1621,6 @@ function startWatermark(username) {
     [72, 10], [72, 40], [72, 62],
   ];
 
-  // Rotation variants
   const rotations = [0, 0, 0, -8, 8, -5, 5, 0, 0, -3, 3, 0];
 
   let lastIdx = -1;
@@ -1926,14 +1629,12 @@ function startWatermark(username) {
     const [top, left] = positions[idx];
     const rot = rotations[idx];
 
-    // Fade out
     wm.style.opacity = '0';
 
     setTimeout(() => {
       wm.style.top = top + '%';
       wm.style.left = left + '%';
       wm.style.transform = `rotate(${rot}deg)`;
-      // Fade in to very subtle opacity
       wm.style.opacity = '1';
     }, 800);
   }
@@ -1946,10 +1647,8 @@ function startWatermark(username) {
     showAt(idx);
   }
 
-  // Show immediately at random spot
   nextPosition();
 
-  // Move every 4–7 seconds randomly
   function scheduleNext() {
     const delay = 4000 + Math.random() * 3000;
     wmInterval = setTimeout(() => {
@@ -1994,71 +1693,40 @@ const upNextVideos = [
 function openVideo(title, artist, initials, grad) {
   const playerWrap = document.getElementById('videoPlayerWrap');
   
-  // Очищаем контейнер
   playerWrap.innerHTML = '';
+  playerWrap.style.position = 'relative';
+  playerWrap.style.width = '100%';
+  playerWrap.style.aspectRatio = '16/9';
+  playerWrap.style.background = '#000';
+  playerWrap.style.zIndex = '100';
   
-  // Создаём iframe
   const iframe = document.createElement('iframe');
   iframe.src = 'https://player.mediadelivery.net/embed/621300/70afb6f8-5037-4074-a31c-58aa4e255ab4?autoplay=true';
-  iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:none;';
+  iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:none;z-index:150;';
   iframe.allow = 'autoplay; fullscreen; encrypted-media';
   iframe.allowFullscreen = true;
+  
   playerWrap.appendChild(iframe);
 
-  // Восстанавливаем watermark
   const wm = document.createElement('div');
   wm.className = 'ghost-watermark';
   wm.id = 'ghostWatermark';
   wm.textContent = '@sofiareinholt';
+  wm.style.zIndex = '140';
   playerWrap.appendChild(wm);
-
-  // Восстанавливаем top bar
-  const topBar = document.createElement('div');
-  topBar.className = 'video-top-bar';
-  topBar.innerHTML = `
-    <button class="video-ctrl-btn" onclick="closeVideo()">‹</button>
-    <div class="video-top-title" id="videoTopTitle">${title}</div>
-    <button class="video-ctrl-btn" id="videoSaveBtn" onclick="toggleSave()">♡</button>
-  `;
-  playerWrap.appendChild(topBar);
-
-  // Восстанавливаем bottom bar с прогрессом
-  const bottomBar = document.createElement('div');
-  bottomBar.className = 'video-bottom-bar';
-  bottomBar.innerHTML = `
-    <div class="video-progress-wrap" onclick="seekVideo(event)">
-      <div class="video-progress-bg"></div>
-      <div class="video-progress-fill" id="progressFill" style="width:0%"></div>
-      <div class="video-progress-thumb" id="progressThumb" style="left:0%"></div>
-    </div>
-    <div class="video-controls-row">
-      <div class="video-time" id="videoTime">00:00 / 41:07</div>
-      <div class="video-ctrl-row-right">
-        <button class="video-ctrl-sm">⏮</button>
-        <button class="video-ctrl-sm" onclick="togglePlay()" id="playPauseBtn">⏸</button>
-        <button class="video-ctrl-sm">⏭</button>
-        <button class="video-ctrl-sm" onclick="toggleMute()" id="muteBtn">🔊</button>
-        <button class="video-ctrl-sm" onclick="toggleFullscreen()">⛶</button>
-      </div>
-    </div>
-  `;
-  playerWrap.appendChild(bottomBar);
 
   startWatermark('@sofiareinholt');
 
-  // Данные видео
   document.getElementById('videoTopTitle').textContent = title;
   document.getElementById('viTitle').textContent = title + ' ASMR';
   document.getElementById('viArtist').textContent = artist;
   document.getElementById('viAv').textContent = initials;
   document.getElementById('viAv').style.background = `linear-gradient(135deg, ${grad[0]}50, ${grad[1]}30)`;
 
-  // Теги
   const tagEl = document.getElementById('viTags');
   const tags = ['👂 Ear Licking','🎤 Whispering','💆 Personal Attention','😴 Sleep','Binaural'];
   tagEl.innerHTML = tags.map(t => `<span class="vi-tag">${t}</span>`).join('');
 
-  // Реакции
   const reactEl = document.getElementById('viReactions');
   reactEl.innerHTML = '';
   reactionData.forEach(r => {
@@ -2072,7 +1740,6 @@ function openVideo(title, artist, initials, grad) {
     reactEl.appendChild(btn);
   });
 
-  // Up Next
   const upEl = document.getElementById('upNextList');
   upEl.innerHTML = upNextVideos.map((v, i) => `
     <div class="up-next-item" onclick="openVideo('${v.title}','${v.artist}','${v.initials}',['${v.grad[0]}','${v.grad[1]}'])">
@@ -2087,7 +1754,6 @@ function openVideo(title, artist, initials, grad) {
       </div>
     </div>`).join('');
 
-  // Сброс состояний
   isPlaying = true; 
   isSaved = false; 
   isLiked = false;
@@ -2097,16 +1763,9 @@ function openVideo(title, artist, initials, grad) {
   document.getElementById('viLikeBtn').classList.remove('liked');
   document.getElementById('viSaveBtn2').classList.remove('saved');
 
-  // ОТКРЫВАЕМ ЭКРАН ВИДЕО
   document.getElementById('screen-video').classList.remove('hidden');
   document.getElementById('backBtn').classList.add('visible');
   screenHistory.push('video');
-
-  // Обновляем активные кнопки навигации
-  screens.forEach(s => {
-    const btn = document.getElementById(`nav-${s}`);
-    if(btn) btn.classList.toggle('active', s === 'video');
-  });
 
   clearInterval(progressInterval);
 }
@@ -2168,7 +1827,6 @@ function seekVideo(e) {
   document.getElementById('progressThumb').style.left = currentProgress + '%';
 }
 
-// Make content cards open video
 document.querySelectorAll('.content-mini-card').forEach((card, i) => {
   const g = grads[i % grads.length];
   const artist = artists[i % artists.length];
@@ -2177,7 +1835,6 @@ document.querySelectorAll('.content-mini-card').forEach((card, i) => {
   card.addEventListener('click', () => openVideo(title, artist, initials, g));
 });
 
-// Make artist cards open video too
 document.querySelectorAll('.artist-mini-card').forEach((card, i) => {
   const g = grads[i % grads.length];
   const artist = artists[i];
@@ -2203,7 +1860,6 @@ function openScreen(name) {
   document.getElementById(`screen-${name}`).classList.remove('hidden');
   screenHistory.push(name);
 
-  // Update nav
   screens.forEach(s => {
     const btn = document.getElementById(`nav-${s}`);
     if(btn) btn.classList.toggle('active', s === name);
@@ -2231,7 +1887,6 @@ function openSubscreen(name) {
   showToast('🎟 Enter your promo code!');
 }
 
-// ── Actions ──
 function copyRef() {
   showToast('✅ Link copied to clipboard!');
 }
@@ -2263,5 +1918,4 @@ function showToast(msg, type) {
   setTimeout(() => toast.classList.remove('show'), 2500);
 }
 </script>
-</body>
 </html>
