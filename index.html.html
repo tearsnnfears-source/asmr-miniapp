@@ -1898,18 +1898,33 @@ const upNextVideos = [
 function openVideo(title, artist, initials, grad) {
   const playerWrap = document.getElementById('videoPlayerWrap');
   
-  playerWrap.innerHTML = `
-    <iframe
-      src="https://player.mediadelivery.net/embed/621300/70afb6f8-5037-4074-a31c-58aa4e255ab4?autoplay=true"
-      style="position:absolute;inset:0;width:100%;height:100%;border:none"
-      allow="autoplay; fullscreen; encrypted-media"
-      allowfullscreen
-    ></iframe>
-    <div class="ghost-watermark" id="ghostWatermark">@sofiareinholt</div>
-  `;
+  // Очищаем контейнер полностью и делаем его просто контейнером для iframe
+  playerWrap.innerHTML = '';
+  playerWrap.style.position = 'relative';
+  playerWrap.style.width = '100%';
+  playerWrap.style.aspectRatio = '16/9';
+  playerWrap.style.background = '#000';
+  playerWrap.style.zIndex = '100';
+  
+  const iframe = document.createElement('iframe');
+  iframe.src = 'https://player.mediadelivery.net/embed/621300/70afb6f8-5037-4074-a31c-58aa4e255ab4?autoplay=true';
+  iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:none;z-index:150;';
+  iframe.allow = 'autoplay; fullscreen; encrypted-media';
+  iframe.allowFullscreen = true;
+  
+  playerWrap.appendChild(iframe);
+
+  // Добавляем watermark
+  const wm = document.createElement('div');
+  wm.className = 'ghost-watermark';
+  wm.id = 'ghostWatermark';
+  wm.textContent = '@sofiareinholt';
+  wm.style.zIndex = '140';
+  playerWrap.appendChild(wm);
 
   startWatermark('@sofiareinholt');
 
+  // Данные видео
   document.getElementById('videoTopTitle').textContent = title;
   document.getElementById('viTitle').textContent = title + ' ASMR';
   document.getElementById('viArtist').textContent = artist;
@@ -1951,7 +1966,9 @@ function openVideo(title, artist, initials, grad) {
     </div>`).join('');
 
   // Сброс состояний
-  isPlaying = true; isSaved = false; isLiked = false;
+  isPlaying = true; 
+  isSaved = false; 
+  isLiked = false;
   document.getElementById('viLikeIcon').textContent = '♡';
   document.getElementById('viSaveIcon').textContent = '☆';
   document.getElementById('videoSaveBtn').textContent = '♡';
