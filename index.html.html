@@ -1898,18 +1898,50 @@ const upNextVideos = [
 function openVideo(title, artist, initials, grad) {
   const playerWrap = document.getElementById('videoPlayerWrap');
   
+  // Очищаем контейнер и добавляем HTML5 видеоплеер вместо iframe
   playerWrap.innerHTML = `
-    <iframe
-      src="https://player.mediadelivery.net/embed/621300/70afb6f8-5037-4074-a31c-58aa4e255ab4?autoplay=true"
-      style="position:absolute;inset:0;width:100%;height:100%;border:none"
-      allow="autoplay; fullscreen; encrypted-media"
-      allowfullscreen
-    ></iframe>
+    <video 
+      id="videoElement" 
+      style="position:absolute;inset:0;width:100%;height:100%;background:#000;"
+      preload="metadata"
+    >
+      <source src="https://test-streams.mux.dev/x36xhzz/x3zzjsz.m3u8" type="application/x-mpegURL">
+    </video>
     <div class="ghost-watermark" id="ghostWatermark">@sofiareinholt</div>
+  `;
+
+  // Восстанавливаем элементы управления видео
+  playerWrap.innerHTML += `
+    <div class="video-play-overlay" id="playOverlay" onclick="togglePlay()">
+      <div class="video-play-btn" id="playBtn">▶</div>
+    </div>
+    <div class="video-top-bar">
+      <button class="video-ctrl-btn" onclick="closeVideo()">‹</button>
+      <div class="video-top-title" id="videoTopTitle">${title}</div>
+      <button class="video-ctrl-btn" id="videoSaveBtn" onclick="toggleSave()">♡</button>
+    </div>
+    <div class="video-bottom-bar">
+      <div class="video-progress-wrap" onclick="seekVideo(event)">
+        <div class="video-progress-bg"></div>
+        <div class="video-progress-fill" id="progressFill" style="width:0%"></div>
+        <div class="video-progress-thumb" id="progressThumb" style="left:0%"></div>
+      </div>
+      <div class="video-controls-row">
+        <div class="video-time" id="videoTime">00:00 / 41:07</div>
+        <div class="video-ctrl-row-right">
+          <button class="video-ctrl-sm">⏮</button>
+          <button class="video-ctrl-sm" onclick="togglePlay()" id="playPauseBtn">⏸</button>
+          <button class="video-ctrl-sm">⏭</button>
+          <button class="video-ctrl-sm" onclick="toggleMute()" id="muteBtn">🔊</button>
+          <button class="video-ctrl-sm" onclick="toggleFullscreen()">⛶</button>
+        </div>
+      </div>
+    </div>
   `;
 
   startWatermark('@sofiareinholt');
 
+  // Данные видео
   document.getElementById('videoTopTitle').textContent = title;
   document.getElementById('viTitle').textContent = title + ' ASMR';
   document.getElementById('viArtist').textContent = artist;
@@ -1963,7 +1995,75 @@ function openVideo(title, artist, initials, grad) {
   document.getElementById('backBtn').classList.add('visible');
   screenHistory.push('video');
 
+  // Инициализируем HTML5 видео
+  const video = document.getElementById('videoElement');
+  if(video) {
+    video.addEventListener('timeupdate', updateProgress);
+    video.addEventListener('play', () => {
+      document.getElementById('playBtn').classList.add('playing');
+    });
+    video.addEventListener('pause', () => {
+      document.getElementById('playBtn').classList.remove('playing');
+    });
+  }
+
   clearInterval(progressInterval);
+}
+
+// Обновляем прогресс видео
+function updateProgress() {
+  const video = document.getElementById('videoElement');
+  if(!video) return;
+  const percent = (video.currentTime / video.duration) * 100;
+  document.getElementById('progressFill').style.width = percent + '%';
+  document.getElementById('progressThumb').style.left = percent + '%';
+  
+  const mins = Math.floor(video.currentTime / 60);
+  const secs = Math.floor(video.currentTime % 60);
+  const totalMins = Math.floor(video.duration / 60);
+  const totalSecs = Math.floor(video.duration % 60);
+  document.getElementById('videoTime').textContent = 
+    `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')} / ${String(totalMins).padStart(2,'0')}:${String(totalSecs).padStart(2,'0')}`;
+}
+
+// Переопределяем togglePlay для работы с видео
+function togglePlay() {
+  const video = document.getElementById('videoElement');
+  if(!video) return;
+  
+  if(video.paused) {
+    video.play();
+    isPlaying = true;
+  } else {
+    video.pause();
+    isPlaying = false;
+  }
+  
+  const btn = document.getElementById('playBtn');
+  const ppBtn = document.getElementById('playPauseBtn');
+  btn.textContent = isPlaying ? '⏸' : '▶';
+  btn.classList.toggle('playing', isPlaying);
+  ppBtn.textContent = isPlaying ? '⏸' : '▶';
+}
+
+// Переопределяем seekVideo для HTML5 видео
+function seekVideo(e) {
+  const bar = e.currentTarget;
+  const rect = bar.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const video = document.getElementById('videoElement');
+  if(!video) return;
+  
+  video.currentTime = (x / rect.width) * video.duration;
+}
+
+// Переопределяем toggleMute для HTML5 видео
+function toggleMute() {
+  const video = document.getElementById('videoElement');
+  if(!video) return;
+  isMuted = !isMuted;
+  video.muted = isMuted;
+  document.getElementById('muteBtn').textContent = isMuted ? '🔇' : '🔊';
 }
 
 function closeVideo() {
