@@ -1911,6 +1911,22 @@ function openVideo(title, artist, initials, grad) {
   `;
 
   // Восстанавливаем элементы управления видео
+  function openVideo(title, artist, initials, grad) {
+  const playerWrap = document.getElementById('videoPlayerWrap');
+  
+  // Очищаем контейнер и добавляем HTML5 видеоплеер вместо iframe
+  playerWrap.innerHTML = `
+    <video 
+      id="videoElement" 
+      style="position:absolute;inset:0;width:100%;height:100%;background:#000;"
+      preload="metadata"
+    >
+      <source src="https://vz-c8e59f28-133.b-cdn.net/70afb6f8-5037-4074-a31c-58aa4e255ab4/playlist.m3u8" type="application/x-mpegURL">
+    </video>
+    <div class="ghost-watermark" id="ghostWatermark">@sofiareinholt</div>
+  `;
+
+  // Восстанавливаем элементы управления видео
   playerWrap.innerHTML += `
     <div class="video-play-overlay" id="playOverlay" onclick="togglePlay()">
       <div class="video-play-btn" id="playBtn">▶</div>
