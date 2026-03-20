@@ -1779,17 +1779,20 @@ function closeVideo() {
   clearInterval(progressInterval);
   stopWatermark();
   
-  const screenVideo = document.getElementById('screen-video');
-  screenVideo.style.display = 'none';
-  screenVideo.classList.add('hidden');
+  document.getElementById('screen-video').classList.add('hidden');
   
   screenHistory.pop();
   const prev = screenHistory[screenHistory.length - 1];
   
-  document.getElementById(`screen-${prev}`).style.display = 'block';
   document.getElementById(`screen-${prev}`).classList.remove('hidden');
   
   document.getElementById('backBtn').classList.toggle('visible', screenHistory.length > 1);
+  
+  // Обновляем активные кнопки навигации
+  screens.forEach(s => {
+    const btn = document.getElementById(`nav-${s}`);
+    if(btn) btn.classList.toggle('active', s === prev);
+  });
 }
 
 function togglePlay() {
@@ -1889,7 +1892,16 @@ function openScreen(name) {
 
 function goBack() {
   if(screenHistory.length <= 1) return;
-  const current = screenHistory.pop();
+  
+  const current = screenHistory[screenHistory.length - 1];
+  
+  // Если мы на видео - закрываем его
+  if(current === 'video') {
+    closeVideo();
+    return;
+  }
+  
+  screenHistory.pop();
   const prev = screenHistory[screenHistory.length - 1];
 
   document.getElementById(`screen-${current}`).classList.add('hidden');
