@@ -1900,9 +1900,9 @@ function openVideo(title, artist, initials, grad) {
   
   playerWrap.innerHTML = `
     <iframe
-      src="https://iframe.mediadelivery.net/embed/621300/70afb6f8-5037-4074-a31c-58aa4e255ab4?autoplay=true"
+      src="https://player.mediadelivery.net/embed/621300/70afb6f8-5037-4074-a31c-58aa4e255ab4?autoplay=true"
       style="position:absolute;inset:0;width:100%;height:100%;border:none"
-      allow="autoplay; fullscreen"
+      allow="autoplay; fullscreen; encrypted-media"
       allowfullscreen
     ></iframe>
     <div class="ghost-watermark" id="ghostWatermark">@sofiareinholt</div>
@@ -1950,7 +1950,7 @@ function openVideo(title, artist, initials, grad) {
       </div>
     </div>`).join('');
 
-  // Сброс кнопок
+  // Сброс состояний
   isPlaying = true; isSaved = false; isLiked = false;
   document.getElementById('viLikeIcon').textContent = '♡';
   document.getElementById('viSaveIcon').textContent = '☆';
@@ -1958,7 +1958,7 @@ function openVideo(title, artist, initials, grad) {
   document.getElementById('viLikeBtn').classList.remove('liked');
   document.getElementById('viSaveBtn2').classList.remove('saved');
 
-  // Открываем видео
+  // Открываем экран
   document.getElementById('screen-video').classList.remove('hidden');
   document.getElementById('backBtn').classList.add('visible');
   screenHistory.push('video');
