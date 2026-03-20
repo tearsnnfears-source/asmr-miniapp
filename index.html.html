@@ -1165,14 +1165,6 @@ html, body {
 }
 
 .toast.show { transform: translateY(0); opacity: 1; }
-
-#videoPlayerWrap {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 16 / 9; /* Это заставит блок держать форму видео */
-    background: #000;    /* Черный фон, пока грузится */
-    margin-bottom: 20px;
-}
 </style>
 </head>
 <body>
@@ -1903,75 +1895,49 @@ const upNextVideos = [
   { title:'Soft Spoken Skincare', artist:'Trinki ASMR', dur:'48:07', initials:'TA', grad:['#44FFE0','#44C8FF'] },
 ];
 
-ffunction openVideo(title, artist, initials, grad) {
-    // 1. Установка фона и текста
-    document.getElementById('videoBg').textContent = initials;
-    const playerWrap = document.getElementById('videoPlayerWrap');
+function openVideo(title, artist, initials, grad) {
+  // Set content
+  document.getElementById('videoBg').textContent = initials;
+  document.getElementById('videoBg').style.background = `linear-gradient(135deg, ${grad[0]}30, ${grad[1]}15)`;
+  document.getElementById('videoTopTitle').textContent = title;
+  document.getElementById('viTitle').textContent = title + ' ASMR';
+  document.getElementById('viArtist').textContent = artist;
+  document.getElementById('viAv').textContent = initials;
+  document.getElementById('viAv').style.background = `linear-gradient(135deg, ${grad[0]}50, ${grad[1]}30)`;
 
-    // 2. Вставка плеера и ватермарки
-    // ВАЖНО: добавлена очистка и правильное позиционирование
-    playerWrap.innerHTML = `
-        <iframe
-            src="https://iframe.mediadelivery.net/embed/621300/70afb6f8-5037-4074-a31c-58aa4e255ab4?autoplay=true&loop=false&muted=false&preload=true"
-            loading="lazy"
-            style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;z-index:1;"
-            allow="autoplay; fullscreen"
-            allowfullscreen
-        ></iframe>
-        <div class="ghost-watermark" id="ghostWatermark" 
-             style="z-index:2; pointer-events:none; position:absolute;">
-             @sofiareinholt
-        </div>
-    `;
+  // Reset state
+  isPlaying = true;
+  isSaved = false;
+  isLiked = false;
+  currentProgress = 0;
+  document.getElementById('playBtn').textContent = '⏸';
+  document.getElementById('playBtn').classList.remove('playing');
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('progressThumb').style.left = '0%';
+  document.getElementById('viLikeIcon').textContent = '♡';
+  document.getElementById('viSaveIcon').textContent = '☆';
+  document.getElementById('videoSaveBtn').textContent = '♡';
+  document.getElementById('viLikeBtn').classList.remove('liked');
+  document.getElementById('viSaveBtn2').classList.remove('saved');
 
-    // Запуск анимации ватермарки
-    if (typeof startWatermark === 'function') {
-        startWatermark('@sofiareinholt');
-    }
+  // Tags
+  const tagEl = document.getElementById('viTags');
+  const tags = ['👂 Ear Licking','🎤 Whispering','💆 Personal Attention','😴 Sleep','Binaural'];
+  tagEl.innerHTML = tags.map(t => `<span class="vi-tag">${t}</span>`).join('');
 
-    // 3. Обновление метаданных видео
-    document.getElementById('videoBg').style.background = `linear-gradient(135deg, ${grad[0]}30, ${grad[1]}15)`;
-    document.getElementById('videoTopTitle').textContent = title;
-    document.getElementById('viTitle').textContent = title + ' ASMR';
-    document.getElementById('viArtist').textContent = artist;
-    document.getElementById('viAv').textContent = initials;
-    document.getElementById('viAv').style.background = `linear-gradient(135deg, ${grad[0]}50, ${grad[1]}30)`;
-
-    // 4. Сброс состояния кнопок и прогресса
-    isPlaying = true;
-    isSaved = false;
-    isLiked = false;
-    currentProgress = 0;
-    
-    document.getElementById('playBtn').textContent = '⏸';
-    document.getElementById('playBtn').classList.remove('playing');
-    document.getElementById('progressFill').style.width = '0%';
-    document.getElementById('progressThumb').style.left = '0%';
-    document.getElementById('viLikeIcon').textContent = '♡';
-    document.getElementById('viSaveIcon').textContent = '☆';
-    document.getElementById('videoSaveBtn').textContent = '♡';
-    document.getElementById('viLikeBtn').classList.remove('liked');
-    document.getElementById('viSaveBtn2').classList.remove('saved');
-
-    // 5. Теги
-    const tagEl = document.getElementById('viTags');
-    const tags = ['👂 Ear Licking','🎤 Whispering','💆 Personal Attention','😴 Sleep','Binaural'];
-    tagEl.innerHTML = tags.map(t => `<span class="vi-tag">${t}</span>`).join('');
-
-    // 6. Реакции
-    const reactEl = document.getElementById('viReactions');
-    reactEl.innerHTML = '';
-    reactionData.forEach(r => {
-        const btn = document.createElement('div');
-        btn.className = 'vi-reaction';
-        btn.innerHTML = `${r.emoji} <span class="vi-reaction-count">${r.count}</span>`;
-        btn.onclick = () => {
-            const reacted = btn.classList.toggle('reacted');
-            btn.querySelector('.vi-reaction-count').textContent = reacted ? r.count + 1 : r.count;
-        };
-        reactEl.appendChild(btn);
-    });
-}
+  // Reactions
+  const reactEl = document.getElementById('viReactions');
+  reactEl.innerHTML = '';
+  reactionData.forEach(r => {
+    const btn = document.createElement('div');
+    btn.className = 'vi-reaction';
+    btn.innerHTML = `${r.emoji} <span class="vi-reaction-count">${r.count}</span>`;
+    btn.onclick = () => {
+      const reacted = btn.classList.toggle('reacted');
+      btn.querySelector('.vi-reaction-count').textContent = reacted ? r.count + 1 : r.count;
+    };
+    reactEl.appendChild(btn);
+  });
 
   // Up next
   const upEl = document.getElementById('upNextList');
