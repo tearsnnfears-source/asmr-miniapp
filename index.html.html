@@ -1708,12 +1708,45 @@ function openVideo(title, artist, initials, grad) {
   
   playerWrap.appendChild(iframe);
 
+  // Восстанавливаем watermark
   const wm = document.createElement('div');
   wm.className = 'ghost-watermark';
   wm.id = 'ghostWatermark';
   wm.textContent = '@sofiareinholt';
-  wm.style.zIndex = '140';
+  wm.style.zIndex = '160';
   playerWrap.appendChild(wm);
+
+  // Восстанавливаем top bar
+  const topBar = document.createElement('div');
+  topBar.className = 'video-top-bar';
+  topBar.innerHTML = `
+    <button class="video-ctrl-btn" onclick="closeVideo()">‹</button>
+    <div class="video-top-title">${title}</div>
+    <button class="video-ctrl-btn" onclick="toggleSave()">♡</button>
+  `;
+  playerWrap.appendChild(topBar);
+
+  // Восстанавливаем bottom bar
+  const bottomBar = document.createElement('div');
+  bottomBar.className = 'video-bottom-bar';
+  bottomBar.innerHTML = `
+    <div class="video-progress-wrap" onclick="seekVideo(event)">
+      <div class="video-progress-bg"></div>
+      <div class="video-progress-fill" id="progressFill" style="width:0%"></div>
+      <div class="video-progress-thumb" id="progressThumb" style="left:0%"></div>
+    </div>
+    <div class="video-controls-row">
+      <div class="video-time" id="videoTime">00:00 / 41:07</div>
+      <div class="video-ctrl-row-right">
+        <button class="video-ctrl-sm">⏮</button>
+        <button class="video-ctrl-sm" onclick="togglePlay()" id="playPauseBtn">⏸</button>
+        <button class="video-ctrl-sm">⏭</button>
+        <button class="video-ctrl-sm" onclick="toggleMute()" id="muteBtn">🔊</button>
+        <button class="video-ctrl-sm" onclick="toggleFullscreen()">⛶</button>
+      </div>
+    </div>
+  `;
+  playerWrap.appendChild(bottomBar);
 
   startWatermark('@sofiareinholt');
 
