@@ -142,6 +142,39 @@ body {
   gap: 16px;
 }
 
+/* ── PAGE CONTAINER ── */
+.page {
+  display: none;
+  flex-direction: column;
+  flex: 1;
+}
+
+.page.active {
+  display: flex;
+}
+
+.page-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+  padding-bottom: 20px;
+}
+
+.page-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.page-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.page-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+}
+
 /* ── PREVIEW SECTION ── */
 .preview-section {
   background: linear-gradient(145deg, #1a0812, #0e0e1a);
@@ -222,17 +255,6 @@ body {
 }
 
 .btn-secondary:active {
-  transform: scale(0.97);
-  opacity: 0.9;
-}
-
-.btn-favorites {
-  background: linear-gradient(135deg, var(--pink), #FF4A9E);
-  color: #0E0E0F;
-  box-shadow: 0 4px 16px rgba(255,126,200,0.3);
-}
-
-.btn-favorites:active {
   transform: scale(0.97);
   opacity: 0.9;
 }
@@ -385,244 +407,6 @@ body {
   color: var(--pink);
 }
 
-/* ── ARTIST PAGE ── */
-.page-container {
-  display: none;
-  flex-direction: column;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--dark);
-  height: 100vh;
-  z-index: 150;
-}
-
-.page-container.active {
-  display: flex;
-}
-
-.artist-page-back {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  background: rgba(0,0,0,0.6);
-  border: none;
-  color: var(--text);
-  font-size: 14px;
-  cursor: pointer;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-family: 'DM Sans', sans-serif;
-  transition: all 0.15s;
-  z-index: 160;
-  backdrop-filter: blur(4px);
-}
-
-.artist-page-back:active {
-  background: rgba(0,0,0,0.8);
-}
-
-.artist-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-size: cover;
-  background-position: center;
-  filter: blur(8px) brightness(0.6);
-  z-index: 1;
-}
-
-.artist-bg::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: 
-    radial-gradient(ellipse at top-left, rgba(0,0,0,0.4) 0%, transparent 40%),
-    radial-gradient(ellipse at top-right, rgba(0,0,0,0.4) 0%, transparent 40%),
-    radial-gradient(ellipse at bottom-left, rgba(0,0,0,0.5) 0%, transparent 40%),
-    radial-gradient(ellipse at bottom-right, rgba(0,0,0,0.5) 0%, transparent 40%),
-    url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" /></filter><rect width="400" height="300" filter="url(%23noise)" opacity="0.08"/></svg>');
-  mix-blend-mode: multiply;
-}
-
-.artist-content {
-  position: relative;
-  z-index: 2;
-  flex: 1;
-}
-
-.artist-stats-bottom {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(22,22,23,0.9);
-  backdrop-filter: blur(10px);
-  border-top: 1px solid var(--border);
-  padding: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  gap: 0;
-  z-index: 3;
-}
-
-.artist-stat {
-  flex: 1;
-  text-align: center;
-}
-
-.artist-stat:first-child {
-  border-right: 1px solid var(--border);
-  padding-right: 20px;
-}
-
-.artist-stat:last-child {
-  padding-left: 20px;
-}
-
-.artist-stat-val {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 28px;
-  color: var(--lime);
-  line-height: 1;
-  margin-bottom: 6px;
-}
-
-.artist-stat-label {
-  font-size: 11px;
-  color: var(--muted);
-  letter-spacing: 0.5px;
-}
-
-/* ── MODAL ── */
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.8);
-  display: none;
-  align-items: flex-end;
-  z-index: 200;
-  backdrop-filter: blur(4px);
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-.modal.active {
-  display: flex;
-}
-
-.modal-content {
-  width: 100%;
-  height: auto;
-  max-height: 55vh;
-  background: var(--dark2);
-  border-top: 1px solid var(--border);
-  border-radius: 20px 20px 0 0;
-  padding: 24px 16px 16px;
-  overflow-y: auto;
-  animation: slideUp 0.3s ease;
-  box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
-  position: relative;
-}
-
-@keyframes slideUp {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
-}
-
-.modal-close {
-  position: absolute;
-  top: -40px;
-  right: 16px;
-  width: 32px;
-  height: 32px;
-  background: var(--dark3);
-  border: none;
-  border-radius: 50%;
-  color: var(--text);
-  font-size: 20px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-  z-index: 201;
-}
-
-.modal-close:active {
-  background: var(--dark4);
-}
-
-.modal-title {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 22px;
-  letter-spacing: 1px;
-  margin-bottom: 16px;
-  margin-top: 6px;
-}
-
-.modal-title span {
-  color: var(--pink);
-}
-
-/* ── PRICING CARDS ── */
-.pricing-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.price-card {
-  background: var(--dark3);
-  border: 1.5px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.price-card.selected {
-  border-color: rgba(204,255,0,0.5);
-  background: rgba(204,255,0,0.05);
-}
-
-.price-card:active {
-  transform: scale(0.98);
-}
-
-.price-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.price-name {
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.price-amount {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 18px;
-  color: var(--lime);
-}
-
-.price-per {
-  font-size: 10px;
-  color: var(--muted);
-}
-
 /* ── FOOTER ── */
 .footer {
   position: fixed;
@@ -660,6 +444,10 @@ body {
   transform: scale(0.9);
 }
 
+.footer-btn.active {
+  color: var(--pink);
+}
+
 .footer-btn-icon {
   font-size: 24px;
   line-height: 1;
@@ -669,6 +457,10 @@ body {
   font-size: 10px;
   color: var(--muted);
   font-weight: 500;
+}
+
+.footer-btn.active .footer-btn-label {
+  color: var(--pink);
 }
 
 .footer-btn.center {
@@ -698,6 +490,278 @@ body {
   color: var(--lime);
   font-weight: 600;
   margin-top: 6px;
+}
+
+.footer-btn.center.active::before {
+  box-shadow: 0 6px 20px rgba(204,255,0,0.4);
+}
+
+/* ── PROFILE PAGE ── */
+.profile-header {
+  background: linear-gradient(145deg, #0e0814, #0e0e0e);
+  padding: 24px 16px 20px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-av-wrap {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 10px;
+}
+
+.profile-av {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--pink), var(--purple));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  letter-spacing: 2px;
+  border: 3px solid var(--dark);
+}
+
+.profile-online {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 14px;
+  height: 14px;
+  background: var(--success);
+  border-radius: 50%;
+  border: 2px solid var(--dark);
+}
+
+.profile-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 26px;
+  letter-spacing: 1px;
+}
+
+.profile-handle {
+  font-size: 13px;
+  color: var(--pink);
+  margin-bottom: 12px;
+}
+
+.profile-stats {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+.profile-stat-item {
+  text-align: center;
+}
+
+.profile-stat-val {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 1px;
+}
+
+.profile-stat-val span {
+  color: var(--lime);
+}
+
+.profile-stat-label {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* ── ROW ITEMS ── */
+.row-section {
+  padding: 16px 0;
+}
+
+.row-section-title {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 16px 10px;
+  margin-bottom: 6px;
+}
+
+.row-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-bottom: 1px solid var(--border);
+}
+
+.row-item:active {
+  background: rgba(255,255,255,0.04);
+}
+
+.row-item:last-child {
+  border-bottom: none;
+}
+
+.row-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.row-label {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.row-sublabel {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.row-arrow {
+  color: rgba(255,255,255,0.2);
+  font-size: 12px;
+}
+
+.row-value {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ── TOGGLE ── */
+.toggle {
+  width: 42px;
+  height: 24px;
+  background: var(--dark4);
+  border-radius: 50px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.toggle.on {
+  background: rgba(200,255,68,0.2);
+  border-color: rgba(200,255,68,0.4);
+}
+
+.toggle::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: var(--muted);
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.toggle.on::after {
+  transform: translateX(18px);
+  background: var(--lime);
+}
+
+/* ── SUPPORT PAGE ── */
+.support-options {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.support-card {
+  background: var(--dark2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.support-card:active {
+  border-color: rgba(255,126,200,0.3);
+}
+
+.support-icon {
+  font-size: 28px;
+}
+
+.support-title {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.support-desc {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 300;
+}
+
+/* ── FAQ ── */
+.faq-accordion {
+  padding: 0 16px;
+}
+
+.faq-item {
+  background: var(--dark2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.faq-q {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.faq-arrow {
+  color: var(--muted);
+  font-size: 11px;
+  transition: transform 0.2s;
+}
+
+.faq-item.open .faq-arrow {
+  transform: rotate(180deg);
+  color: var(--pink);
+}
+
+.faq-a {
+  max-height: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 300;
+  color: var(--muted);
+  line-height: 1.6;
+  transition: max-height 0.3s, padding 0.3s;
+}
+
+.faq-item.open .faq-a {
+  max-height: 200px;
+  padding: 0 16px 14px;
 }
 
 /* ── TOAST ── */
@@ -755,96 +819,202 @@ body {
   </div>
 </div>
 
-<!-- MAIN CONTENT -->
-<div class="main-container" id="homePage">
-  <div class="content">
+<!-- PAGES -->
+<div class="page active" id="page-home">
+  <div class="main-container">
+    <div class="content">
 
-    <!-- PREVIEW SECTION -->
-    <div class="preview-section">
-      <h2>Page Preview</h2>
-      <div class="preview-placeholder">🎬</div>
-      <p class="preview-text">Insert your group preview video here</p>
-    </div>
-
-    <!-- CTA BUTTONS -->
-    <div class="cta-section" id="ctaSection">
-      <button class="btn btn-primary" id="subscribeBtnMain" onclick="openSubscribeModal()">
-        💳 Subscribe Now
-      </button>
-      <button class="btn btn-secondary" id="freeBtnMain" onclick="tryFree()">
-        🎁 Try 3 Days Free
-      </button>
-      <button class="btn btn-favorites hidden" id="favoritesBtnMain">
-        ⭐ My Favorites
-      </button>
-    </div>
-
-    <!-- ARTISTS SECTION -->
-    <div>
-      <div class="section-header">
-        <div class="section-title">🎙 Artists</div>
-        <button class="see-all-btn" onclick="showToast('See all artists')">See all →</button>
+      <!-- PREVIEW SECTION -->
+      <div class="preview-section">
+        <h2>Page Preview</h2>
+        <div class="preview-placeholder">🎬</div>
+        <p class="preview-text">Insert your group preview video here</p>
       </div>
-      <div class="artists-scroll" id="artistsScroll"></div>
-    </div>
 
-    <!-- NEW VIDEOS SECTION -->
-    <div>
-      <div class="section-header">
-        <div class="section-title">✨ New Videos</div>
-        <button class="see-all-btn" onclick="showToast('See all videos')">See all →</button>
+      <!-- CTA BUTTONS -->
+      <div class="cta-section">
+        <button class="btn btn-primary" onclick="showToast('💳 Subscribe Now')">
+          💳 Subscribe Now
+        </button>
+        <button class="btn btn-secondary" onclick="showToast('🎁 Try 3 Days Free')">
+          🎁 Try 3 Days Free
+        </button>
       </div>
-      <div class="videos-scroll" id="videosScroll"></div>
-    </div>
 
-  </div>
-</div>
+      <!-- ARTISTS SECTION -->
+      <div>
+        <div class="section-header">
+          <div class="section-title">🎙 Artists</div>
+          <button class="see-all-btn" onclick="showToast('See all artists')">See all →</button>
+        </div>
+        <div class="artists-scroll" id="artistsScroll"></div>
+      </div>
 
-<!-- ARTIST PAGE -->
-<div class="page-container" id="artistPage">
-  <button class="artist-page-back" onclick="goBack()">‹ Back</button>
-  <div class="artist-bg" id="artistBg"></div>
-  <div class="artist-content">
-    <!-- Пустое пространство сверху -->
-  </div>
-  <!-- БАР ВНИЗУ -->
-  <div class="artist-stats-bottom">
-    <div class="artist-stat">
-      <div class="artist-stat-val" id="photoCount">12</div>
-      <div class="artist-stat-label">Photos</div>
-    </div>
-    <div class="artist-stat">
-      <div class="artist-stat-val" id="videoCount">8</div>
-      <div class="artist-stat-label">Videos</div>
+      <!-- NEW VIDEOS SECTION -->
+      <div>
+        <div class="section-header">
+          <div class="section-title">✨ New Videos</div>
+          <button class="see-all-btn" onclick="showToast('See all videos')">See all →</button>
+        </div>
+        <div class="videos-scroll" id="videosScroll"></div>
+      </div>
+
     </div>
   </div>
 </div>
 
-<!-- SUBSCRIBE MODAL -->
-<div class="modal" id="subscribeModal">
-  <div class="modal-content">
-    <button class="modal-close" onclick="closeModal()">×</button>
-    <div class="modal-title">Choose <span>Plan</span></div>
-    <div class="pricing-cards" id="pricingCards"></div>
-    <button class="btn btn-primary" onclick="confirmSubscribe()">
-      💳 Subscribe
-    </button>
+<!-- PROFILE PAGE -->
+<div class="page" id="page-profile">
+  <div class="page-scroll">
+    <div class="profile-header">
+      <div class="profile-av-wrap">
+        <div class="profile-av">SR</div>
+        <div class="profile-online"></div>
+      </div>
+      <div class="profile-name">Sofia Reinholt</div>
+      <div class="profile-handle">@sofiareinholt</div>
+      <div class="profile-stats">
+        <div class="profile-stat-item">
+          <div class="profile-stat-val">27<span>d</span></div>
+          <div class="profile-stat-label">Days Left</div>
+        </div>
+        <div class="profile-stat-item">
+          <div class="profile-stat-val">143</div>
+          <div class="profile-stat-label">Watched</div>
+        </div>
+        <div class="profile-stat-item">
+          <div class="profile-stat-val">24</div>
+          <div class="profile-stat-label">Saved</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row-section">
+      <div class="row-section-title">Subscription</div>
+      <div class="row-item" onclick="showToast('🔄 Renew Subscription')">
+        <div class="row-icon" style="background:rgba(255,126,200,0.1)">🔄</div>
+        <div>
+          <div class="row-label">Renew Subscription</div>
+          <div class="row-sublabel">Expires Apr 16, 2026</div>
+        </div>
+        <div class="row-arrow">›</div>
+      </div>
+      <div class="row-item" onclick="showToast('⭐ My Favorites')">
+        <div class="row-icon" style="background:rgba(255,126,200,0.1)">⭐</div>
+        <div class="row-label">My Favorites</div>
+        <div style="background:rgba(255,126,200,0.1);color:var(--pink);font-size:10px;padding:2px 8px;border-radius:4px;font-weight:500">24 saved</div>
+      </div>
+    </div>
+
+    <div class="row-section">
+      <div class="row-section-title">Notifications</div>
+      <div class="row-item">
+        <div class="row-icon" style="background:rgba(68,200,255,0.1)">🔔</div>
+        <div>
+          <div class="row-label">New content</div>
+          <div class="row-sublabel">When artists upload</div>
+        </div>
+        <div class="toggle on" onclick="this.classList.toggle('on'); event.stopPropagation()"></div>
+      </div>
+      <div class="row-item">
+        <div class="row-icon" style="background:rgba(255,224,68,0.1)">⏰</div>
+        <div>
+          <div class="row-label">Expiry reminder</div>
+          <div class="row-sublabel">3 days before end</div>
+        </div>
+        <div class="toggle on" onclick="this.classList.toggle('on'); event.stopPropagation()"></div>
+      </div>
+      <div class="row-item">
+        <div class="row-icon" style="background:rgba(200,107,255,0.1)">🌙</div>
+        <div>
+          <div class="row-label">Night mode (23:00–08:00)</div>
+          <div class="row-sublabel">No alerts at night</div>
+        </div>
+        <div class="toggle" onclick="this.classList.toggle('on'); event.stopPropagation()"></div>
+      </div>
+    </div>
+
+    <div class="row-section">
+      <div class="row-section-title">Settings</div>
+      <div class="row-item">
+        <div class="row-icon" style="background:rgba(255,255,255,0.05)">🌐</div>
+        <div class="row-label">Language</div>
+        <div class="row-value">English</div>
+        <div class="row-arrow">›</div>
+      </div>
+      <div class="row-item" onclick="openPage('support')">
+        <div class="row-icon" style="background:rgba(255,126,200,0.1)">💬</div>
+        <div class="row-label">Support</div>
+        <div class="row-arrow">›</div>
+      </div>
+      <div class="row-item">
+        <div class="row-icon" style="background:rgba(255,255,255,0.05)">📋</div>
+        <div class="row-label">Terms & Privacy</div>
+        <div class="row-arrow">›</div>
+      </div>
+    </div>
+
+    <div style="padding:20px 16px">
+      <button class="btn" style="background:var(--dark3);color:rgba(255,80,80,0.7);border:1px solid rgba(255,80,80,0.15);">↩ Sign Out</button>
+    </div>
+  </div>
+</div>
+
+<!-- SUPPORT PAGE -->
+<div class="page" id="page-support">
+  <div class="page-scroll">
+    <div style="padding:20px 16px 8px;text-align:center">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1.5px;margin-bottom:6px">How can we <span style="color:var(--pink)">Help?</span></div>
+      <div style="font-size:13px;color:var(--muted);font-weight:300">Usually respond within a few hours</div>
+    </div>
+
+    <div class="support-options">
+      <div class="support-card" onclick="showToast('💬 Opening Telegram...')">
+        <div class="support-icon">💬</div>
+        <div>
+          <div class="support-title">Chat with Support</div>
+          <div class="support-desc">Open Telegram chat with our team</div>
+        </div>
+        <div style="color:var(--muted);font-size:12px">→</div>
+      </div>
+      <div class="support-card" onclick="showToast('🐛 Report a Bug')">
+        <div class="support-icon">🐛</div>
+        <div>
+          <div class="support-title">Report a Bug</div>
+          <div class="support-desc">Something not working? Tell us</div>
+        </div>
+        <div style="color:var(--muted);font-size:12px">→</div>
+      </div>
+      <div class="support-card" onclick="showToast('💡 Suggest a Feature')">
+        <div class="support-icon">💡</div>
+        <div>
+          <div class="support-title">Suggest a Feature</div>
+          <div class="support-desc">We read every suggestion</div>
+        </div>
+        <div style="color:var(--muted);font-size:12px">→</div>
+      </div>
+    </div>
+
+    <div style="padding:0 16px 12px">
+      <div style="font-size:12px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">FAQ</div>
+    </div>
+    <div class="faq-accordion" id="faqAccordion"></div>
   </div>
 </div>
 
 <!-- FOOTER -->
 <div class="footer">
-  <button class="footer-btn" onclick="showToast('⭐ Open Favorites')">
-    <div class="footer-btn-icon">⭐</div>
-    <div class="footer-btn-label">Favorites</div>
+  <button class="footer-btn active" id="footer-home" onclick="openPage('home')">
+    <div class="footer-btn-icon">🏠</div>
+    <div class="footer-btn-label">Home</div>
   </button>
   
-  <button class="footer-btn center" onclick="showToast('👤 Open Profile')">
+  <button class="footer-btn center" id="footer-profile" onclick="openPage('profile')">
     <div class="footer-btn-icon">👤</div>
     <div class="footer-btn-label">Profile</div>
   </button>
   
-  <button class="footer-btn" onclick="showToast('💬 Open Support')">
+  <button class="footer-btn" id="footer-support" onclick="openPage('support')">
     <div class="footer-btn-icon">💬</div>
     <div class="footer-btn-label">Support</div>
   </button>
@@ -875,21 +1045,18 @@ const videos = [
 
 const artistPhoto = 'https://images.unsplash.com/photo-1544717278-ca5e3cff53d7?w=500&h=600&fit=crop';
 
-// ── STATE ──
-let selectedPlan = 1;
-let isSubscribed = false;
-
-const plans = [
-  { name: '1 Week', price: '€5', per: '€0.71/day', days: 7 },
-  { name: '1 Month', price: '€15', per: '€0.50/day', days: 30 },
-  { name: '3 Months', price: '€35', per: '€0.39/day', days: 90 },
+const faqs = [
+  { q: 'How do I access the group?', a: "After subscribing, you'll receive an invite link automatically. Just click it to join." },
+  { q: 'Does it auto-renew?', a: 'No! We never charge you automatically. Renew manually when you want.' },
+  { q: 'Can I try for free?', a: 'Yes! New users get 3 free days. Just tap "Try Free" in the main menu.' },
+  { q: 'I paid but no access?', a: 'Contact support — we usually fix it within minutes.' },
 ];
 
 // ── INIT ──
 function init() {
   renderArtists();
   renderVideos();
-  renderPricingCards();
+  renderFAQ();
 }
 
 // ── ARTISTS ──
@@ -897,7 +1064,7 @@ function renderArtists() {
   const scroll = document.getElementById('artistsScroll');
   scroll.innerHTML = artistsData.map((artist) => {
     return `
-      <div class="artist-mini-card" onclick="openArtistPage('${artist.name}', ${artist.photos}, ${artist.videos})">
+      <div class="artist-mini-card">
         <div class="artist-mini-av" style="background-image:url('${artistPhoto}');"></div>
         <div class="artist-mini-name">${artist.name.split(' ')[0]}</div>
       </div>
@@ -920,72 +1087,35 @@ function renderVideos() {
   `).join('');
 }
 
-// ── ARTIST PAGE ──
-function openArtistPage(name, photos, videos_count) {
-  document.getElementById('homePage').style.display = 'none';
-  document.getElementById('artistPage').classList.add('active');
-  document.body.style.overflow = 'hidden';
-  
-  const mooonaPhotoUrl = 'https://i.ibb.co/7xjYTFQn/photo-2026-01-14-07-10-54.jpg';
-  
-  document.getElementById('artistBg').style.backgroundImage = `url('${mooonaPhotoUrl}')`;
-  document.getElementById('photoCount').textContent = photos;
-  document.getElementById('videoCount').textContent = videos_count;
-}
-
-function goBack() {
-  document.getElementById('artistPage').classList.remove('active');
-  document.getElementById('homePage').style.display = 'block';
-  document.body.style.overflow = 'auto';
-}
-
-// ── PRICING ──
-function renderPricingCards() {
-  const container = document.getElementById('pricingCards');
-  container.innerHTML = plans.map((plan, i) => `
-    <div class="price-card ${i === selectedPlan ? 'selected' : ''}" onclick="selectPlan(${i})">
-      <div class="price-top">
-        <div class="price-name">${plan.name}</div>
-        <div class="price-amount">${plan.price}</div>
+// ── FAQ ──
+function renderFAQ() {
+  const faqEl = document.getElementById('faqAccordion');
+  faqEl.innerHTML = faqs.map(f => `
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+        <span>${f.q}</span>
+        <span class="faq-arrow">▼</span>
       </div>
-      <div class="price-per">${plan.per}</div>
+      <div class="faq-a">${f.a}</div>
     </div>
   `).join('');
 }
 
-function selectPlan(index) {
-  selectedPlan = index;
-  renderPricingCards();
-}
-
-// ── SUBSCRIBE ──
-function openSubscribeModal() {
-  document.getElementById('subscribeModal').classList.add('active');
-}
-
-function closeModal() {
-  document.getElementById('subscribeModal').classList.remove('active');
-}
-
-function confirmSubscribe() {
-  isSubscribed = true;
-  closeModal();
-  updateUI();
-  showToast('✅ Welcome to ASMR.LEAKS!');
-}
-
-function tryFree() {
-  isSubscribed = true;
-  updateUI();
-  showToast('🎁 3 free days activated!');
-}
-
-function updateUI() {
-  const freeBtnMain = document.getElementById('freeBtnMain');
-  const favoritesBtnMain = document.getElementById('favoritesBtnMain');
-
-  freeBtnMain.classList.add('hidden');
-  favoritesBtnMain.classList.remove('hidden');
+// ── PAGES ──
+function openPage(pageName) {
+  // Hide all pages
+  document.querySelectorAll('.page').forEach(page => {
+    page.classList.remove('active');
+  });
+  
+  // Show selected page
+  document.getElementById(`page-${pageName}`).classList.add('active');
+  
+  // Update footer buttons
+  document.querySelectorAll('.footer-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  document.getElementById(`footer-${pageName}`).classList.add('active');
 }
 
 // ── TOAST ──
