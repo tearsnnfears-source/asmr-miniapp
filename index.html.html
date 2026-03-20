@@ -1899,23 +1899,55 @@ const upNextVideos = [
 function openVideo(title, artist, initials, grad) {
   const playerWrap = document.getElementById('videoPlayerWrap');
   
-  // Очищаем контейнер полностью и делаем его просто контейнером для iframe
+  // Очищаем контейнер
   playerWrap.innerHTML = '';
   
+  // Создаём iframe
   const iframe = document.createElement('iframe');
   iframe.src = 'https://player.mediadelivery.net/embed/621300/70afb6f8-5037-4074-a31c-58aa4e255ab4?autoplay=true';
-  iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:none;z-index:150;';
+  iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:none;';
   iframe.allow = 'autoplay; fullscreen; encrypted-media';
   iframe.allowFullscreen = true;
-  
   playerWrap.appendChild(iframe);
 
-  // Добавляем watermark
+  // Восстанавливаем watermark
   const wm = document.createElement('div');
-wm.className = 'ghost-watermark';
-wm.id = 'ghostWatermark';
-wm.textContent = '@sofiareinholt';
-playerWrap.appendChild(wm);
+  wm.className = 'ghost-watermark';
+  wm.id = 'ghostWatermark';
+  wm.textContent = '@sofiareinholt';
+  playerWrap.appendChild(wm);
+
+  // Восстанавливаем top bar
+  const topBar = document.createElement('div');
+  topBar.className = 'video-top-bar';
+  topBar.innerHTML = `
+    <button class="video-ctrl-btn" onclick="closeVideo()">‹</button>
+    <div class="video-top-title" id="videoTopTitle">${title}</div>
+    <button class="video-ctrl-btn" id="videoSaveBtn" onclick="toggleSave()">♡</button>
+  `;
+  playerWrap.appendChild(topBar);
+
+  // Восстанавливаем bottom bar с прогрессом
+  const bottomBar = document.createElement('div');
+  bottomBar.className = 'video-bottom-bar';
+  bottomBar.innerHTML = `
+    <div class="video-progress-wrap" onclick="seekVideo(event)">
+      <div class="video-progress-bg"></div>
+      <div class="video-progress-fill" id="progressFill" style="width:0%"></div>
+      <div class="video-progress-thumb" id="progressThumb" style="left:0%"></div>
+    </div>
+    <div class="video-controls-row">
+      <div class="video-time" id="videoTime">00:00 / 41:07</div>
+      <div class="video-ctrl-row-right">
+        <button class="video-ctrl-sm">⏮</button>
+        <button class="video-ctrl-sm" onclick="togglePlay()" id="playPauseBtn">⏸</button>
+        <button class="video-ctrl-sm">⏭</button>
+        <button class="video-ctrl-sm" onclick="toggleMute()" id="muteBtn">🔊</button>
+        <button class="video-ctrl-sm" onclick="toggleFullscreen()">⛶</button>
+      </div>
+    </div>
+  `;
+  playerWrap.appendChild(bottomBar);
 
   startWatermark('@sofiareinholt');
 
@@ -1970,10 +2002,16 @@ playerWrap.appendChild(wm);
   document.getElementById('viLikeBtn').classList.remove('liked');
   document.getElementById('viSaveBtn2').classList.remove('saved');
 
-  // Открываем экран
+  // ОТКРЫВАЕМ ЭКРАН ВИДЕО
   document.getElementById('screen-video').classList.remove('hidden');
   document.getElementById('backBtn').classList.add('visible');
   screenHistory.push('video');
+
+  // Обновляем активные кнопки навигации
+  screens.forEach(s => {
+    const btn = document.getElementById(`nav-${s}`);
+    if(btn) btn.classList.toggle('active', s === 'video');
+  });
 
   clearInterval(progressInterval);
 }
