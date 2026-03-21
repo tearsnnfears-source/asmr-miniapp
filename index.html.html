@@ -1792,7 +1792,7 @@ let selectedMethod = 0;
 let isSubscribed = false;
 let currentUser = null;
 let serverDaysLeft = null;
-const API_BASE = window.__MINIAPP_API_BASE__ || "";
+const API_BASE = window.__MINIAPP_API_BASE__ || "https://asmr-bot-production.up.railway.app";
 
 function getInitials(fullName) {
   const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
