@@ -530,6 +530,115 @@ body {
   letter-spacing: 0.5px;
 }
 
+/* ── ARTISTS PAGE ── */
+.artists-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 16px;
+}
+
+.artist-card {
+  background: var(--dark2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.artist-card:active {
+  border-color: rgba(255,126,200,0.4);
+}
+
+.artist-card-image {
+  width: 100%;
+  height: 140px;
+  background: var(--dark3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  background-size: cover;
+  background-position: center;
+}
+
+.artist-card-info {
+  padding: 12px;
+}
+
+.artist-card-name {
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.artist-card-meta {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* ── VIDEOS PAGE ── */
+.videos-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 16px;
+}
+
+.video-card {
+  background: var(--dark2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.video-card:active {
+  border-color: rgba(255,126,200,0.4);
+}
+
+.video-card-thumb {
+  width: 100%;
+  height: 100px;
+  background: var(--dark3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  position: relative;
+}
+
+.video-card-dur {
+  position: absolute;
+  bottom: 5px;
+  right: 6px;
+  background: rgba(0,0,0,0.7);
+  font-size: 8px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  color: rgba(255,255,255,0.8);
+}
+
+.video-card-info {
+  padding: 10px;
+}
+
+.video-card-title {
+  font-size: 11px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.video-card-artist {
+  font-size: 9px;
+  color: var(--pink);
+}
+
 /* ── MODAL ── */
 .modal {
   position: fixed;
@@ -711,46 +820,6 @@ body {
 
 .footer-btn.active .footer-btn-label {
   color: var(--pink);
-}
-
-.footer-btn.center {
-  position: relative;
-}
-
-.footer-btn.center::before {
-  content: '';
-  position: absolute;
-  width: 60px;
-  height: 60px;
-  background: linear-gradient(135deg, var(--lime), #B3E600);
-  border-radius: 50%;
-  top: -20px;
-  box-shadow: 0 4px 16px rgba(204,255,0,0.3);
-  z-index: -1;
-}
-
-.footer-btn.center .footer-btn-icon {
-  font-size: 28px;
-  position: relative;
-  z-index: 1;
-  color: #0E0E0F;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: -12px;
-}
-
-.footer-btn.center .footer-btn-label {
-  color: var(--lime);
-  font-weight: 600;
-  margin-top: 6px;
-}
-
-.footer-btn.center.active::before {
-  box-shadow: 0 6px 20px rgba(204,255,0,0.4);
 }
 
 /* ── PROFILE PAGE ── */
@@ -1021,6 +1090,28 @@ body {
   padding: 0 16px 14px;
 }
 
+/* ── PAGE TITLE ── */
+.page-title-section {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.page-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  letter-spacing: 1.5px;
+  margin-bottom: 4px;
+}
+
+.page-title span {
+  color: var(--pink);
+}
+
+.page-subtitle {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* ── TOAST ── */
 .toast {
   position: fixed;
@@ -1105,7 +1196,7 @@ body {
       <div>
         <div class="section-header">
           <div class="section-title">🎙 Artists</div>
-          <button class="see-all-btn" onclick="showToast('See all artists')">See all →</button>
+          <button class="see-all-btn" onclick="openPage('artists')">See all →</button>
         </div>
         <div class="artists-scroll" id="artistsScroll"></div>
       </div>
@@ -1114,12 +1205,34 @@ body {
       <div>
         <div class="section-header">
           <div class="section-title">✨ New Videos</div>
-          <button class="see-all-btn" onclick="showToast('See all videos')">See all →</button>
+          <button class="see-all-btn" onclick="openPage('videos')">See all →</button>
         </div>
         <div class="videos-scroll" id="videosScroll"></div>
       </div>
 
     </div>
+  </div>
+</div>
+
+<!-- ARTISTS PAGE -->
+<div class="page" id="page-artists">
+  <div class="page-scroll">
+    <div class="page-title-section">
+      <div class="page-title">All <span>Artists</span></div>
+      <div class="page-subtitle">Browse all creators</div>
+    </div>
+    <div class="artists-grid" id="artistsGrid"></div>
+  </div>
+</div>
+
+<!-- VIDEOS PAGE -->
+<div class="page" id="page-videos">
+  <div class="page-scroll">
+    <div class="page-title-section">
+      <div class="page-title">All <span>Videos</span></div>
+      <div class="page-subtitle">Latest content</div>
+    </div>
+    <div class="videos-grid" id="videosGrid"></div>
   </div>
 </div>
 
@@ -1313,7 +1426,7 @@ body {
     <div class="footer-btn-label">Home</div>
   </button>
   
-  <button class="footer-btn center" id="footer-profile" onclick="openPage('profile')">
+  <button class="footer-btn" id="footer-profile" onclick="openPage('profile')">
     <div class="footer-btn-icon">👤</div>
     <div class="footer-btn-label">Profile</div>
   </button>
@@ -1336,6 +1449,8 @@ const artistsData = [
   { name: 'Mood ASMR', initials: 'MO', emoji: '😴', photos: 10, videos: 7 },
   { name: 'Puffin ASMR', initials: 'PA', emoji: '🐦', photos: 14, videos: 9 },
   { name: 'Trinki ASMR', initials: 'TA', emoji: '✨', photos: 16, videos: 12 },
+  { name: 'Beebee ASMR', initials: 'BA', emoji: '🐝', photos: 13, videos: 8 },
+  { name: 'Jinx ASMR', initials: 'JA', emoji: '⚡', photos: 17, videos: 11 },
 ];
 
 const videos = [
@@ -1345,6 +1460,8 @@ const videos = [
   { title: 'Sleep Session', artist: 'Mood ASMR', duration: '34:18', emoji: '😴' },
   { title: 'Personal Attention', artist: 'Puffin ASMR', duration: '22:44', emoji: '💆' },
   { title: 'Binaural ASMR', artist: 'Trinki ASMR', duration: '48:07', emoji: '👂' },
+  { title: 'Brain Tingles', artist: 'Beebee ASMR', duration: '35:12', emoji: '🧠' },
+  { title: 'Close Whisper', artist: 'Jinx ASMR', duration: '42:33', emoji: '🤫' },
 ];
 
 const artistPhoto = 'https://images.unsplash.com/photo-1544717278-ca5e3cff53d7?w=500&h=600&fit=crop';
@@ -1369,6 +1486,8 @@ let isSubscribed = false;
 function init() {
   renderArtists();
   renderVideos();
+  renderArtistsGrid();
+  renderVideosGrid();
   renderFAQ();
   renderPricingCards();
 }
@@ -1376,7 +1495,7 @@ function init() {
 // ── ARTISTS ──
 function renderArtists() {
   const scroll = document.getElementById('artistsScroll');
-  scroll.innerHTML = artistsData.map((artist) => {
+  scroll.innerHTML = artistsData.slice(0, 6).map((artist) => {
     return `
       <div class="artist-mini-card" onclick="openArtistPage('${artist.name}', ${artist.photos}, ${artist.videos})">
         <div class="artist-mini-av" style="background-image:url('${artistPhoto}');"></div>
@@ -1389,7 +1508,7 @@ function renderArtists() {
 // ── VIDEOS ──
 function renderVideos() {
   const scroll = document.getElementById('videosScroll');
-  scroll.innerHTML = videos.map((video) => `
+  scroll.innerHTML = videos.slice(0, 6).map((video) => `
     <div class="video-mini-card">
       <div class="video-mini-thumb">
         ${video.emoji}
@@ -1397,6 +1516,37 @@ function renderVideos() {
       </div>
       <div class="video-mini-title">${video.title}</div>
       <div class="video-mini-artist">${video.artist}</div>
+    </div>
+  `).join('');
+}
+
+// ── ARTISTS GRID ──
+function renderArtistsGrid() {
+  const grid = document.getElementById('artistsGrid');
+  grid.innerHTML = artistsData.map((artist) => `
+    <div class="artist-card" onclick="openArtistPage('${artist.name}', ${artist.photos}, ${artist.videos})">
+      <div class="artist-card-image" style="background-image:url('${artistPhoto}')">${artist.emoji}</div>
+      <div class="artist-card-info">
+        <div class="artist-card-name">${artist.name}</div>
+        <div class="artist-card-meta">${artist.photos} photos · ${artist.videos} videos</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── VIDEOS GRID ──
+function renderVideosGrid() {
+  const grid = document.getElementById('videosGrid');
+  grid.innerHTML = videos.map((video) => `
+    <div class="video-card">
+      <div class="video-card-thumb">
+        ${video.emoji}
+        <div class="video-card-dur">${video.duration}</div>
+      </div>
+      <div class="video-card-info">
+        <div class="video-card-title">${video.title}</div>
+        <div class="video-card-artist">${video.artist}</div>
+      </div>
     </div>
   `).join('');
 }
@@ -1445,7 +1595,10 @@ function openPage(pageName) {
   document.querySelectorAll('.footer-btn').forEach(btn => {
     btn.classList.remove('active');
   });
-  document.getElementById(`footer-${pageName}`).classList.add('active');
+  
+  if (pageName !== 'artists' && pageName !== 'videos') {
+    document.getElementById(`footer-${pageName}`).classList.add('active');
+  }
 }
 
 // ── ARTIST PAGE ──
@@ -1471,16 +1624,12 @@ function updateCTAButtons() {
   const favoritesBtnMain = document.getElementById('favoritesBtnMain');
 
   if (isSubscribed) {
-    // Скрываем только Trial
     subscribeBtnMain.classList.remove('hidden');
     freeBtnMain.classList.add('hidden');
-    // Показываем Favorites вместо Trial
     favoritesBtnMain.classList.remove('hidden');
   } else {
-    // Показываем оба
     subscribeBtnMain.classList.remove('hidden');
     freeBtnMain.classList.remove('hidden');
-    // Скрываем Favorites
     favoritesBtnMain.classList.add('hidden');
   }
 }
