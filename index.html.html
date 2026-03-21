@@ -69,6 +69,9 @@ body {
   height: 40px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--pink), var(--purple));
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1074,6 +1077,9 @@ body {
   height: 80px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--pink), var(--purple));
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1801,6 +1807,40 @@ function getInitials(fullName) {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
+function applyUserAvatar(url, initials) {
+  const headerAvatar = document.getElementById("headerAvatar");
+  const profileAvatar = document.getElementById("profileAvatar");
+  const fallback = () => {
+    if (headerAvatar) {
+      headerAvatar.style.backgroundImage = "";
+      headerAvatar.textContent = initials;
+    }
+    if (profileAvatar) {
+      profileAvatar.style.backgroundImage = "";
+      profileAvatar.textContent = initials;
+    }
+  };
+
+  if (!url) {
+    fallback();
+    return;
+  }
+
+  const img = new Image();
+  img.onload = () => {
+    if (headerAvatar) {
+      headerAvatar.style.backgroundImage = `url("${url}")`;
+      headerAvatar.textContent = "";
+    }
+    if (profileAvatar) {
+      profileAvatar.style.backgroundImage = `url("${url}")`;
+      profileAvatar.textContent = "";
+    }
+  };
+  img.onerror = fallback;
+  img.src = url;
+}
+
 function renderTelegramProfile(user) {
   if (!user) return;
 
@@ -1808,6 +1848,7 @@ function renderTelegramProfile(user) {
   const username = user.username ? `@${user.username}` : "@no_username";
   const initials = getInitials(fullName);
   const idText = `ID: ${user.id}`;
+  const photoUrl = user.photo_url || "";
 
   const headerAvatar = document.getElementById("headerAvatar");
   const headerName = document.getElementById("headerName");
@@ -1824,6 +1865,7 @@ function renderTelegramProfile(user) {
   if (profileName) profileName.textContent = fullName;
   if (profileHandle) profileHandle.textContent = username;
   if (profileTelegramId) profileTelegramId.textContent = idText;
+  applyUserAvatar(photoUrl, initials);
 }
 
 async function fetchServerProfile(initData) {
