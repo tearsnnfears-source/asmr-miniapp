@@ -271,7 +271,7 @@ body {
 }
 
 .btn.hidden {
-  display: none;
+  display: none !important;
 }
 
 /* ── SECTION HEADER ── */
@@ -298,6 +298,7 @@ body {
   font-family: 'DM Sans', sans-serif;
   font-weight: 500;
   transition: color 0.15s;
+  padding: 4px 8px;
 }
 
 .see-all-btn:active {
@@ -432,7 +433,7 @@ body {
 }
 
 .artist-page.active {
-  display: flex;
+  display: flex !important;
 }
 
 .artist-page-back {
@@ -637,6 +638,28 @@ body {
 .video-card-artist {
   font-size: 9px;
   color: var(--pink);
+}
+
+/* ── PAGE TITLE ── */
+.page-title-section {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.page-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  letter-spacing: 1.5px;
+  margin-bottom: 4px;
+}
+
+.page-title span {
+  color: var(--pink);
+}
+
+.page-subtitle {
+  font-size: 12px;
+  color: var(--muted);
 }
 
 /* ── MODAL ── */
@@ -1090,28 +1113,6 @@ body {
   padding: 0 16px 14px;
 }
 
-/* ── PAGE TITLE ── */
-.page-title-section {
-  padding: 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.page-title {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 28px;
-  letter-spacing: 1.5px;
-  margin-bottom: 4px;
-}
-
-.page-title span {
-  color: var(--pink);
-}
-
-.page-subtitle {
-  font-size: 12px;
-  color: var(--muted);
-}
-
 /* ── TOAST ── */
 .toast {
   position: fixed;
@@ -1131,22 +1132,6 @@ body {
 
 .toast.show {
   transform: translateX(-50%) translateY(0);
-}
-
-/* ── RESPONSIVE ── */
-@media (max-width: 480px) {
-  .content {
-    padding: 12px;
-    gap: 12px;
-  }
-  
-  .header {
-    padding: 12px;
-  }
-  
-  .footer {
-    padding: 12px 16px 16px;
-  }
 }
 </style>
 </head>
@@ -1196,7 +1181,7 @@ body {
       <div>
         <div class="section-header">
           <div class="section-title">🎙 Artists</div>
-          <button class="see-all-btn" onclick="openPage('artists')">See all →</button>
+          <button class="see-all-btn" onclick="showArtistsPage()">See all →</button>
         </div>
         <div class="artists-scroll" id="artistsScroll"></div>
       </div>
@@ -1205,7 +1190,7 @@ body {
       <div>
         <div class="section-header">
           <div class="section-title">✨ New Videos</div>
-          <button class="see-all-btn" onclick="openPage('videos')">See all →</button>
+          <button class="see-all-btn" onclick="showVideosPage()">See all →</button>
         </div>
         <div class="videos-scroll" id="videosScroll"></div>
       </div>
@@ -1441,16 +1426,15 @@ body {
 <div class="toast" id="toast"></div>
 
 <script>
-// ── DATA ──
 const artistsData = [
-  { name: 'Moona ASMR', initials: 'MA', emoji: '🎙', photos: 12, videos: 8 },
-  { name: 'HoneyGirl', initials: 'HG', emoji: '👧', photos: 15, videos: 10 },
-  { name: 'Rose ASMR', initials: 'RA', emoji: '🌹', photos: 18, videos: 11 },
-  { name: 'Mood ASMR', initials: 'MO', emoji: '😴', photos: 10, videos: 7 },
-  { name: 'Puffin ASMR', initials: 'PA', emoji: '🐦', photos: 14, videos: 9 },
-  { name: 'Trinki ASMR', initials: 'TA', emoji: '✨', photos: 16, videos: 12 },
-  { name: 'Beebee ASMR', initials: 'BA', emoji: '🐝', photos: 13, videos: 8 },
-  { name: 'Jinx ASMR', initials: 'JA', emoji: '⚡', photos: 17, videos: 11 },
+  { name: 'Moona ASMR', photos: 12, videos: 8 },
+  { name: 'HoneyGirl', photos: 15, videos: 10 },
+  { name: 'Rose ASMR', photos: 18, videos: 11 },
+  { name: 'Mood ASMR', photos: 10, videos: 7 },
+  { name: 'Puffin ASMR', photos: 14, videos: 9 },
+  { name: 'Trinki ASMR', photos: 16, videos: 12 },
+  { name: 'Beebee ASMR', photos: 13, videos: 8 },
+  { name: 'Jinx ASMR', photos: 17, videos: 11 },
 ];
 
 const videos = [
@@ -1482,50 +1466,32 @@ const plans = [
 let selectedPlan = 1;
 let isSubscribed = false;
 
-// ── INIT ──
-function init() {
-  renderArtists();
-  renderVideos();
-  renderArtistsGrid();
-  renderVideosGrid();
-  renderFAQ();
-  renderPricingCards();
-}
-
-// ── ARTISTS ──
 function renderArtists() {
   const scroll = document.getElementById('artistsScroll');
-  scroll.innerHTML = artistsData.slice(0, 6).map((artist) => {
-    return `
-      <div class="artist-mini-card" onclick="openArtistPage('${artist.name}', ${artist.photos}, ${artist.videos})">
-        <div class="artist-mini-av" style="background-image:url('${artistPhoto}');"></div>
-        <div class="artist-mini-name">${artist.name.split(' ')[0]}</div>
-      </div>
-    `;
-  }).join('');
+  scroll.innerHTML = artistsData.slice(0, 6).map(artist => `
+    <div class="artist-mini-card" onclick="openArtistPage('${artist.name}', ${artist.photos}, ${artist.videos})">
+      <div class="artist-mini-av" style="background-image:url('${artistPhoto}')"></div>
+      <div class="artist-mini-name">${artist.name.split(' ')[0]}</div>
+    </div>
+  `).join('');
 }
 
-// ── VIDEOS ──
 function renderVideos() {
   const scroll = document.getElementById('videosScroll');
-  scroll.innerHTML = videos.slice(0, 6).map((video) => `
+  scroll.innerHTML = videos.slice(0, 6).map(video => `
     <div class="video-mini-card">
-      <div class="video-mini-thumb">
-        ${video.emoji}
-        <div class="video-dur">${video.duration}</div>
-      </div>
+      <div class="video-mini-thumb">${video.emoji}<div class="video-dur">${video.duration}</div></div>
       <div class="video-mini-title">${video.title}</div>
       <div class="video-mini-artist">${video.artist}</div>
     </div>
   `).join('');
 }
 
-// ── ARTISTS GRID ──
 function renderArtistsGrid() {
   const grid = document.getElementById('artistsGrid');
-  grid.innerHTML = artistsData.map((artist) => `
+  grid.innerHTML = artistsData.map(artist => `
     <div class="artist-card" onclick="openArtistPage('${artist.name}', ${artist.photos}, ${artist.videos})">
-      <div class="artist-card-image" style="background-image:url('${artistPhoto}')">${artist.emoji}</div>
+      <div class="artist-card-image" style="background-image:url('${artistPhoto}')"></div>
       <div class="artist-card-info">
         <div class="artist-card-name">${artist.name}</div>
         <div class="artist-card-meta">${artist.photos} photos · ${artist.videos} videos</div>
@@ -1534,15 +1500,11 @@ function renderArtistsGrid() {
   `).join('');
 }
 
-// ── VIDEOS GRID ──
 function renderVideosGrid() {
   const grid = document.getElementById('videosGrid');
-  grid.innerHTML = videos.map((video) => `
+  grid.innerHTML = videos.map(video => `
     <div class="video-card">
-      <div class="video-card-thumb">
-        ${video.emoji}
-        <div class="video-card-dur">${video.duration}</div>
-      </div>
+      <div class="video-card-thumb">${video.emoji}<div class="video-card-dur">${video.duration}</div></div>
       <div class="video-card-info">
         <div class="video-card-title">${video.title}</div>
         <div class="video-card-artist">${video.artist}</div>
@@ -1551,7 +1513,6 @@ function renderVideosGrid() {
   `).join('');
 }
 
-// ── FAQ ──
 function renderFAQ() {
   const faqEl = document.getElementById('faqAccordion');
   faqEl.innerHTML = faqs.map(f => `
@@ -1565,7 +1526,6 @@ function renderFAQ() {
   `).join('');
 }
 
-// ── PRICING ──
 function renderPricingCards() {
   const container = document.getElementById('pricingCards');
   container.innerHTML = plans.map((plan, i) => `
@@ -1584,31 +1544,24 @@ function selectPlan(index) {
   renderPricingCards();
 }
 
-// ── PAGES ──
-function openPage(pageName) {
-  document.querySelectorAll('.page').forEach(page => {
-    page.classList.remove('active');
-  });
-  
-  document.getElementById(`page-${pageName}`).classList.add('active');
-  
-  document.querySelectorAll('.footer-btn').forEach(btn => {
-    btn.classList.remove('active');
-  });
-  
-  if (pageName !== 'artists' && pageName !== 'videos') {
-    document.getElementById(`footer-${pageName}`).classList.add('active');
-  }
+function openPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(`page-${page}`).classList.add('active');
+  document.querySelectorAll('.footer-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`footer-${page}`)?.classList.add('active');
 }
 
-// ── ARTIST PAGE ──
+function showArtistsPage() {
+  openPage('artists');
+}
+
+function showVideosPage() {
+  openPage('videos');
+}
+
 function openArtistPage(name, photos, videos_count) {
-  const artistPage = document.getElementById('artist-page');
-  artistPage.classList.add('active');
-  
-  const mooonaPhotoUrl = 'https://i.ibb.co/7xjYTFQn/photo-2026-01-14-07-10-54.jpg';
-  
-  document.getElementById('artistBg').style.backgroundImage = `url('${mooonaPhotoUrl}')`;
+  document.getElementById('artist-page').classList.add('active');
+  document.getElementById('artistBg').style.backgroundImage = `url('https://i.ibb.co/7xjYTFQn/photo-2026-01-14-07-10-54.jpg')`;
   document.getElementById('photoCount').textContent = photos;
   document.getElementById('videoCount').textContent = videos_count;
 }
@@ -1617,7 +1570,6 @@ function closeArtistPage() {
   document.getElementById('artist-page').classList.remove('active');
 }
 
-// ── UPDATE UI ──
 function updateCTAButtons() {
   const subscribeBtnMain = document.getElementById('subscribeBtnMain');
   const freeBtnMain = document.getElementById('freeBtnMain');
@@ -1634,7 +1586,6 @@ function updateCTAButtons() {
   }
 }
 
-// ── SUBSCRIBE MODAL ──
 function openSubscribeModal() {
   document.getElementById('subscribeModal').classList.add('active');
 }
@@ -1650,7 +1601,6 @@ function confirmSubscribe() {
   showToast('✅ Subscription confirmed!');
 }
 
-// ── TRIAL MODAL ──
 function openTrialModal() {
   document.getElementById('trialModal').classList.add('active');
 }
@@ -1666,7 +1616,6 @@ function confirmTrial() {
   showToast('🎁 3 free days activated!');
 }
 
-// ── TOAST ──
 function showToast(msg) {
   const toast = document.getElementById('toast');
   toast.textContent = msg;
@@ -1674,8 +1623,12 @@ function showToast(msg) {
   setTimeout(() => toast.classList.remove('show'), 2500);
 }
 
-// ── START ──
-init();
+renderArtists();
+renderVideos();
+renderArtistsGrid();
+renderVideosGrid();
+renderFAQ();
+renderPricingCards();
 </script>
 
 </body>
