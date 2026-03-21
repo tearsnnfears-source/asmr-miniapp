@@ -465,7 +465,7 @@ body {
   bottom: 0;
   background-size: cover;
   background-position: center;
-  filter: blur(8px) brightness(0.6);
+  filter: blur(4px) brightness(0.7);
   z-index: 1;
 }
 
@@ -529,6 +529,57 @@ body {
   font-size: 11px;
   color: var(--muted);
   letter-spacing: 0.5px;
+}
+
+/* ── SEARCH ── */
+.search-bar {
+  display: flex;
+  gap: 8px;
+  padding: 16px;
+  background: var(--dark);
+}
+
+.search-input {
+  flex: 1;
+  background: var(--dark2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus {
+  border-color: rgba(255,126,200,0.3);
+}
+
+.search-input::placeholder {
+  color: var(--muted);
+}
+
+.search-clear {
+  background: var(--dark2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 40px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 18px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.search-clear.active {
+  display: flex;
+}
+
+.search-clear:active {
+  background: var(--dark3);
 }
 
 /* ── ARTISTS PAGE ── */
@@ -1375,7 +1426,7 @@ body {
     <div class="content">
 
       <!-- PREVIEW SECTION -->
-       <div class="preview-section">
+      <div class="preview-section">
         <h2>Page Preview</h2>
         <div style="position:relative;width:100%;aspect-ratio:16/9;border-radius:10px;overflow:hidden;margin-bottom:10px">
           <iframe 
@@ -1425,10 +1476,20 @@ body {
 
 <!-- ARTISTS PAGE -->
 <div class="page" id="page-artists">
+  <div class="search-bar">
+    <input 
+      type="text" 
+      class="search-input" 
+      id="artistSearch" 
+      placeholder="Search artists..." 
+      oninput="searchArtists(this.value)"
+    >
+    <button class="search-clear" id="searchClear" onclick="clearSearch()">✕</button>
+  </div>
   <div class="page-scroll">
     <div class="page-title-section">
       <div class="page-title">All <span>Artists</span></div>
-      <div class="page-subtitle">Browse all creators</div>
+      <div class="page-subtitle" id="artistsSubtitle">Browse all creators</div>
     </div>
     <div class="artists-grid" id="artistsGrid"></div>
   </div>
@@ -1804,7 +1865,7 @@ function renderPricingCards() {
       <div class="plan-features-m">
         <span class="pf-tag">✓ All creators</span>
         <span class="pf-tag">✓ HD quality</span>
-        <span class="pf-tag">�� Group access</span>
+        <span class="pf-tag">✓ Group access</span>
       </div>
     </div>
   `).join('');
@@ -1854,13 +1915,59 @@ function showVideosPage() {
 
 function openArtistProfile(name, photos, videos_count) {
   document.getElementById('artist-profile-page').classList.add('active');
-  document.getElementById('artistProfileBg').style.backgroundImage = `url('${artistPhoto}')`;
+  const mooonaPhotoUrl = 'https://i.ibb.co/7xjYTFQn/photo-2026-01-14-07-10-54.jpg';
+  document.getElementById('artistProfileBg').style.backgroundImage = `url('${mooonaPhotoUrl}')`;
   document.getElementById('profilePhotoCount').textContent = photos;
   document.getElementById('profileVideoCount').textContent = videos_count;
 }
 
 function closeArtistProfile() {
   document.getElementById('artist-profile-page').classList.remove('active');
+}
+
+function searchArtists(query) {
+  const searchClear = document.getElementById('searchClear');
+  const subtitle = document.getElementById('artistsSubtitle');
+  
+  if (query.length > 0) {
+    searchClear.classList.add('active');
+  } else {
+    searchClear.classList.remove('active');
+  }
+
+  const filtered = allArtists.filter(name => 
+    name.toLowerCase().includes(query.toLowerCase())
+  );
+
+  const grid = document.getElementById('artistsGrid');
+  
+  if (filtered.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 40px 16px; color: var(--muted)">
+        <div style="font-size: 32px; margin-bottom: 12px">🔍</div>
+        <div style="font-size: 14px">No artists found</div>
+      </div>
+    `;
+    subtitle.textContent = 'No results';
+  } else {
+    grid.innerHTML = filtered.map(name => `
+      <div class="artist-card" onclick="openArtistProfile('${name}', 12, 8)">
+        <div class="artist-card-image" style="background-image:url('${artistPhoto}')"></div>
+        <div class="artist-card-info">
+          <div class="artist-card-name">${name}</div>
+          <div class="artist-card-meta">12 photos · 8 videos</div>
+        </div>
+      </div>
+    `).join('');
+    subtitle.textContent = `${filtered.length} creator${filtered.length !== 1 ? 's' : ''}`;
+  }
+}
+
+function clearSearch() {
+  document.getElementById('artistSearch').value = '';
+  document.getElementById('searchClear').classList.remove('active');
+  renderArtistsGrid();
+  document.getElementById('artistsSubtitle').textContent = 'Browse all creators';
 }
 
 function updateCTAButtons() {
