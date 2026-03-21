@@ -82,7 +82,7 @@ body {
 }
 
 .user-info h3 {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 500;
   margin-bottom: 1px;
   display: flex;
@@ -91,7 +91,7 @@ body {
 }
 
 .user-info p {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--pink);
 }
 
@@ -102,19 +102,24 @@ body {
   background: rgba(200,255,68,0.08);
   border: 1px solid rgba(200,255,68,0.2);
   border-radius: 50px;
-  padding: 5px 12px;
+  padding: 8px 16px;
 }
 
 .days-left-num {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: 16px;
+  font-size: 22px;
   color: var(--lime);
   line-height: 1;
 }
 
 .days-left-label {
-  font-size: 8px;
+  font-size: 10px;
   color: rgba(200,255,68,0.6);
+}
+
+.infinity-value {
+  font-size: 30px !important;
+  line-height: 0.9 !important;
 }
 
 /* ── MAIN CONTAINER ── */
@@ -1797,7 +1802,8 @@ const videoTitles = [
   'Relaxing Sounds', 'Tingles & Whispers'
 ];
 
-const artistPhoto = 'https://images.unsplash.com/photo-1544717278-ca5e3cff53d7?w=500&h=600&fit=crop';
+const VERONIKA_PROFILE_PHOTO = 'https://i.ibb.co/7xjYTFQn/photo-2026-01-14-07-10-54.jpg';
+const PLACEHOLDER_ARTIST_PHOTO = 'https://placehold.co/500x600/1E1E20/8A8A8A?text=No+Photo';
 
 const faqs = [
   { q: 'How do I access the group?', a: "After subscribing, you'll receive an invite link automatically. Just click it to join." },
@@ -1826,6 +1832,14 @@ let currentUser = null;
 let serverDaysLeft = null;
 const API_BASE = window.__MINIAPP_API_BASE__ || "https://asmr-bot-production.up.railway.app";
 const INFINITE_SUB_DAYS_THRESHOLD = 9000;
+const artistProfiles = Object.fromEntries(
+  allArtists.map(name => [name, { photo: PLACEHOLDER_ARTIST_PHOTO, photos: 0, videos: 0 }])
+);
+artistProfiles['Veronika ASMR'] = {
+  photo: VERONIKA_PROFILE_PHOTO,
+  photos: 12,
+  videos: 8
+};
 
 function getInitials(fullName) {
   const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
@@ -1942,8 +1956,8 @@ async function initTelegramWebAppUser() {
 function renderArtists() {
   const scroll = document.getElementById('artistsScroll');
   scroll.innerHTML = allArtists.slice(0, 10).map(name => `
-    <div class="artist-mini-card" onclick="openArtistProfile('${name}', 12, 8)">
-      <div class="artist-mini-av" style="background-image:url('${artistPhoto}')"></div>
+    <div class="artist-mini-card" onclick="openArtistProfile('${name}')">
+      <div class="artist-mini-av" style="background-image:url('${artistProfiles[name].photo}')"></div>
       <div class="artist-mini-name">${name.split(' ')[0]}</div>
     </div>
   `).join('');
@@ -1963,11 +1977,11 @@ function renderVideos() {
 function renderArtistsGrid() {
   const grid = document.getElementById('artistsGrid');
   grid.innerHTML = allArtists.map(name => `
-    <div class="artist-card" onclick="openArtistProfile('${name}', 12, 8)">
-      <div class="artist-card-image" style="background-image:url('${artistPhoto}')"></div>
+    <div class="artist-card" onclick="openArtistProfile('${name}')">
+      <div class="artist-card-image" style="background-image:url('${artistProfiles[name].photo}')"></div>
       <div class="artist-card-info">
         <div class="artist-card-name">${name}</div>
-        <div class="artist-card-meta">12 photos · 8 videos</div>
+        <div class="artist-card-meta">${artistProfiles[name].photos} photos · ${artistProfiles[name].videos} videos</div>
       </div>
     </div>
   `).join('');
@@ -2063,12 +2077,16 @@ function showVideosPage() {
   openPage('videos');
 }
 
-function openArtistProfile(name, photos, videos_count) {
+function openArtistProfile(name) {
   document.getElementById('artist-profile-page').classList.add('active');
-  const mooonaPhotoUrl = 'https://i.ibb.co/7xjYTFQn/photo-2026-01-14-07-10-54.jpg';
-  document.getElementById('artistProfileBg').style.backgroundImage = `url('${mooonaPhotoUrl}')`;
-  document.getElementById('profilePhotoCount').textContent = photos;
-  document.getElementById('profileVideoCount').textContent = videos_count;
+  const profile = artistProfiles[name] || { photo: PLACEHOLDER_ARTIST_PHOTO, photos: 0, videos: 0 };
+  document.getElementById('artistProfileBg').style.backgroundImage = `url('${profile.photo}')`;
+  document.querySelector('.artist-profile-content').innerHTML = `
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px">${name}</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px">Creator profile</div>
+  `;
+  document.getElementById('profilePhotoCount').textContent = profile.photos;
+  document.getElementById('profileVideoCount').textContent = profile.videos;
 }
 
 function closeArtistProfile() {
@@ -2101,11 +2119,11 @@ function searchArtists(query) {
     subtitle.textContent = 'No results';
   } else {
     grid.innerHTML = filtered.map(name => `
-      <div class="artist-card" onclick="openArtistProfile('${name}', 12, 8)">
-        <div class="artist-card-image" style="background-image:url('${artistPhoto}')"></div>
+      <div class="artist-card" onclick="openArtistProfile('${name}')">
+        <div class="artist-card-image" style="background-image:url('${artistProfiles[name].photo}')"></div>
         <div class="artist-card-info">
           <div class="artist-card-name">${name}</div>
-          <div class="artist-card-meta">12 photos · 8 videos</div>
+          <div class="artist-card-meta">${artistProfiles[name].photos} photos · ${artistProfiles[name].videos} videos</div>
         </div>
       </div>
     `).join('');
@@ -2132,6 +2150,8 @@ function updateCTAButtons() {
 
   if (headerVipBadge) headerVipBadge.classList.toggle('show', isInfiniteSub);
   if (profileVipBadge) profileVipBadge.classList.toggle('show', isInfiniteSub);
+  if (headerDaysLeft) headerDaysLeft.classList.toggle('infinity-value', isInfiniteSub);
+  if (profileDaysLeft) profileDaysLeft.classList.toggle('infinity-value', isInfiniteSub);
 
   if (isSubscribed) {
     subscribeBtnMain.classList.remove('hidden');
