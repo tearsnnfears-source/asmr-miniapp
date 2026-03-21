@@ -1961,14 +1961,22 @@ body {
     <div class="promo-wrap">
       <div class="section-title" style="margin-bottom:8px">Promo Code</div>
       <div class="promo-input-wrap">
-        <input type="text" class="promo-input" placeholder="Enter promo code" id="promoInput" oninput="this.value=this.value.toUpperCase()">
+        <input type="text" class="promo-input" placeholder="Enter promo code" id="promoInput" oninput="this.value=this.value.toUpperCase(); this.style.borderColor = 'rgba(255,126,200,0.3)';">
         <button class="promo-apply" onclick="applyPromo()">Apply</button>
       </div>
     </div>
 
-    <div style="padding:0 16px 16px">
+    <div style="padding:0 16px 16px" id="subscribeBtnContainer">
       <button class="btn-primary" id="payBtn" onclick="processPay()">
         💳 Subscribe — €15 / 30 days
+      </button>
+    </div>
+    
+    <!-- Stylish Subscribe Button After Promo -->
+    <div style="padding:0 16px 24px" id="stylishSubscribeBtn">
+      <button onclick="openPaymentLink()" style="width:100%;border:none;border-radius:16px;padding:18px 20px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 8px 32px rgba(255,126,200,0.4);background:linear-gradient(135deg, #FF7EC8, #C86BFF);color:#FFFFFF;transition:all 0.2s;transform:scale(1);">
+        <span style="font-size:20px">🚀</span>
+        <span>Subscribe Now</span>
       </button>
     </div>
   </div>
@@ -2764,10 +2772,113 @@ function confirmTrial() {
   refreshFavoritesBadgesOnly();
 }
 
+// Payment URLs from bot config
+const PAYMENT_URLS = {
+  tribute: 'https://t.me/tribute/app?startapp=sQSn',
+  // For YooMoney/SBP, we'll call the API
+};
+
+let promoApplied = false;
+let promoBonus = 0;
+
 function applyPromo() {
   const code = document.getElementById('promoInput').value.trim();
   if(!code) { showToast('⚠️ Enter a promo code first'); return; }
-  showToast(code === 'ASMR2026' ? '🎉 Promo applied! +7 days bonus' : '❌ Invalid promo code');
+  if (code === 'ASMR2026') {
+    promoApplied = true;
+    promoBonus = 7;
+    showToast('🎉 Promo applied! +7 days bonus');
+    document.getElementById('promoInput').style.borderColor = 'var(--lime)';
+  } else {
+    showToast('❌ Invalid promo code');
+    document.getElementById('promoInput').style.borderColor = 'rgba(255,80,80,0.5)';
+  }
+}
+
+async function openPaymentLink() {
+  const plan = plans[selectedPlan];
+  const method = methods[selectedMethod];
+  
+  if (!plan || plan.soon) {
+    showToast('🚧 This plan is not available yet');
+    return;
+  }
+  
+  if (method.soon) {
+    showToast('🚧 This payment method is coming soon');
+    return;
+  }
+  
+  const tg = window.Telegram?.WebApp;
+  const initData = getTelegramInitData();
+  
+  let paymentUrl = '';
+  
+  switch(selectedMethod) {
+    case 0: // Card via Tribute
+      paymentUrl = PAYMENT_URLS.tribute;
+      break;
+    case 1: // TG Stars - create invoice via API
+      try {
+        showToast('⏳ Creating invoice...');
+        const res = await fetch(`${API_BASE}/miniapp/create_stars_invoice`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            initData,
+            days: plan.days 
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.invoice_link) {
+          paymentUrl = data.invoice_link;
+        } else {
+          // Fallback - open payment bot inline
+          paymentUrl = `https://t.me/${tg?.initDataUnsafe?.bot?.username || 'asmrLeaksBot'}?start=pay_stars_${plan.days}`;
+        }
+      } catch (e) {
+        // Fallback to bot
+        paymentUrl = `https://t.me/asmrLeaksBot?start=pay_stars_${plan.days}`;
+      }
+      break;
+    case 2: // СБП via YooMoney
+      try {
+        showToast('⏳ Creating payment link...');
+        const res = await fetch(`${API_BASE}/miniapp/create_yoomoney_payment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            initData,
+            days: plan.days 
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.payment_url) {
+          paymentUrl = data.payment_url;
+        } else {
+          // Fallback to bot
+          paymentUrl = `https://t.me/asmrLeaksBot?start=pay_yoomoney_${plan.days}`;
+        }
+      } catch (e) {
+        paymentUrl = `https://t.me/asmrLeaksBot?start=pay_yoomoney_${plan.days}`;
+      }
+      break;
+    case 3: // Crypto
+      showToast('🚧 Crypto payments coming soon');
+      return;
+    default:
+      showToast('⚠️ Please select a payment method');
+      return;
+  }
+  
+  // Open payment link
+  if (tg && typeof tg.openLink === 'function') {
+    tg.openLink(paymentUrl);
+  } else {
+    window.open(paymentUrl, '_blank', 'noopener');
+  }
+  
+  showToast(`Opening ${method.name} payment...`);
 }
 
 function processPay() {
