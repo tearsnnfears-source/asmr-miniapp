@@ -1699,11 +1699,20 @@ body {
       </div>
 
       <!-- STATS BANNER -->
-      <div style="background:linear-gradient(135deg,rgba(204,255,0,0.12),rgba(204,255,0,0.05));border:1px solid rgba(204,255,0,0.25);border-radius:12px;padding:14px 16px;text-align:center;display:flex;align-items:center;justify-content:center;gap:16px">
+      <div style="background:linear-gradient(135deg,rgba(204,255,0,0.12),rgba(204,255,0,0.05));border:1px solid rgba(204,255,0,0.25);border-radius:12px;padding:14px 16px;text-align:center;display:flex;align-items:center;justify-content:center;gap:12px">
         <div style="font-size:16px;font-weight:600;color:var(--lime)">51.534 Photos</div>
         <div style="width:1px;height:20px;background:rgba(204,255,0,0.3)"></div>
         <div style="font-size:16px;font-weight:600;color:var(--lime)">10.423 Videos</div>
+        <div style="width:1px;height:20px;background:rgba(204,255,0,0.3)"></div>
+        <div style="font-size:16px;font-weight:600;color:var(--lime)">90 Artists</div>
+        <span style="width:10px;height:10px;background:var(--purple);border-radius:50%;animation:blink 1.5s infinite;box-shadow:0 0 8px var(--purple)"></span>
       </div>
+      <style>
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+      </style>
 
       <!-- CTA BUTTONS -->
       <div class="cta-section" id="ctaSection">
