@@ -698,6 +698,9 @@ body {
 .footer-btn-icon {
   font-size: 24px;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .footer-btn-label {
@@ -731,6 +734,13 @@ body {
   position: relative;
   z-index: 1;
   color: #0E0E0F;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -12px;
 }
 
 .footer-btn.center .footer-btn-label {
@@ -1086,7 +1096,7 @@ body {
         <button class="btn btn-secondary" id="freeBtnMain" onclick="openTrialModal()">
           🎁 Try 3 Days Free
         </button>
-        <button class="btn btn-favorites hidden" id="favoritesBtnMain" onclick="openPage('home')">
+        <button class="btn btn-favorites hidden" id="favoritesBtnMain" onclick="showToast('⭐ My Favorites')">
           ⭐ My Favorites
         </button>
       </div>
@@ -1118,7 +1128,7 @@ body {
   <div class="page-scroll">
     <div class="profile-header">
       <div class="profile-av-wrap">
-        <div class="profile-av">SR</div>
+        <div class="profile-av">👤</div>
         <div class="profile-online"></div>
       </div>
       <div class="profile-name">Sofia Reinholt</div>
@@ -1461,13 +1471,13 @@ function updateCTAButtons() {
   const favoritesBtnMain = document.getElementById('favoritesBtnMain');
 
   if (isSubscribed) {
-    // Скрываем Subscribe и Trial
-    subscribeBtnMain.classList.add('hidden');
+    // Скрываем только Trial
+    subscribeBtnMain.classList.remove('hidden');
     freeBtnMain.classList.add('hidden');
-    // Показываем Favorites
+    // Показываем Favorites вместо Trial
     favoritesBtnMain.classList.remove('hidden');
   } else {
-    // Показываем Subscribe и Trial
+    // Показываем оба
     subscribeBtnMain.classList.remove('hidden');
     freeBtnMain.classList.remove('hidden');
     // Скрываем Favorites
