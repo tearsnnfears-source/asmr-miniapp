@@ -555,11 +555,11 @@ body {
 .artist-card-image {
   width: 100%;
   height: 140px;
-  background: var(--dark3);
+  background: linear-gradient(135deg, #FF7EC8, #C86BFF);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 32px;
+  font-size: 48px;
   background-size: cover;
   background-position: center;
 }
@@ -603,7 +603,7 @@ body {
 .video-card-thumb {
   width: 100%;
   height: 100px;
-  background: var(--dark3);
+  background: linear-gradient(135deg, #44C8FF, #6B8FFF);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -806,7 +806,7 @@ body {
 .footer-btn {
   background: none;
   border: none;
-  color: var(--text);
+  color: var(--lime);
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -837,7 +837,7 @@ body {
 
 .footer-btn-label {
   font-size: 10px;
-  color: var(--muted);
+  color: var(--lime);
   font-weight: 500;
 }
 
@@ -1426,26 +1426,32 @@ body {
 <div class="toast" id="toast"></div>
 
 <script>
-const artistsData = [
-  { name: 'Moona ASMR', photos: 12, videos: 8 },
-  { name: 'HoneyGirl', photos: 15, videos: 10 },
-  { name: 'Rose ASMR', photos: 18, videos: 11 },
-  { name: 'Mood ASMR', photos: 10, videos: 7 },
-  { name: 'Puffin ASMR', photos: 14, videos: 9 },
-  { name: 'Trinki ASMR', photos: 16, videos: 12 },
-  { name: 'Beebee ASMR', photos: 13, videos: 8 },
-  { name: 'Jinx ASMR', photos: 17, videos: 11 },
+const allArtists = [
+  'Moona ASMR', 'HoneyGirl', 'Reneserealrm', 'Emma', 'Ruby ASMR', 
+  'HeatheredEffect', 'Rose ASMR', 'Malinkaa98', 'Mood ASMR', 'Soly ASMR',
+  'Puffin ASMR', 'Trinki ASMR', 'SkepticalPickle ASMR', 'Akuma ASMR', 'Tysria',
+  'The Sounds of Girls', 'Jinx ASMR', 'Beebee ASMR', 'Diddly ASMR', 'Its_Bunnii ASMR',
+  'Maimy', 'Nyan ASMR', 'Tangerin', 'BusyB', 'Kotya ASMR',
+  'BellaRama', 'Beka', 'Malaika', 'Mewlies ASMR', 'Miinu Inu',
+  'LinaNeyeon', 'FoxenKin', 'Bilochka ASMR', 'TheNicoleT', 'Nananightray',
+  'JazzMeow', 'Lyrica', 'Leyna Inu', 'Veronika ASMR', 'Tanya Melson ASMR',
+  'Florescent', 'Amouranth', 'Maddy ASMR', 'Telishamaree', 'Ginger ASMR',
+  'KittyKlaw', 'LunaRexx', 'Arina', 'SL Lauren', 'Alexis ASMR',
+  'Orenda ASMR', 'Valeriya ASMR', 'Amy ASMR', 'Wan ASMR', 'Emilyuwo ASMR',
+  'Kailey Mae ASMR', 'Cherry Crush ASMR', 'Arilove ASMR', 'SacredXO', 'ASMRbyK',
+  'Claudy ASMR', 'ArianaRealTV', 'Emma My Space', 'Laurel Jeune', 'ESTHEROlive',
+  'Onuri', 'Amyrosebutt', 'BunnyAyumi', 'All Bella', 'Holly Rosi ASMR',
+  'ElisabeteXO ASMR', 'Malina ASMR', 'Lei ASMR', 'Bunny Marthy', 'Trisha Fisher',
+  'JadetheJaguar', 'White Spa ASMR', 'Vico ASMR', 'Corneliusthecat', 'Smizzles',
+  'Mimi_fun', 'Alice Delish', 'Sarene Wild', 'Fifi_lurks', 'Jenfoxx',
+  'PekeASMR', 'Lexinkin', 'Senadeska', 'Lin ASMR', 'Lerka',
+  'Mazzybelle', 'Castaway', 'Sofifrenchfry', 'SleepySab', 'Sabrina Vaz'
 ];
 
-const videos = [
-  { title: 'Ear Eating ASMR', artist: 'Moona ASMR', duration: '41:07', emoji: '👂' },
-  { title: 'Deep Whisper', artist: 'HoneyGirl', duration: '28:22', emoji: '🎤' },
-  { title: 'Tapping Tingles', artist: 'Rose ASMR', duration: '55:14', emoji: '✋' },
-  { title: 'Sleep Session', artist: 'Mood ASMR', duration: '34:18', emoji: '😴' },
-  { title: 'Personal Attention', artist: 'Puffin ASMR', duration: '22:44', emoji: '💆' },
-  { title: 'Binaural ASMR', artist: 'Trinki ASMR', duration: '48:07', emoji: '👂' },
-  { title: 'Brain Tingles', artist: 'Beebee ASMR', duration: '35:12', emoji: '🧠' },
-  { title: 'Close Whisper', artist: 'Jinx ASMR', duration: '42:33', emoji: '🤫' },
+const videoTitles = [
+  'Ear Eating ASMR', 'Deep Whisper', 'Tapping Tingles', 'Sleep Session',
+  'Personal Attention', 'Binaural ASMR', 'Brain Tingles', 'Close Whisper',
+  'Relaxing Sounds', 'Tingles & Whispers'
 ];
 
 const artistPhoto = 'https://images.unsplash.com/photo-1544717278-ca5e3cff53d7?w=500&h=600&fit=crop';
@@ -1468,33 +1474,33 @@ let isSubscribed = false;
 
 function renderArtists() {
   const scroll = document.getElementById('artistsScroll');
-  scroll.innerHTML = artistsData.slice(0, 6).map(artist => `
-    <div class="artist-mini-card" onclick="openArtistPage('${artist.name}', ${artist.photos}, ${artist.videos})">
+  scroll.innerHTML = allArtists.slice(0, 10).map(name => `
+    <div class="artist-mini-card" onclick="openArtistPage('${name}', 12, 8)">
       <div class="artist-mini-av" style="background-image:url('${artistPhoto}')"></div>
-      <div class="artist-mini-name">${artist.name.split(' ')[0]}</div>
+      <div class="artist-mini-name">${name.split(' ')[0]}</div>
     </div>
   `).join('');
 }
 
 function renderVideos() {
   const scroll = document.getElementById('videosScroll');
-  scroll.innerHTML = videos.slice(0, 6).map(video => `
+  scroll.innerHTML = videoTitles.slice(0, 5).map((title, i) => `
     <div class="video-mini-card">
-      <div class="video-mini-thumb">${video.emoji}<div class="video-dur">${video.duration}</div></div>
-      <div class="video-mini-title">${video.title}</div>
-      <div class="video-mini-artist">${video.artist}</div>
+      <div class="video-mini-thumb">🎬<div class="video-dur">41:07</div></div>
+      <div class="video-mini-title">${title}</div>
+      <div class="video-mini-artist">${allArtists[i]}</div>
     </div>
   `).join('');
 }
 
 function renderArtistsGrid() {
   const grid = document.getElementById('artistsGrid');
-  grid.innerHTML = artistsData.map(artist => `
-    <div class="artist-card" onclick="openArtistPage('${artist.name}', ${artist.photos}, ${artist.videos})">
+  grid.innerHTML = allArtists.map(name => `
+    <div class="artist-card" onclick="openArtistPage('${name}', 12, 8)">
       <div class="artist-card-image" style="background-image:url('${artistPhoto}')"></div>
       <div class="artist-card-info">
-        <div class="artist-card-name">${artist.name}</div>
-        <div class="artist-card-meta">${artist.photos} photos · ${artist.videos} videos</div>
+        <div class="artist-card-name">${name}</div>
+        <div class="artist-card-meta">12 photos · 8 videos</div>
       </div>
     </div>
   `).join('');
@@ -1502,12 +1508,12 @@ function renderArtistsGrid() {
 
 function renderVideosGrid() {
   const grid = document.getElementById('videosGrid');
-  grid.innerHTML = videos.map(video => `
+  grid.innerHTML = videoTitles.map((title, i) => `
     <div class="video-card">
-      <div class="video-card-thumb">${video.emoji}<div class="video-card-dur">${video.duration}</div></div>
+      <div class="video-card-thumb">🎬<div class="video-card-dur">41:07</div></div>
       <div class="video-card-info">
-        <div class="video-card-title">${video.title}</div>
-        <div class="video-card-artist">${video.artist}</div>
+        <div class="video-card-title">${title}</div>
+        <div class="video-card-artist">${allArtists[i]}</div>
       </div>
     </div>
   `).join('');
@@ -1561,7 +1567,7 @@ function showVideosPage() {
 
 function openArtistPage(name, photos, videos_count) {
   document.getElementById('artist-page').classList.add('active');
-  document.getElementById('artistBg').style.backgroundImage = `url('https://i.ibb.co/7xjYTFQn/photo-2026-01-14-07-10-54.jpg')`;
+  document.getElementById('artistBg').style.backgroundImage = `url('${artistPhoto}')`;
   document.getElementById('photoCount').textContent = photos;
   document.getElementById('videoCount').textContent = videos_count;
 }
