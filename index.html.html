@@ -1857,6 +1857,8 @@ let selectedMethod = 0;
 let isSubscribed = false;
 let currentUser = null;
 let serverDaysLeft = null;
+/** null until /miniapp/profile responds; then from show_subscribe_button */
+let serverShowSubscribe = null;
 const API_BASE = window.__MINIAPP_API_BASE__ || "https://asmr-bot-production.up.railway.app";
 const INFINITE_SUB_DAYS_THRESHOLD = 9000;
 const MAX_ALLOWED_DAYS = 60;
@@ -1965,6 +1967,15 @@ async function initTelegramWebAppUser() {
     if (typeof profile.days_left === "number") {
       serverDaysLeft = profile.days_left;
       isSubscribed = profile.days_left > 0;
+    }
+    if (typeof profile.show_subscribe_button === "boolean") {
+      serverShowSubscribe = profile.show_subscribe_button;
+    } else if (typeof profile.days_left === "number") {
+      const u = profile.days_left;
+      if (u <= 0) serverShowSubscribe = true;
+      else if (u > INFINITE_SUB_DAYS_THRESHOLD) serverShowSubscribe = false;
+      else if (u > 3) serverShowSubscribe = false;
+      else serverShowSubscribe = !!profile.trial_used;
     }
     if (profile.full_name) {
       const nameParts = profile.full_name.split(" ");
@@ -2124,22 +2135,36 @@ function updatePaymentUI() {
   const maxDaysNotice = document.getElementById('maxDaysNotice');
   const isInfiniteSub = typeof serverDaysLeft === "number" && serverDaysLeft > INFINITE_SUB_DAYS_THRESHOLD;
   const hasAnySub = isSubscribed || (typeof serverDaysLeft === "number" && serverDaysLeft > 0);
-  const actionLabel = hasAnySub ? "Add days" : "Subscribe";
+  const payBlocked = serverShowSubscribe === false && hasAnySub;
   const plan = plans[selectedPlan];
 
   if (payBtn && plan) {
-    payBtn.textContent = `💳 ${actionLabel} — ${plan.price} / ${plan.days} days`;
+    if (payBlocked) {
+      payBtn.disabled = true;
+      payBtn.style.opacity = '0.55';
+      payBtn.textContent = '✅ You already have access';
+    } else {
+      payBtn.disabled = false;
+      payBtn.style.opacity = '1';
+      payBtn.textContent = `💳 Subscribe — ${plan.price} / ${plan.days} days`;
+    }
   }
   if (paymentTitle) {
-    paymentTitle.innerHTML = hasAnySub ? `Add <span style="color:var(--pink)">Days</span>` : `Choose <span style="color:var(--pink)">Plan</span>`;
+    paymentTitle.innerHTML = payBlocked
+      ? `You’re <span style="color:var(--pink)">Subscribed</span>`
+      : `Choose <span style="color:var(--pink)">Plan</span>`;
   }
   if (paymentSubtitle) {
-    paymentSubtitle.textContent = hasAnySub
-      ? `Current: ${isInfiniteSub ? "∞" : (serverDaysLeft ?? 0)} days · Max allowed: 60 days`
-      : 'Cancel anytime · No auto-renewal';
+    if (payBlocked) {
+      paymentSubtitle.textContent = 'You already have an active subscription.';
+    } else if (hasAnySub) {
+      paymentSubtitle.textContent = `Current: ${isInfiniteSub ? "∞" : (serverDaysLeft ?? 0)} days · Max allowed: 60 days total`;
+    } else {
+      paymentSubtitle.textContent = 'Cancel anytime · No auto-renewal';
+    }
   }
   if (maxDaysNotice) {
-    maxDaysNotice.style.display = hasAnySub ? 'block' : 'none';
+    maxDaysNotice.style.display = !payBlocked && hasAnySub ? 'block' : 'none';
   }
 }
 
@@ -2228,28 +2253,33 @@ function updateCTAButtons() {
   const headerVipBadge = document.getElementById('headerVipBadge');
   const profileVipBadge = document.getElementById('profileVipBadge');
   const isInfiniteSub = typeof serverDaysLeft === "number" && serverDaysLeft > INFINITE_SUB_DAYS_THRESHOLD;
+  const hasAccess = isSubscribed || (typeof serverDaysLeft === "number" && serverDaysLeft > 0);
+  const showSubscribeBtn =
+    serverShowSubscribe === true ||
+    (serverShowSubscribe === null && !hasAccess);
 
   if (headerVipBadge) headerVipBadge.classList.toggle('show', isInfiniteSub);
   if (profileVipBadge) profileVipBadge.classList.toggle('show', isInfiniteSub);
   if (headerDaysLeft) headerDaysLeft.classList.toggle('infinity-value', isInfiniteSub);
   if (profileDaysLeft) profileDaysLeft.classList.toggle('infinity-value', isInfiniteSub);
 
-  if (isSubscribed) {
-    subscribeBtnMain.classList.remove('hidden');
-    freeBtnMain.classList.add('hidden');
+  const days = typeof serverDaysLeft === "number" ? serverDaysLeft : 0;
+  if (headerDaysLeft) headerDaysLeft.textContent = isInfiniteSub ? "∞" : String(days);
+  if (profileDaysLeft) profileDaysLeft.innerHTML = isInfiniteSub ? '∞' : `${days}<span>d</span>`;
+
+  if (hasAccess) {
     favoritesBtnMain.classList.remove('hidden');
-    subscribeBtnMain.textContent = '➕ Add days';
-    const days = serverDaysLeft !== null ? serverDaysLeft : 30;
-    if (headerDaysLeft) headerDaysLeft.textContent = isInfiniteSub ? "∞" : String(days);
-    if (profileDaysLeft) profileDaysLeft.innerHTML = isInfiniteSub ? '∞' : `${days}<span>d</span>`;
+    freeBtnMain.classList.add('hidden');
   } else {
-    subscribeBtnMain.classList.remove('hidden');
-    freeBtnMain.classList.remove('hidden');
     favoritesBtnMain.classList.add('hidden');
+    freeBtnMain.classList.remove('hidden');
+  }
+
+  if (showSubscribeBtn) {
+    subscribeBtnMain.classList.remove('hidden');
     subscribeBtnMain.textContent = '💳 Subscribe Now';
-    const days = serverDaysLeft !== null ? serverDaysLeft : 0;
-    if (headerDaysLeft) headerDaysLeft.textContent = isInfiniteSub ? "∞" : String(days);
-    if (profileDaysLeft) profileDaysLeft.innerHTML = isInfiniteSub ? '∞' : `${days}<span>d</span>`;
+  } else {
+    subscribeBtnMain.classList.add('hidden');
   }
   updatePaymentUI();
 }
@@ -2265,6 +2295,7 @@ function closeTrialModal() {
 function confirmTrial() {
   if (serverDaysLeft === null || serverDaysLeft < 3) serverDaysLeft = 3;
   isSubscribed = true;
+  serverShowSubscribe = true;
   updateCTAButtons();
   closeTrialModal();
   showToast('🎁 3 free days activated!');
@@ -2284,6 +2315,12 @@ function processPay() {
     return;
   }
 
+  const hasAnySub = isSubscribed || (typeof serverDaysLeft === "number" && serverDaysLeft > 0);
+  if (serverShowSubscribe === false && hasAnySub) {
+    showToast('✅ You already have an active subscription');
+    return;
+  }
+
   const isInfiniteSub = typeof serverDaysLeft === "number" && serverDaysLeft > INFINITE_SUB_DAYS_THRESHOLD;
   if (isInfiniteSub) {
     showToast('♾️ Unlimited subscription active');
@@ -2299,6 +2336,7 @@ function processPay() {
 
   serverDaysLeft = nextTotal;
   isSubscribed = true;
+  serverShowSubscribe = false;
   updateCTAButtons();
   showToast(`✅ Added ${plan.days} days (total: ${nextTotal})`);
 }
