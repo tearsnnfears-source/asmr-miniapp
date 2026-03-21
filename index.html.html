@@ -1687,8 +1687,11 @@ body {
 <div class="page" id="page-payment">
   <div class="page-scroll">
     <div style="padding:20px 16px 8px;text-align:center">
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1.5px;margin-bottom:6px">Choose <span style="color:var(--pink)">Plan</span></div>
-      <div style="font-size:13px;color:var(--muted);font-weight:300">Cancel anytime · No auto-renewal</div>
+      <div id="paymentTitle" style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1.5px;margin-bottom:6px">Choose <span style="color:var(--pink)">Plan</span></div>
+      <div id="paymentSubtitle" style="font-size:13px;color:var(--muted);font-weight:300">Cancel anytime · No auto-renewal</div>
+    </div>
+    <div id="maxDaysNotice" style="display:none;background:rgba(255,159,68,0.09);border:1px solid rgba(255,159,68,0.25);border-radius:12px;margin:0 16px 12px;padding:10px 12px;font-size:12px;color:#FFC58A">
+      You cannot have more than 60 days total.
     </div>
 
     <div style="background:rgba(200,255,68,0.07);border:1px solid rgba(200,255,68,0.18);border-radius:12px;margin:0 16px 16px;padding:10px 14px;display:flex;align-items:center;gap:10px">
@@ -1832,6 +1835,7 @@ let currentUser = null;
 let serverDaysLeft = null;
 const API_BASE = window.__MINIAPP_API_BASE__ || "https://asmr-bot-production.up.railway.app";
 const INFINITE_SUB_DAYS_THRESHOLD = 9000;
+const MAX_ALLOWED_DAYS = 60;
 const artistProfiles = Object.fromEntries(
   allArtists.map(name => [name, { photo: PLACEHOLDER_ARTIST_PHOTO, photos: 0, videos: 0 }])
 );
@@ -2059,7 +2063,32 @@ function renderPaymentMethods() {
 function selectPlan(index) {
   selectedPlan = index;
   renderPricingCards();
-  document.getElementById('payBtn').textContent = `💳 Subscribe — ${plans[index].price} / ${plans[index].days} days`;
+  updatePaymentUI();
+}
+
+function updatePaymentUI() {
+  const payBtn = document.getElementById('payBtn');
+  const paymentTitle = document.getElementById('paymentTitle');
+  const paymentSubtitle = document.getElementById('paymentSubtitle');
+  const maxDaysNotice = document.getElementById('maxDaysNotice');
+  const isInfiniteSub = typeof serverDaysLeft === "number" && serverDaysLeft > INFINITE_SUB_DAYS_THRESHOLD;
+  const hasAnySub = isSubscribed || (typeof serverDaysLeft === "number" && serverDaysLeft > 0);
+  const actionLabel = hasAnySub ? "Add days" : "Subscribe";
+
+  if (payBtn) {
+    payBtn.textContent = `💳 ${actionLabel} — ${plans[selectedPlan].price} / ${plans[selectedPlan].days} days`;
+  }
+  if (paymentTitle) {
+    paymentTitle.innerHTML = hasAnySub ? `Add <span style="color:var(--pink)">Days</span>` : `Choose <span style="color:var(--pink)">Plan</span>`;
+  }
+  if (paymentSubtitle) {
+    paymentSubtitle.textContent = hasAnySub
+      ? `Current: ${isInfiniteSub ? "∞" : (serverDaysLeft ?? 0)} days · Max allowed: 60 days`
+      : 'Cancel anytime · No auto-renewal';
+  }
+  if (maxDaysNotice) {
+    maxDaysNotice.style.display = hasAnySub ? 'block' : 'none';
+  }
 }
 
 function openPage(page) {
@@ -2157,6 +2186,7 @@ function updateCTAButtons() {
     subscribeBtnMain.classList.remove('hidden');
     freeBtnMain.classList.add('hidden');
     favoritesBtnMain.classList.remove('hidden');
+    subscribeBtnMain.textContent = '➕ Add days';
     const days = serverDaysLeft !== null ? serverDaysLeft : 30;
     if (headerDaysLeft) headerDaysLeft.textContent = isInfiniteSub ? "∞" : String(days);
     if (profileDaysLeft) profileDaysLeft.innerHTML = isInfiniteSub ? '∞' : `${days}<span>d</span>`;
@@ -2164,10 +2194,12 @@ function updateCTAButtons() {
     subscribeBtnMain.classList.remove('hidden');
     freeBtnMain.classList.remove('hidden');
     favoritesBtnMain.classList.add('hidden');
+    subscribeBtnMain.textContent = '💳 Subscribe Now';
     const days = serverDaysLeft !== null ? serverDaysLeft : 0;
     if (headerDaysLeft) headerDaysLeft.textContent = isInfiniteSub ? "∞" : String(days);
     if (profileDaysLeft) profileDaysLeft.innerHTML = isInfiniteSub ? '∞' : `${days}<span>d</span>`;
   }
+  updatePaymentUI();
 }
 
 function openTrialModal() {
@@ -2179,6 +2211,7 @@ function closeTrialModal() {
 }
 
 function confirmTrial() {
+  if (serverDaysLeft === null || serverDaysLeft < 3) serverDaysLeft = 3;
   isSubscribed = true;
   updateCTAButtons();
   closeTrialModal();
@@ -2192,9 +2225,23 @@ function applyPromo() {
 }
 
 function processPay() {
+  const isInfiniteSub = typeof serverDaysLeft === "number" && serverDaysLeft > INFINITE_SUB_DAYS_THRESHOLD;
+  if (isInfiniteSub) {
+    showToast('♾️ Unlimited subscription active');
+    return;
+  }
+
+  const currentDays = typeof serverDaysLeft === "number" ? serverDaysLeft : (isSubscribed ? 30 : 0);
+  const nextTotal = currentDays + plans[selectedPlan].days;
+  if (nextTotal > MAX_ALLOWED_DAYS) {
+    showToast('⚠️ You cannot have more than 60 days');
+    return;
+  }
+
+  serverDaysLeft = nextTotal;
   isSubscribed = true;
   updateCTAButtons();
-  showToast('✅ Subscription confirmed!');
+  showToast(`✅ Added ${plans[selectedPlan].days} days (total: ${nextTotal})`);
 }
 
 function showToast(msg) {
