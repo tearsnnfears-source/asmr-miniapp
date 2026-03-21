@@ -1403,6 +1403,204 @@ body {
   transform: translateX(-50%) translateY(0);
 }
 
+.is-hidden {
+  display: none !important;
+}
+
+/* ── FAVORITES PAGE ── */
+.fav-head {
+  padding: 22px 16px 14px;
+  text-align: center;
+}
+
+.fav-head h1 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 30px;
+  letter-spacing: 1.5px;
+  margin-bottom: 6px;
+}
+
+.fav-head p {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 300;
+}
+
+.fav-counter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 126, 200, 0.1);
+  border: 1px solid rgba(255, 126, 200, 0.22);
+  font-size: 11px;
+  color: var(--pink);
+  font-weight: 600;
+}
+
+.fav-locked-card {
+  margin: 8px 16px 20px;
+  padding: 28px 20px;
+  text-align: center;
+  background: linear-gradient(145deg, rgba(30, 30, 32, 0.95), rgba(20, 12, 18, 0.98));
+  border: 1px solid var(--border);
+  border-radius: 18px;
+}
+
+.fav-locked-card .fav-locked-icon {
+  font-size: 42px;
+  margin-bottom: 12px;
+  opacity: 0.9;
+}
+
+.fav-locked-card h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.fav-locked-card p {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.fav-list-wrap {
+  padding: 0 16px 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fav-card {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  background: var(--dark2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: border-color 0.2s, transform 0.15s;
+}
+
+.fav-card:active {
+  transform: scale(0.99);
+}
+
+.fav-card-main {
+  flex: 1;
+  padding: 14px 14px 14px 16px;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.fav-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.fav-card-url {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fav-card-del {
+  width: 52px;
+  border: none;
+  background: rgba(255, 80, 80, 0.08);
+  color: rgba(255, 120, 120, 0.95);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.fav-card-del:active {
+  background: rgba(255, 80, 80, 0.18);
+}
+
+.fav-empty {
+  text-align: center;
+  padding: 36px 24px 24px;
+  color: var(--muted);
+}
+
+.fav-empty .fav-empty-icon {
+  font-size: 48px;
+  margin-bottom: 14px;
+  opacity: 0.35;
+}
+
+.fav-empty p {
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 260px;
+  margin: 0 auto;
+}
+
+.fav-add-btn {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 96px;
+  z-index: 115;
+  border: none;
+  border-radius: 14px;
+  padding: 15px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--pink), #FF4A9E);
+  color: #0E0E0F;
+  box-shadow: 0 6px 24px rgba(255, 126, 200, 0.35);
+}
+
+.fav-add-btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.fav-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--dark3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 14px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.fav-input::placeholder {
+  color: var(--muted);
+}
+
+.fav-input:focus {
+  outline: none;
+  border-color: rgba(255, 126, 200, 0.45);
+}
+
 /* ── FOOTER ── */
 .footer {
   position: fixed;
@@ -1411,13 +1609,13 @@ body {
   right: 0;
   background: var(--dark2);
   border-top: 1px solid var(--border);
-  padding: 12px 16px 20px;
+  padding: 10px 8px 18px;
   display: flex;
   align-items: center;
   justify-content: space-around;
-  gap: 16px;
+  gap: 4px;
   z-index: 120;
-  height: 80px;
+  min-height: 78px;
 }
 
 .footer-btn {
@@ -1453,7 +1651,7 @@ body {
 }
 
 .footer-btn-label {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--lime);
   font-weight: 500;
 }
@@ -1507,7 +1705,7 @@ body {
         <button class="btn btn-secondary" id="freeBtnMain" onclick="openTrialModal()">
           🎁 Try 3 Days Free
         </button>
-        <button class="btn btn-favorites hidden" id="favoritesBtnMain" onclick="showToast('⭐ My Favorites')">
+        <button class="btn btn-favorites hidden" id="favoritesBtnMain" onclick="openPage('favorites')">
           ⭐ My Favorites
         </button>
       </div>
@@ -1588,7 +1786,7 @@ body {
           <div class="profile-stat-label">Watched</div>
         </div>
         <div class="profile-stat-item">
-          <div class="profile-stat-val">24</div>
+          <div class="profile-stat-val" id="profileSavedCount">0</div>
           <div class="profile-stat-label">Saved</div>
         </div>
       </div>
@@ -1604,10 +1802,10 @@ body {
         </div>
         <div class="row-arrow">›</div>
       </div>
-      <div class="row-item" onclick="showToast('⭐ My Favorites')">
+      <div class="row-item" onclick="openPage('favorites')">
         <div class="row-icon" style="background:rgba(255,126,200,0.1)">⭐</div>
         <div class="row-label">My Favorites</div>
-        <div style="background:rgba(255,126,200,0.1);color:var(--pink);font-size:10px;padding:2px 8px;border-radius:4px;font-weight:500">24 saved</div>
+        <div id="profileFavBadge" style="background:rgba(255,126,200,0.1);color:var(--pink);font-size:10px;padding:2px 8px;border-radius:4px;font-weight:500">0 saved</div>
       </div>
     </div>
 
@@ -1707,6 +1905,35 @@ body {
   </div>
 </div>
 
+<!-- FAVORITES PAGE -->
+<div class="page" id="page-favorites">
+  <div class="page-scroll">
+    <div class="fav-head">
+      <h1>My <span style="color:var(--pink)">Favorites</span></h1>
+      <p>Save group video links — open in one tap</p>
+      <div class="fav-counter-pill" id="favCounterPill">
+        <span>⭐</span> <span id="favCountText">0</span> / <span id="favLimitText">100</span>
+      </div>
+    </div>
+
+    <div id="favLockedWrap" class="fav-locked-card is-hidden">
+      <div class="fav-locked-icon">🔒</div>
+      <h3>Subscribers only</h3>
+      <p>Favorites are available when your subscription is active. Subscribe or use your free trial from Home.</p>
+    </div>
+
+    <div id="favActiveWrap">
+      <div id="favEmpty" class="fav-empty is-hidden">
+        <div class="fav-empty-icon">⭐</div>
+        <p>Nothing saved yet. Tap <b>Add</b> below, paste a link from the group, and give it a name.</p>
+      </div>
+      <div id="favList" class="fav-list-wrap"></div>
+    </div>
+
+    <button type="button" class="fav-add-btn" id="favAddBtn" onclick="openFavAddModal()">➕ Add video</button>
+  </div>
+</div>
+
 <!-- PAYMENT PAGE -->
 <div class="page" id="page-payment">
   <div class="page-scroll">
@@ -1763,6 +1990,20 @@ body {
   </div>
 </div>
 
+<!-- ADD FAVORITE MODAL -->
+<div class="modal" id="favAddModal">
+  <div class="modal-content">
+    <button type="button" class="modal-close" onclick="closeFavAddModal()">×</button>
+    <div class="modal-title">Add <span>Favorite</span></div>
+    <p style="font-size:12px;color:var(--muted);margin:-4px 0 14px;text-align:center;line-height:1.45">Step 1: paste the video link from the group.<br>Step 2: choose a short title.</p>
+    <input type="url" class="fav-input" id="favUrlInput" placeholder="https://t.me/c/…" autocomplete="off">
+    <input type="text" class="fav-input" id="favTitleInput" placeholder="Title (max 128 characters)" maxlength="128" autocomplete="off">
+    <button type="button" class="btn-primary" onclick="submitAddFavorite()" style="width:100%;border:none;border-radius:14px;padding:15px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(255,126,200,0.35);background:linear-gradient(135deg, var(--pink), #FF4A9E);color:#0E0E0F;">
+      ✨ Save to favorites
+    </button>
+  </div>
+</div>
+
 <!-- TRIAL MODAL -->
 <div class="modal" id="trialModal">
   <div class="modal-content">
@@ -1788,6 +2029,11 @@ body {
   <button class="footer-btn" id="footer-profile" onclick="openPage('profile')">
     <div class="footer-btn-icon">👤</div>
     <div class="footer-btn-label">Profile</div>
+  </button>
+
+  <button class="footer-btn" id="footer-favorites" onclick="openPage('favorites')">
+    <div class="footer-btn-icon">⭐</div>
+    <div class="footer-btn-label">Favorites</div>
   </button>
   
   <button class="footer-btn" id="footer-support" onclick="openPage('support')">
@@ -1939,6 +2185,218 @@ function renderTelegramProfile(user) {
   applyUserAvatar(photoUrl, initials);
 }
 
+function getTelegramInitData() {
+  const tg = window.Telegram?.WebApp;
+  return tg?.initData || "";
+}
+
+function escapeHtml(s) {
+  if (s == null) return "";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function escapeHtmlAttr(s) {
+  return escapeHtml(s).replace(/'/g, "&#39;");
+}
+
+function applyFavoritesBadges(count) {
+  const n = typeof count === "number" ? count : 0;
+  const badge = document.getElementById("profileFavBadge");
+  if (badge) badge.textContent = `${n} saved`;
+  const sc = document.getElementById("profileSavedCount");
+  if (sc) sc.textContent = String(n);
+  const ft = document.getElementById("favCountText");
+  if (ft) ft.textContent = String(n);
+}
+
+async function apiFavoritesList() {
+  const initData = getTelegramInitData();
+  if (!initData) return { ok: false, status: 0, data: null };
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/favorites`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initData }),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  } catch (_) {
+    return { ok: false, status: 0, data: null };
+  }
+}
+
+async function refreshFavoritesBadgesOnly() {
+  const { ok, status, data } = await apiFavoritesList();
+  if (ok && data && typeof data.count === "number") {
+    applyFavoritesBadges(data.count);
+    const fl = document.getElementById("favLimitText");
+    if (fl && typeof data.limit === "number") fl.textContent = String(data.limit);
+  } else if (status === 403) {
+    applyFavoritesBadges(0);
+  }
+}
+
+function openFavoriteUrlFromBtn(btn) {
+  const url = btn.getAttribute("data-url");
+  if (!url) return;
+  const tg = window.Telegram?.WebApp;
+  if (tg && typeof tg.openLink === "function") tg.openLink(url);
+  else window.open(url, "_blank", "noopener");
+}
+
+async function loadFavorites() {
+  const { ok, status, data } = await apiFavoritesList();
+  const locked = document.getElementById("favLockedWrap");
+  const active = document.getElementById("favActiveWrap");
+  const addBtn = document.getElementById("favAddBtn");
+  const empty = document.getElementById("favEmpty");
+  const list = document.getElementById("favList");
+
+  if (!getTelegramInitData()) {
+    if (locked) {
+      locked.classList.remove("is-hidden");
+      locked.querySelector("h3").textContent = "Open from Telegram";
+      locked.querySelector("p").textContent = "Open this mini app from the bot to use favorites.";
+    }
+    if (active) active.classList.add("is-hidden");
+    if (addBtn) addBtn.classList.add("is-hidden");
+    return;
+  }
+
+  if (status === 403) {
+    if (locked) {
+      locked.classList.remove("is-hidden");
+      const h3 = locked.querySelector("h3");
+      const p = locked.querySelector("p");
+      if (h3) h3.textContent = "Subscribers only";
+      if (p) p.textContent = "Favorites are available when your subscription is active. Subscribe or use your free trial from Home.";
+    }
+    if (active) active.classList.add("is-hidden");
+    if (addBtn) addBtn.classList.add("is-hidden");
+    applyFavoritesBadges(0);
+    return;
+  }
+
+  if (locked) locked.classList.add("is-hidden");
+  if (active) active.classList.remove("is-hidden");
+  if (addBtn) {
+    addBtn.classList.remove("is-hidden");
+    const count = (data && data.count) || 0;
+    const limit = (data && data.limit) || 100;
+    addBtn.disabled = count >= limit;
+  }
+
+  if (!ok || !data || !Array.isArray(data.items)) {
+    if (data && data.error) showToast(data.error);
+    else if (!ok) showToast("Could not load favorites");
+    return;
+  }
+
+  applyFavoritesBadges(data.count || 0);
+  const fl = document.getElementById("favLimitText");
+  if (fl) fl.textContent = String(data.limit || 100);
+
+  if (!data.items.length) {
+    if (empty) empty.classList.remove("is-hidden");
+    if (list) list.innerHTML = "";
+  } else {
+    if (empty) empty.classList.add("is-hidden");
+    if (list) {
+      list.innerHTML = data.items.map((f) => `
+    <div class="fav-card">
+      <button type="button" class="fav-card-main" data-url="${escapeHtmlAttr(f.url)}" onclick="openFavoriteUrlFromBtn(this)">
+        <div class="fav-card-title">${escapeHtml(f.title)}</div>
+        <div class="fav-card-url">${escapeHtml(f.url)}</div>
+      </button>
+      <button type="button" class="fav-card-del" onclick="deleteFavorite(${f.id})" aria-label="Delete">🗑</button>
+    </div>
+  `).join("");
+    }
+  }
+}
+
+function openFavAddModal() {
+  const m = document.getElementById("favAddModal");
+  if (m) m.classList.add("active");
+  const u = document.getElementById("favUrlInput");
+  const t = document.getElementById("favTitleInput");
+  if (u) u.value = "";
+  if (t) t.value = "";
+}
+
+function closeFavAddModal() {
+  const m = document.getElementById("favAddModal");
+  if (m) m.classList.remove("active");
+}
+
+async function submitAddFavorite() {
+  const url = document.getElementById("favUrlInput")?.value.trim() || "";
+  const title = document.getElementById("favTitleInput")?.value.trim() || "";
+  if (!url.startsWith("http")) {
+    showToast("⚠️ Paste a valid link (https://…)");
+    return;
+  }
+  if (!title) {
+    showToast("⚠️ Enter a title");
+    return;
+  }
+  const initData = getTelegramInitData();
+  if (!initData) {
+    showToast("Open from Telegram");
+    return;
+  }
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/favorites/add`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initData, url, title }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 409) {
+      showToast("⚠️ Limit reached (100 favorites)");
+      return;
+    }
+    if (res.status === 403) {
+      showToast("❌ Subscription required");
+      return;
+    }
+    if (!res.ok) {
+      showToast(data.error || "Could not save");
+      return;
+    }
+    closeFavAddModal();
+    showToast(`✅ «${title.slice(0, 40)}${title.length > 40 ? "…" : ""}» saved`);
+    await loadFavorites();
+  } catch (_) {
+    showToast("Network error");
+  }
+}
+
+async function deleteFavorite(id) {
+  const initData = getTelegramInitData();
+  if (!initData) return;
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/favorites/delete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initData, id }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showToast(data.error || "Could not delete");
+      return;
+    }
+    showToast("🗑 Removed");
+    await loadFavorites();
+  } catch (_) {
+    showToast("Network error");
+  }
+}
+
 async function fetchServerProfile(initData) {
   if (!API_BASE) return null;
   try {
@@ -1989,6 +2447,7 @@ async function initTelegramWebAppUser() {
       renderTelegramProfile(currentUser);
     }
     updateCTAButtons();
+    refreshFavoritesBadgesOnly();
   }
 }
 
@@ -2170,9 +2629,11 @@ function updatePaymentUI() {
 
 function openPage(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById(`page-${page}`).classList.add('active');
+  const pageEl = document.getElementById(`page-${page}`);
+  if (pageEl) pageEl.classList.add('active');
   document.querySelectorAll('.footer-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`footer-${page}`)?.classList.add('active');
+  if (page === 'favorites') loadFavorites();
 }
 
 function showArtistsPage() {
@@ -2299,6 +2760,7 @@ function confirmTrial() {
   updateCTAButtons();
   closeTrialModal();
   showToast('🎁 3 free days activated!');
+  refreshFavoritesBadgesOnly();
 }
 
 function applyPromo() {
@@ -2339,6 +2801,7 @@ function processPay() {
   serverShowSubscribe = false;
   updateCTAButtons();
   showToast(`✅ Added ${plan.days} days (total: ${nextTotal})`);
+  refreshFavoritesBadgesOnly();
 }
 
 function showToast(msg) {
