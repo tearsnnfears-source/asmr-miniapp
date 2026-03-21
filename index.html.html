@@ -151,7 +151,7 @@ body {
   overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.1) transparent;
-  padding-bottom: 20px;
+  padding-bottom: 100px;
 }
 
 .page-scroll::-webkit-scrollbar {
@@ -786,63 +786,221 @@ body {
   color: var(--muted);
 }
 
-/* ── FOOTER ── */
-.footer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+/* ── PAYMENT PAGE STYLES ── */
+.pay-plans { 
+  padding: 16px; 
+  display: flex; 
+  flex-direction: column; 
+  gap: 10px; 
+}
+
+.plan-card-m {
   background: var(--dark2);
-  border-top: 1px solid var(--border);
-  padding: 12px 16px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  gap: 16px;
-  z-index: 120;
-  height: 80px;
+  border: 1.5px solid var(--border);
+  border-radius: 16px; 
+  padding: 16px;
+  cursor: pointer; 
+  transition: all 0.2s;
+  position: relative; 
+  overflow: hidden;
 }
 
-.footer-btn {
-  background: none;
-  border: none;
-  color: var(--lime);
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+.plan-card-m.selected {
+  border-color: rgba(255,126,200,0.5);
+  background: rgba(255,126,200,0.05);
+}
+
+.plan-card-m.featured { 
+  border-color: rgba(255,126,200,0.3); 
+}
+
+.plan-card-m.featured::before {
+  content: ''; 
+  position: absolute;
+  top: 0; 
+  left: 0; 
+  right: 0; 
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--pink), transparent);
+}
+
+.plan-popular-m {
+  position: absolute; 
+  top: 0; 
+  right: 16px;
+  background: var(--pink); 
+  color: #0E0E0F;
+  font-size: 8px; 
+  font-weight: 500; 
+  letter-spacing: 1px; 
+  text-transform: uppercase;
+  padding: 3px 10px; 
+  border-radius: 0 0 6px 6px;
+}
+
+.plan-top { 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between; 
+  margin-bottom: 8px; 
+}
+
+.plan-name-m { 
+  font-size: 13px; 
+  font-weight: 500; 
+  color: var(--muted); 
+}
+
+.plan-price-m { 
+  font-family: 'Bebas Neue', sans-serif; 
+  font-size: 36px; 
+  letter-spacing: 1px; 
+}
+
+.plan-price-m span { 
+  font-size: 18px; 
+  color: var(--muted); 
+}
+
+.plan-save-m { 
+  background: rgba(200,255,68,0.1); 
+  color: var(--lime); 
+  border: 1px solid rgba(200,255,68,0.2); 
+  border-radius: 4px; 
+  font-size: 9px; 
+  font-weight: 500; 
+  padding: 2px 8px; 
+  letter-spacing: 0.5px; 
+}
+
+.plan-per-m { 
+  font-size: 11px; 
+  color: var(--muted); 
+}
+
+.plan-features-m {
+  display: flex; 
+  gap: 6px; 
+  flex-wrap: wrap; 
+  margin-top: 10px;
+}
+
+.pf-tag {
+  display: flex; 
+  align-items: center; 
   gap: 4px;
-  padding: 8px;
-  transition: all 0.15s;
-  font-family: 'DM Sans', sans-serif;
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px; 
+  padding: 3px 8px;
+  font-size: 10px; 
+  color: rgba(255,255,255,0.6);
+}
+
+.pay-methods { 
+  padding: 0 16px 16px; 
+  display: flex; 
+  flex-direction: column; 
+  gap: 8px; 
+}
+
+.pm-card-m {
+  background: var(--dark2); 
+  border: 1.5px solid var(--border);
+  border-radius: 14px; 
+  padding: 14px 16px;
+  display: flex; 
+  align-items: center; 
+  gap: 12px;
+  cursor: pointer; 
+  transition: border-color 0.2s;
+}
+
+.pm-card-m.selected { 
+  border-color: rgba(255,126,200,0.45); 
+  background: rgba(255,126,200,0.04); 
+}
+
+.pm-card-m.soon { 
+  opacity: 0.4; 
+  pointer-events: none; 
+}
+
+.pm-icon-m { 
+  font-size: 24px; 
+}
+
+.pm-info { 
+  flex: 1; 
+}
+
+.pm-name-m { 
+  font-size: 13px; 
+  font-weight: 500; 
+}
+
+.pm-desc-m { 
+  font-size: 11px; 
+  color: var(--muted); 
+}
+
+.pm-radio { 
+  width: 18px; 
+  height: 18px; 
+  border-radius: 50%; 
+  border: 1.5px solid var(--border); 
+  flex-shrink: 0; 
+  transition: all 0.15s; 
+}
+
+.pm-card-m.selected .pm-radio { 
+  border-color: var(--pink); 
+  background: var(--pink); 
+  box-shadow: 0 0 0 3px rgba(255,126,200,0.15); 
+}
+
+.promo-wrap { 
+  padding: 0 16px 16px; 
+}
+
+.promo-input-wrap { 
+  display: flex; 
+  gap: 8px; 
+}
+
+.promo-input {
   flex: 1;
+  background: var(--dark3); 
+  border: 1px solid var(--border);
+  border-radius: 10px; 
+  padding: 12px 14px;
+  font-family: 'DM Sans', sans-serif; 
+  font-size: 13px;
+  color: var(--text); 
+  outline: none;
+  transition: border-color 0.2s;
+  text-transform: uppercase; 
+  letter-spacing: 1px;
 }
 
-.footer-btn:active {
-  transform: scale(0.9);
+.promo-input:focus { 
+  border-color: rgba(255,126,200,0.3); 
 }
 
-.footer-btn.active {
-  color: var(--pink);
+.promo-input::placeholder { 
+  color: rgba(255,255,255,0.2); 
+  letter-spacing: 0; 
+  text-transform: none; 
 }
 
-.footer-btn-icon {
-  font-size: 24px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.footer-btn-label {
-  font-size: 10px;
-  color: var(--lime);
-  font-weight: 500;
-}
-
-.footer-btn.active .footer-btn-label {
-  color: var(--pink);
+.promo-apply {
+  background: var(--dark3); 
+  border: 1px solid var(--border);
+  border-radius: 10px; 
+  padding: 12px 16px;
+  font-family: 'DM Sans', sans-serif; 
+  font-size: 13px;
+  color: var(--muted); 
+  cursor: pointer;
 }
 
 /* ── PROFILE PAGE ── */
@@ -1133,6 +1291,65 @@ body {
 .toast.show {
   transform: translateX(-50%) translateY(0);
 }
+
+/* ── FOOTER ── */
+.footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--dark2);
+  border-top: 1px solid var(--border);
+  padding: 12px 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 16px;
+  z-index: 120;
+  height: 80px;
+}
+
+.footer-btn {
+  background: none;
+  border: none;
+  color: var(--lime);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px;
+  transition: all 0.15s;
+  font-family: 'DM Sans', sans-serif;
+  flex: 1;
+}
+
+.footer-btn:active {
+  transform: scale(0.9);
+}
+
+.footer-btn.active {
+  color: var(--pink);
+}
+
+.footer-btn-icon {
+  font-size: 24px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.footer-btn-label {
+  font-size: 10px;
+  color: var(--lime);
+  font-weight: 500;
+}
+
+.footer-btn.active .footer-btn-label {
+  color: var(--pink);
+}
 </style>
 </head>
 <body>
@@ -1249,7 +1466,7 @@ body {
 
     <div class="row-section">
       <div class="row-section-title">Subscription</div>
-      <div class="row-item" onclick="openSubscribeModal()">
+      <div class="row-item" onclick="openPage('payment')">
         <div class="row-icon" style="background:rgba(255,126,200,0.1)">🔄</div>
         <div>
           <div class="row-label">Renew Subscription</div>
@@ -1360,47 +1577,39 @@ body {
   </div>
 </div>
 
-<!-- ARTIST PAGE -->
-<div class="artist-page" id="artist-page">
-  <button class="artist-page-back" onclick="closeArtistPage()">‹ Back</button>
-  <div class="artist-bg" id="artistBg"></div>
-  <div class="artist-content"></div>
-  <div class="artist-stats-bottom">
-    <div class="artist-stat">
-      <div class="artist-stat-val" id="photoCount">12</div>
-      <div class="artist-stat-label">Photos</div>
+<!-- PAYMENT PAGE -->
+<div class="page" id="page-payment">
+  <div class="page-scroll">
+    <div style="padding:20px 16px 8px;text-align:center">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1.5px;margin-bottom:6px">Choose <span style="color:var(--pink)">Plan</span></div>
+      <div style="font-size:13px;color:var(--muted);font-weight:300">Cancel anytime · No auto-renewal</div>
     </div>
-    <div class="artist-stat">
-      <div class="artist-stat-val" id="videoCount">8</div>
-      <div class="artist-stat-label">Videos</div>
-    </div>
-  </div>
-</div>
 
-<!-- SUBSCRIBE MODAL -->
-<div class="modal" id="subscribeModal">
-  <div class="modal-content">
-    <button class="modal-close" onclick="closeSubscribeModal()">×</button>
-    <div class="modal-title">Choose <span>Plan</span></div>
-    <div class="pricing-cards" id="pricingCards"></div>
-    <button class="btn btn-primary" onclick="confirmSubscribe()">
-      💳 Subscribe
-    </button>
-  </div>
-</div>
-
-<!-- TRIAL MODAL -->
-<div class="modal" id="trialModal">
-  <div class="modal-content">
-    <button class="modal-close" onclick="closeTrialModal()">×</button>
-    <div class="modal-title">Try <span>Free</span></div>
-    <div style="background:rgba(200,255,68,0.1);border:1px solid rgba(200,255,68,0.2);border-radius:14px;padding:16px;margin-bottom:16px;text-align:center">
-      <div style="font-size:14px;font-weight:500;margin-bottom:4px">🎁 3 Days Completely Free</div>
-      <div style="font-size:11px;color:var(--muted)">No payment method required • Cancel anytime</div>
+    <div style="background:rgba(200,255,68,0.07);border:1px solid rgba(200,255,68,0.18);border-radius:12px;margin:0 16px 16px;padding:10px 14px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:18px">🎁</span>
+      <span style="font-size:12px;color:var(--lime)">New? Try <strong>3 days free</strong> — no payment needed</span>
     </div>
-    <button class="btn btn-primary" onclick="confirmTrial()">
-      🎁 Get 3 Days Free
-    </button>
+
+    <div class="pay-plans" id="payPlans"></div>
+
+    <div style="padding:0 16px 8px">
+      <div class="section-title">Payment Method</div>
+    </div>
+    <div class="pay-methods" id="payMethods"></div>
+
+    <div class="promo-wrap">
+      <div class="section-title" style="margin-bottom:8px">Promo Code</div>
+      <div class="promo-input-wrap">
+        <input type="text" class="promo-input" placeholder="Enter promo code" id="promoInput" oninput="this.value=this.value.toUpperCase()">
+        <button class="promo-apply" onclick="applyPromo()">Apply</button>
+      </div>
+    </div>
+
+    <div style="padding:0 16px 16px">
+      <button class="btn-primary" id="payBtn" onclick="processPay()">
+        💳 Subscribe — €15 / 30 days
+      </button>
+    </div>
   </div>
 </div>
 
@@ -1464,12 +1673,20 @@ const faqs = [
 ];
 
 const plans = [
-  { name: '1 Week', price: '€5', per: '€0.71/day', days: 7 },
-  { name: '1 Month', price: '€15', per: '€0.50/day', days: 30 },
-  { name: '3 Months', price: '€35', per: '€0.39/day', days: 90 },
+  { name: '1 Week', price: '€5', per: '€0.71/day', days: 7, save: null, featured: false },
+  { name: '1 Month', price: '€15', per: '€0.50/day', days: 30, save: 'Save 30%', featured: true },
+  { name: '3 Months', price: '€35', per: '€0.39/day', days: 90, save: 'Save 45%', featured: false },
+];
+
+const methods = [
+  { icon:'💳', name:'Card', desc:'via Tribute' },
+  { icon:'⭐', name:'TG Stars', desc:'Telegram Stars' },
+  { icon:'🏦', name:'СБП', desc:'Russian banks' },
+  { icon:'₿', name:'Crypto', desc:'Coming soon', soon:true },
 ];
 
 let selectedPlan = 1;
+let selectedMethod = 0;
 let isSubscribed = false;
 
 function renderArtists() {
@@ -1533,21 +1750,52 @@ function renderFAQ() {
 }
 
 function renderPricingCards() {
-  const container = document.getElementById('pricingCards');
+  const container = document.getElementById('payPlans');
   container.innerHTML = plans.map((plan, i) => `
-    <div class="price-card ${i === selectedPlan ? 'selected' : ''}" onclick="selectPlan(${i})">
-      <div class="price-top">
-        <div class="price-name">${plan.name}</div>
-        <div class="price-amount">${plan.price}</div>
+    <div class="plan-card-m ${plan.featured?' featured':''}${i === selectedPlan ? 'selected' : ''}" onclick="selectPlan(${i})">
+      ${plan.featured ? '<div class="plan-popular-m">Most Popular</div>' : ''}
+      <div class="plan-top">
+        <div>
+          <div class="plan-name-m">${plan.name}</div>
+          <div class="plan-price-m"><span>€</span>${plan.price.replace('€','')}</div>
+          <div class="plan-per-m">${plan.per}</div>
+        </div>
+        ${plan.save ? `<div class="plan-save-m">${plan.save}</div>` : ''}
       </div>
-      <div class="price-per">${plan.per}</div>
+      <div class="plan-features-m">
+        <span class="pf-tag">✓ All creators</span>
+        <span class="pf-tag">✓ HD quality</span>
+        <span class="pf-tag">✓ Group access</span>
+      </div>
     </div>
   `).join('');
+}
+
+function renderPaymentMethods() {
+  const pmEl = document.getElementById('payMethods');
+  pmEl.innerHTML = methods.map((m, i) => `
+    <div class="pm-card-m${i===selectedMethod?' selected':''}${m.soon?' soon':''}">
+      <div class="pm-icon-m">${m.icon}</div>
+      <div class="pm-info">
+        <div class="pm-name-m">${m.name}</div>
+        <div class="pm-desc-m">${m.desc}</div>
+      </div>
+      <div class="pm-radio"></div>
+    </div>
+  `).join('');
+  
+  document.querySelectorAll('.pm-card-m:not(.soon)').forEach((el, i) => {
+    el.addEventListener('click', () => {
+      selectedMethod = i;
+      document.querySelectorAll('.pm-card-m').forEach((c, j) => c.classList.toggle('selected', j===i && !methods[j].soon));
+    });
+  });
 }
 
 function selectPlan(index) {
   selectedPlan = index;
   renderPricingCards();
+  document.getElementById('payBtn').textContent = `💳 Subscribe — ${plans[index].price} / ${plans[index].days} days`;
 }
 
 function openPage(page) {
@@ -1566,14 +1814,7 @@ function showVideosPage() {
 }
 
 function openArtistPage(name, photos, videos_count) {
-  document.getElementById('artist-page').classList.add('active');
-  document.getElementById('artistBg').style.backgroundImage = `url('${artistPhoto}')`;
-  document.getElementById('photoCount').textContent = photos;
-  document.getElementById('videoCount').textContent = videos_count;
-}
-
-function closeArtistPage() {
-  document.getElementById('artist-page').classList.remove('active');
+  showToast(`👀 Viewing ${name}`);
 }
 
 function updateCTAButtons() {
@@ -1593,33 +1834,25 @@ function updateCTAButtons() {
 }
 
 function openSubscribeModal() {
-  document.getElementById('subscribeModal').classList.add('active');
-}
-
-function closeSubscribeModal() {
-  document.getElementById('subscribeModal').classList.remove('active');
-}
-
-function confirmSubscribe() {
-  isSubscribed = true;
-  updateCTAButtons();
-  closeSubscribeModal();
-  showToast('✅ Subscription confirmed!');
+  openPage('payment');
 }
 
 function openTrialModal() {
-  document.getElementById('trialModal').classList.add('active');
-}
-
-function closeTrialModal() {
-  document.getElementById('trialModal').classList.remove('active');
-}
-
-function confirmTrial() {
   isSubscribed = true;
   updateCTAButtons();
-  closeTrialModal();
   showToast('🎁 3 free days activated!');
+}
+
+function applyPromo() {
+  const code = document.getElementById('promoInput').value.trim();
+  if(!code) { showToast('⚠️ Enter a promo code first'); return; }
+  showToast(code === 'ASMR2026' ? '🎉 Promo applied! +7 days bonus' : '❌ Invalid promo code');
+}
+
+function processPay() {
+  isSubscribed = true;
+  updateCTAButtons();
+  showToast('✅ Subscription confirmed!');
 }
 
 function showToast(msg) {
@@ -1635,6 +1868,7 @@ renderArtistsGrid();
 renderVideosGrid();
 renderFAQ();
 renderPricingCards();
+renderPaymentMethods();
 </script>
 
 </body>
