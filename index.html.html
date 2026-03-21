@@ -898,6 +898,7 @@ body {
   text-transform: uppercase;
   padding: 3px 10px; 
   border-radius: 0 0 6px 6px;
+  pointer-events: none;
 }
 
 .plan-top { 
@@ -933,6 +934,23 @@ body {
   font-weight: 500; 
   padding: 2px 8px; 
   letter-spacing: 0.5px; 
+  pointer-events: none;
+}
+
+.plan-soon-m {
+  position: absolute;
+  top: 0;
+  right: 16px;
+  background: var(--dark4);
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 0 0 6px 6px;
+  border: 1px solid var(--border);
+  pointer-events: none;
 }
 
 .plan-per-m { 
@@ -985,6 +1003,12 @@ body {
 .pm-card-m.soon { 
   opacity: 0.4; 
   pointer-events: none; 
+}
+
+.plan-card-m.soon {
+  opacity: 0.45;
+  pointer-events: none;
+  cursor: not-allowed;
 }
 
 .pm-icon-m { 
@@ -1816,9 +1840,9 @@ const faqs = [
 ];
 
 const plans = [
-  { name: '1 Week', price: '€5', per: '€0.71/day', days: 7, save: null, featured: false },
-  { name: '1 Month', price: '€15', per: '€0.50/day', days: 30, save: 'Save 30%', featured: true },
-  { name: '3 Months', price: '€35', per: '€0.39/day', days: 90, save: 'Save 45%', featured: false },
+  { name: '1 Week', price: '€2', per: '€0.29/day', days: 7, save: null, featured: false, soon: false },
+  { name: '1 Month', price: '€6', per: '€0.20/day', days: 30, save: null, featured: true, soon: false },
+  { name: '3 Months', price: '€15', per: '—', days: 90, save: null, featured: false, soon: true },
 ];
 
 const methods = [
@@ -2017,16 +2041,32 @@ function renderFAQ() {
   `).join('');
 }
 
+function ensureValidSelectedPlan() {
+  const p = plans[selectedPlan];
+  if (p && p.soon) {
+    const idx = plans.findIndex((x) => !x.soon);
+    selectedPlan = idx >= 0 ? idx : 0;
+  }
+}
+
 function renderPricingCards() {
+  ensureValidSelectedPlan();
   const container = document.getElementById('payPlans');
-  container.innerHTML = plans.map((plan, i) => `
-    <div class="plan-card-m ${plan.featured?' featured':''}${i === selectedPlan ? 'selected' : ''}" onclick="selectPlan(${i})">
-      ${plan.featured ? '<div class="plan-popular-m">Most Popular</div>' : ''}
+  container.innerHTML = plans.map((plan, i) => {
+    const cls = ['plan-card-m'];
+    if (plan.featured) cls.push('featured');
+    if (i === selectedPlan) cls.push('selected');
+    if (plan.soon) cls.push('soon');
+    const perLine = plan.soon ? 'Coming soon' : plan.per;
+    return `
+    <div class="${cls.join(' ')}" onclick="selectPlan(${i})">
+      ${plan.featured && !plan.soon ? '<div class="plan-popular-m">Most Popular</div>' : ''}
+      ${plan.soon ? '<div class="plan-soon-m">Soon</div>' : ''}
       <div class="plan-top">
         <div>
           <div class="plan-name-m">${plan.name}</div>
           <div class="plan-price-m"><span>€</span>${plan.price.replace('€','')}</div>
-          <div class="plan-per-m">${plan.per}</div>
+          <div class="plan-per-m">${perLine}</div>
         </div>
         ${plan.save ? `<div class="plan-save-m">${plan.save}</div>` : ''}
       </div>
@@ -2036,13 +2076,14 @@ function renderPricingCards() {
         <span class="pf-tag">✓ Group access</span>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function renderPaymentMethods() {
   const pmEl = document.getElementById('payMethods');
   pmEl.innerHTML = methods.map((m, i) => `
-    <div class="pm-card-m${i===selectedMethod?' selected':''}${m.soon?' soon':''}">
+    <div class="pm-card-m${i===selectedMethod?' selected':''}${m.soon?' soon':''}" data-pay-method="${i}">
       <div class="pm-icon-m">${m.icon}</div>
       <div class="pm-info">
         <div class="pm-name-m">${m.name}</div>
@@ -2052,21 +2093,31 @@ function renderPaymentMethods() {
     </div>
   `).join('');
   
-  document.querySelectorAll('.pm-card-m:not(.soon)').forEach((el, i) => {
+  document.querySelectorAll('.pm-card-m').forEach((el) => {
     el.addEventListener('click', () => {
+      const i = Number(el.getAttribute('data-pay-method'));
+      if (!methods[i] || methods[i].soon) return;
       selectedMethod = i;
-      document.querySelectorAll('.pm-card-m').forEach((c, j) => c.classList.toggle('selected', j===i && !methods[j].soon));
+      document.querySelectorAll('.pm-card-m').forEach((c) => {
+        const j = Number(c.getAttribute('data-pay-method'));
+        c.classList.toggle('selected', j === i);
+      });
     });
   });
 }
 
 function selectPlan(index) {
+  if (!plans[index] || plans[index].soon) {
+    showToast('🚧 3 months — coming soon');
+    return;
+  }
   selectedPlan = index;
   renderPricingCards();
   updatePaymentUI();
 }
 
 function updatePaymentUI() {
+  ensureValidSelectedPlan();
   const payBtn = document.getElementById('payBtn');
   const paymentTitle = document.getElementById('paymentTitle');
   const paymentSubtitle = document.getElementById('paymentSubtitle');
@@ -2074,9 +2125,10 @@ function updatePaymentUI() {
   const isInfiniteSub = typeof serverDaysLeft === "number" && serverDaysLeft > INFINITE_SUB_DAYS_THRESHOLD;
   const hasAnySub = isSubscribed || (typeof serverDaysLeft === "number" && serverDaysLeft > 0);
   const actionLabel = hasAnySub ? "Add days" : "Subscribe";
+  const plan = plans[selectedPlan];
 
-  if (payBtn) {
-    payBtn.textContent = `💳 ${actionLabel} — ${plans[selectedPlan].price} / ${plans[selectedPlan].days} days`;
+  if (payBtn && plan) {
+    payBtn.textContent = `💳 ${actionLabel} — ${plan.price} / ${plan.days} days`;
   }
   if (paymentTitle) {
     paymentTitle.innerHTML = hasAnySub ? `Add <span style="color:var(--pink)">Days</span>` : `Choose <span style="color:var(--pink)">Plan</span>`;
@@ -2225,6 +2277,13 @@ function applyPromo() {
 }
 
 function processPay() {
+  ensureValidSelectedPlan();
+  const plan = plans[selectedPlan];
+  if (!plan || plan.soon) {
+    showToast('🚧 This plan is not available yet');
+    return;
+  }
+
   const isInfiniteSub = typeof serverDaysLeft === "number" && serverDaysLeft > INFINITE_SUB_DAYS_THRESHOLD;
   if (isInfiniteSub) {
     showToast('♾️ Unlimited subscription active');
@@ -2232,7 +2291,7 @@ function processPay() {
   }
 
   const currentDays = typeof serverDaysLeft === "number" ? serverDaysLeft : (isSubscribed ? 30 : 0);
-  const nextTotal = currentDays + plans[selectedPlan].days;
+  const nextTotal = currentDays + plan.days;
   if (nextTotal > MAX_ALLOWED_DAYS) {
     showToast('⚠️ You cannot have more than 60 days');
     return;
@@ -2241,7 +2300,7 @@ function processPay() {
   serverDaysLeft = nextTotal;
   isSubscribed = true;
   updateCTAButtons();
-  showToast(`✅ Added ${plans[selectedPlan].days} days (total: ${nextTotal})`);
+  showToast(`✅ Added ${plan.days} days (total: ${nextTotal})`);
 }
 
 function showToast(msg) {
