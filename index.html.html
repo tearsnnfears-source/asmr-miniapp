@@ -259,6 +259,17 @@ body {
   opacity: 0.9;
 }
 
+.btn-favorites {
+  background: linear-gradient(135deg, var(--pink), #FF4A9E);
+  color: #0E0E0F;
+  box-shadow: 0 4px 16px rgba(255,126,200,0.3);
+}
+
+.btn-favorites:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
 .btn.hidden {
   display: none;
 }
@@ -1068,12 +1079,15 @@ body {
       </div>
 
       <!-- CTA BUTTONS -->
-      <div class="cta-section">
-        <button class="btn btn-primary" onclick="openSubscribeModal()">
+      <div class="cta-section" id="ctaSection">
+        <button class="btn btn-primary" id="subscribeBtnMain" onclick="openSubscribeModal()">
           💳 Subscribe Now
         </button>
-        <button class="btn btn-secondary" onclick="openTrialModal()">
+        <button class="btn btn-secondary" id="freeBtnMain" onclick="openTrialModal()">
           🎁 Try 3 Days Free
+        </button>
+        <button class="btn btn-favorites hidden" id="favoritesBtnMain" onclick="openPage('home')">
+          ⭐ My Favorites
         </button>
       </div>
 
@@ -1219,7 +1233,7 @@ body {
           <div class="support-title">Report a Bug</div>
           <div class="support-desc">Something not working? Tell us</div>
         </div>
-        <div style="color:var(--muted);font-size:12px">���</div>
+        <div style="color:var(--muted);font-size:12px">→</div>
       </div>
       <div class="support-card" onclick="showToast('💡 Suggest a Feature')">
         <div class="support-icon">💡</div>
@@ -1339,6 +1353,7 @@ const plans = [
 ];
 
 let selectedPlan = 1;
+let isSubscribed = false;
 
 // ── INIT ──
 function init() {
@@ -1439,6 +1454,27 @@ function closeArtistPage() {
   document.getElementById('artist-page').classList.remove('active');
 }
 
+// ── UPDATE UI ──
+function updateCTAButtons() {
+  const subscribeBtnMain = document.getElementById('subscribeBtnMain');
+  const freeBtnMain = document.getElementById('freeBtnMain');
+  const favoritesBtnMain = document.getElementById('favoritesBtnMain');
+
+  if (isSubscribed) {
+    // Скрываем Subscribe и Trial
+    subscribeBtnMain.classList.add('hidden');
+    freeBtnMain.classList.add('hidden');
+    // Показываем Favorites
+    favoritesBtnMain.classList.remove('hidden');
+  } else {
+    // Показываем Subscribe и Trial
+    subscribeBtnMain.classList.remove('hidden');
+    freeBtnMain.classList.remove('hidden');
+    // Скрываем Favorites
+    favoritesBtnMain.classList.add('hidden');
+  }
+}
+
 // ── SUBSCRIBE MODAL ──
 function openSubscribeModal() {
   document.getElementById('subscribeModal').classList.add('active');
@@ -1449,6 +1485,8 @@ function closeSubscribeModal() {
 }
 
 function confirmSubscribe() {
+  isSubscribed = true;
+  updateCTAButtons();
   closeSubscribeModal();
   showToast('✅ Subscription confirmed!');
 }
@@ -1463,6 +1501,8 @@ function closeTrialModal() {
 }
 
 function confirmTrial() {
+  isSubscribed = true;
+  updateCTAButtons();
   closeTrialModal();
   showToast('🎁 3 free days activated!');
 }
