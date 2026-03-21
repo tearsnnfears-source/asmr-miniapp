@@ -1408,14 +1408,14 @@ body {
 <!-- HEADER -->
 <div class="header">
   <div class="header-left">
-    <div class="avatar">SR</div>
+    <div class="avatar" id="headerAvatar">SR</div>
     <div class="user-info">
-      <h3>Sofia Reinholt</h3>
-      <p>@sofiareinholt</p>
+      <h3 id="headerName">Sofia Reinholt</h3>
+      <p id="headerUsername">@sofiareinholt</p>
     </div>
   </div>
   <div class="days-left">
-    <div class="days-left-num">27</div>
+    <div class="days-left-num" id="headerDaysLeft">27</div>
     <div class="days-left-label">days</div>
   </div>
 </div>
@@ -1511,14 +1511,15 @@ body {
   <div class="page-scroll">
     <div class="profile-header">
       <div class="profile-av-wrap">
-        <div class="profile-av">👤</div>
+        <div class="profile-av" id="profileAvatar">👤</div>
         <div class="profile-online"></div>
       </div>
-      <div class="profile-name">Sofia Reinholt</div>
-      <div class="profile-handle">@sofiareinholt</div>
+      <div class="profile-name" id="profileName">Sofia Reinholt</div>
+      <div class="profile-handle" id="profileHandle">@sofiareinholt</div>
+      <div class="profile-handle" id="profileTelegramId">ID: —</div>
       <div class="profile-stats">
         <div class="profile-stat-item">
-          <div class="profile-stat-val">27<span>d</span></div>
+          <div class="profile-stat-val" id="profileDaysLeft">27<span>d</span></div>
           <div class="profile-stat-label">Days Left</div>
         </div>
         <div class="profile-stat-item">
@@ -1734,6 +1735,7 @@ body {
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
 const allArtists = [
   'Moona ASMR', 'HoneyGirl', 'Reneserealrm', 'Emma', 'Ruby ASMR', 
@@ -1788,6 +1790,85 @@ const methods = [
 let selectedPlan = 1;
 let selectedMethod = 0;
 let isSubscribed = false;
+let currentUser = null;
+let serverDaysLeft = null;
+const API_BASE = window.__MINIAPP_API_BASE__ || "";
+
+function getInitials(fullName) {
+  const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "TG";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+function renderTelegramProfile(user) {
+  if (!user) return;
+
+  const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ").trim() || "Telegram User";
+  const username = user.username ? `@${user.username}` : "@no_username";
+  const initials = getInitials(fullName);
+  const idText = `ID: ${user.id}`;
+
+  const headerAvatar = document.getElementById("headerAvatar");
+  const headerName = document.getElementById("headerName");
+  const headerUsername = document.getElementById("headerUsername");
+  const profileAvatar = document.getElementById("profileAvatar");
+  const profileName = document.getElementById("profileName");
+  const profileHandle = document.getElementById("profileHandle");
+  const profileTelegramId = document.getElementById("profileTelegramId");
+
+  if (headerAvatar) headerAvatar.textContent = initials;
+  if (headerName) headerName.textContent = fullName;
+  if (headerUsername) headerUsername.textContent = username;
+  if (profileAvatar) profileAvatar.textContent = initials;
+  if (profileName) profileName.textContent = fullName;
+  if (profileHandle) profileHandle.textContent = username;
+  if (profileTelegramId) profileTelegramId.textContent = idText;
+}
+
+async function fetchServerProfile(initData) {
+  if (!API_BASE) return null;
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/profile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initData })
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (_) {
+    return null;
+  }
+}
+
+async function initTelegramWebAppUser() {
+  const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+  if (!tg) return;
+
+  tg.ready();
+  currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
+  renderTelegramProfile(currentUser);
+
+  const profile = await fetchServerProfile(tg.initData || "");
+  if (profile) {
+    if (typeof profile.days_left === "number") {
+      serverDaysLeft = profile.days_left;
+      isSubscribed = profile.days_left > 0;
+    }
+    if (profile.full_name) {
+      const nameParts = profile.full_name.split(" ");
+      currentUser = {
+        ...currentUser,
+        first_name: nameParts[0] || currentUser?.first_name,
+        last_name: nameParts.slice(1).join(" ") || currentUser?.last_name,
+        username: (profile.username || "").replace(/^@/, ""),
+        id: profile.telegram_id || currentUser?.id
+      };
+      renderTelegramProfile(currentUser);
+    }
+    updateCTAButtons();
+  }
+}
 
 function renderArtists() {
   const scroll = document.getElementById('artistsScroll');
@@ -1974,15 +2055,23 @@ function updateCTAButtons() {
   const subscribeBtnMain = document.getElementById('subscribeBtnMain');
   const freeBtnMain = document.getElementById('freeBtnMain');
   const favoritesBtnMain = document.getElementById('favoritesBtnMain');
+  const headerDaysLeft = document.getElementById('headerDaysLeft');
+  const profileDaysLeft = document.getElementById('profileDaysLeft');
 
   if (isSubscribed) {
     subscribeBtnMain.classList.remove('hidden');
     freeBtnMain.classList.add('hidden');
     favoritesBtnMain.classList.remove('hidden');
+    const days = serverDaysLeft !== null ? serverDaysLeft : 30;
+    if (headerDaysLeft) headerDaysLeft.textContent = String(days);
+    if (profileDaysLeft) profileDaysLeft.innerHTML = `${days}<span>d</span>`;
   } else {
     subscribeBtnMain.classList.remove('hidden');
     freeBtnMain.classList.remove('hidden');
     favoritesBtnMain.classList.add('hidden');
+    const days = serverDaysLeft !== null ? serverDaysLeft : 0;
+    if (headerDaysLeft) headerDaysLeft.textContent = String(days);
+    if (profileDaysLeft) profileDaysLeft.innerHTML = `${days}<span>d</span>`;
   }
 }
 
@@ -2027,6 +2116,8 @@ renderVideosGrid();
 renderFAQ();
 renderPricingCards();
 renderPaymentMethods();
+initTelegramWebAppUser();
+updateCTAButtons();
 </script>
 
 </body>
