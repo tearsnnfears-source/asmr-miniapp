@@ -419,8 +419,8 @@ body {
   color: var(--pink);
 }
 
-/* ── ARTIST PAGE ── */
-.artist-page {
+/* ── ARTIST PROFILE PAGE ── */
+.artist-profile-page {
   position: fixed;
   top: 0;
   left: 0;
@@ -432,11 +432,11 @@ body {
   flex-direction: column;
 }
 
-.artist-page.active {
+.artist-profile-page.active {
   display: flex !important;
 }
 
-.artist-page-back {
+.artist-profile-back {
   position: absolute;
   top: 16px;
   left: 16px;
@@ -453,11 +453,11 @@ body {
   backdrop-filter: blur(4px);
 }
 
-.artist-page-back:active {
+.artist-profile-back:active {
   background: rgba(0,0,0,0.8);
 }
 
-.artist-bg {
+.artist-profile-bg {
   position: absolute;
   top: 0;
   left: 0;
@@ -469,7 +469,7 @@ body {
   z-index: 1;
 }
 
-.artist-bg::after {
+.artist-profile-bg::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -481,13 +481,13 @@ body {
   mix-blend-mode: multiply;
 }
 
-.artist-content {
+.artist-profile-content {
   position: relative;
   z-index: 2;
   flex: 1;
 }
 
-.artist-stats-bottom {
+.artist-profile-stats {
   position: absolute;
   bottom: 0;
   left: 0;
@@ -503,21 +503,21 @@ body {
   z-index: 3;
 }
 
-.artist-stat {
+.artist-profile-stat {
   flex: 1;
   text-align: center;
 }
 
-.artist-stat:first-child {
+.artist-profile-stat:first-child {
   border-right: 1px solid var(--border);
   padding-right: 20px;
 }
 
-.artist-stat:last-child {
+.artist-profile-stat:last-child {
   padding-left: 20px;
 }
 
-.artist-stat-val {
+.artist-profile-stat-val {
   font-family: 'Bebas Neue', sans-serif;
   font-size: 28px;
   color: var(--lime);
@@ -525,7 +525,7 @@ body {
   margin-bottom: 6px;
 }
 
-.artist-stat-label {
+.artist-profile-stat-label {
   font-size: 11px;
   color: var(--muted);
   letter-spacing: 0.5px;
@@ -1383,7 +1383,7 @@ body {
 
       <!-- CTA BUTTONS -->
       <div class="cta-section" id="ctaSection">
-        <button class="btn btn-primary" id="subscribeBtnMain" onclick="openSubscribeModal()">
+        <button class="btn btn-primary" id="subscribeBtnMain" onclick="openPage('payment')">
           💳 Subscribe Now
         </button>
         <button class="btn btn-secondary" id="freeBtnMain" onclick="openTrialModal()">
@@ -1613,6 +1613,38 @@ body {
   </div>
 </div>
 
+<!-- ARTIST PROFILE PAGE -->
+<div class="artist-profile-page" id="artist-profile-page">
+  <button class="artist-profile-back" onclick="closeArtistProfile()">‹ Back</button>
+  <div class="artist-profile-bg" id="artistProfileBg"></div>
+  <div class="artist-profile-content"></div>
+  <div class="artist-profile-stats">
+    <div class="artist-profile-stat">
+      <div class="artist-profile-stat-val" id="profilePhotoCount">12</div>
+      <div class="artist-profile-stat-label">Photos</div>
+    </div>
+    <div class="artist-profile-stat">
+      <div class="artist-profile-stat-val" id="profileVideoCount">8</div>
+      <div class="artist-profile-stat-label">Videos</div>
+    </div>
+  </div>
+</div>
+
+<!-- TRIAL MODAL -->
+<div class="modal" id="trialModal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeTrialModal()">×</button>
+    <div class="modal-title">Try <span>Free</span></div>
+    <div style="background:rgba(200,255,68,0.1);border:1px solid rgba(200,255,68,0.2);border-radius:14px;padding:16px;margin-bottom:16px;text-align:center">
+      <div style="font-size:14px;font-weight:500;margin-bottom:4px">🎁 3 Days Completely Free</div>
+      <div style="font-size:11px;color:var(--muted)">No payment method required • Cancel anytime</div>
+    </div>
+    <button class="btn-primary" onclick="confirmTrial()" style="width:100%;background:linear-gradient(135deg, #CCFF00, #B3E600);color:#0E0E0F;border:none;border-radius:14px;padding:15px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(204,255,0,0.3);">
+      🎁 Get 3 Days Free
+    </button>
+  </div>
+</div>
+
 <!-- FOOTER -->
 <div class="footer">
   <button class="footer-btn active" id="footer-home" onclick="openPage('home')">
@@ -1692,7 +1724,7 @@ let isSubscribed = false;
 function renderArtists() {
   const scroll = document.getElementById('artistsScroll');
   scroll.innerHTML = allArtists.slice(0, 10).map(name => `
-    <div class="artist-mini-card" onclick="openArtistPage('${name}', 12, 8)">
+    <div class="artist-mini-card" onclick="openArtistProfile('${name}', 12, 8)">
       <div class="artist-mini-av" style="background-image:url('${artistPhoto}')"></div>
       <div class="artist-mini-name">${name.split(' ')[0]}</div>
     </div>
@@ -1713,7 +1745,7 @@ function renderVideos() {
 function renderArtistsGrid() {
   const grid = document.getElementById('artistsGrid');
   grid.innerHTML = allArtists.map(name => `
-    <div class="artist-card" onclick="openArtistPage('${name}', 12, 8)">
+    <div class="artist-card" onclick="openArtistProfile('${name}', 12, 8)">
       <div class="artist-card-image" style="background-image:url('${artistPhoto}')"></div>
       <div class="artist-card-info">
         <div class="artist-card-name">${name}</div>
@@ -1765,7 +1797,7 @@ function renderPricingCards() {
       <div class="plan-features-m">
         <span class="pf-tag">✓ All creators</span>
         <span class="pf-tag">✓ HD quality</span>
-        <span class="pf-tag">✓ Group access</span>
+        <span class="pf-tag">�� Group access</span>
       </div>
     </div>
   `).join('');
@@ -1813,8 +1845,15 @@ function showVideosPage() {
   openPage('videos');
 }
 
-function openArtistPage(name, photos, videos_count) {
-  showToast(`👀 Viewing ${name}`);
+function openArtistProfile(name, photos, videos_count) {
+  document.getElementById('artist-profile-page').classList.add('active');
+  document.getElementById('artistProfileBg').style.backgroundImage = `url('${artistPhoto}')`;
+  document.getElementById('profilePhotoCount').textContent = photos;
+  document.getElementById('profileVideoCount').textContent = videos_count;
+}
+
+function closeArtistProfile() {
+  document.getElementById('artist-profile-page').classList.remove('active');
 }
 
 function updateCTAButtons() {
@@ -1833,13 +1872,18 @@ function updateCTAButtons() {
   }
 }
 
-function openSubscribeModal() {
-  openPage('payment');
+function openTrialModal() {
+  document.getElementById('trialModal').classList.add('active');
 }
 
-function openTrialModal() {
+function closeTrialModal() {
+  document.getElementById('trialModal').classList.remove('active');
+}
+
+function confirmTrial() {
   isSubscribed = true;
   updateCTAButtons();
+  closeTrialModal();
   showToast('🎁 3 free days activated!');
 }
 
