@@ -3400,7 +3400,13 @@ async function selectLanguage(lang) {
   showToast(successMsg);
 }
 
+let languageChecked = false;
+
 async function checkLanguageAndShowOverlay() {
+  // Prevent multiple checks
+  if (languageChecked) return;
+  languageChecked = true;
+  
   const initData = getTelegramInitData();
   
   // Try to get profile with language
@@ -3415,22 +3421,31 @@ async function checkLanguageAndShowOverlay() {
         const data = await res.json();
         const savedLang = data.lang;
         
-        // Only show overlay if NO language is set (empty or undefined)
-        if (!savedLang || savedLang === '') {
+        // Only show overlay if NO valid language is set
+        // Valid languages: 'en', 'ru', 'es'
+        if (!savedLang || savedLang === '' || savedLang === null || savedLang === undefined) {
           // No language selected - show overlay
           setTimeout(showLanguageOverlay, 500);
-        } else {
+        } else if (savedLang === 'en' || savedLang === 'ru' || savedLang === 'es') {
           // Language already selected - update UI only
           currentLang = savedLang;
           updateLanguageUI(savedLang);
+        } else {
+          // Unknown language value - show overlay
+          setTimeout(showLanguageOverlay, 500);
         }
+      } else {
+        // API error - don't show overlay
+        console.log('Profile API error, not showing language overlay');
       }
     } catch (e) {
       console.error('Failed to check language:', e);
-      // Don't show overlay on network error - just use default
+      // Don't show overlay on network error
     }
+  } else {
+    // No initData - don't show overlay
+    console.log('No initData, not showing language overlay');
   }
-  // If no initData, don't show overlay either
 }
 
 // Initialize everything
