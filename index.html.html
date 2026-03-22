@@ -1437,6 +1437,125 @@ body {
   transform: translateX(-50%) translateY(0);
 }
 
+/* ── LANGUAGE SELECTION PAGE ── */
+.lang-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(145deg, #0a0510, #0e0e0f);
+  z-index: 500;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.lang-overlay.active {
+  display: flex;
+}
+
+.lang-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--pink), var(--purple));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 36px;
+  letter-spacing: 2px;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 32px rgba(255,126,200,0.35);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 8px 32px rgba(255,126,200,0.35); }
+  50% { transform: scale(1.05); box-shadow: 0 12px 48px rgba(255,126,200,0.5); }
+}
+
+.lang-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 32px;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+.lang-subtitle {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 32px;
+  line-height: 1.5;
+}
+
+.lang-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.lang-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 16px 20px;
+  border-radius: 14px;
+  border: 1.5px solid var(--border);
+  background: var(--dark2);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.lang-btn:hover {
+  border-color: rgba(255,126,200,0.4);
+  background: rgba(255,126,200,0.08);
+}
+
+.lang-btn:active {
+  transform: scale(0.98);
+  border-color: var(--pink);
+  background: rgba(255,126,200,0.12);
+}
+
+.lang-btn.soon {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lang-btn.soon:active {
+  transform: none;
+  border-color: var(--border);
+  background: var(--dark2);
+}
+
+.lang-flag {
+  font-size: 24px;
+}
+
+.lang-check {
+  position: absolute;
+  right: 16px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.lang-btn.selected .lang-check {
+  opacity: 1;
+}
+
 .is-hidden {
   display: none !important;
 }
@@ -1916,10 +2035,10 @@ body {
 
     <div class="row-section">
       <div class="row-section-title">Settings</div>
-      <div class="row-item">
+      <div class="row-item" onclick="showLanguageOverlay()">
         <div class="row-icon" style="background:rgba(255,255,255,0.05)">🌐</div>
         <div class="row-label">Language</div>
-        <div class="row-value">English</div>
+        <div class="row-value" id="profileLangValue">English</div>
         <div class="row-arrow">›</div>
       </div>
       <div class="row-item" onclick="openPage('support')">
@@ -2133,6 +2252,27 @@ body {
 
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
+
+<!-- LANGUAGE SELECTION OVERLAY -->
+<div class="lang-overlay" id="langOverlay">
+  <div class="lang-avatar" id="langAvatar">👋</div>
+  <div class="lang-title" id="langTitle">🌐 Select Language</div>
+  <div class="lang-subtitle" id="langSubtitle">Choose your preferred language</div>
+  <div class="lang-options">
+    <button class="lang-btn" id="langEnBtn" onclick="selectLanguage('en')">
+      <span class="lang-flag">🇬🇧</span>
+      <span>English</span>
+    </button>
+    <button class="lang-btn" id="langRuBtn" onclick="selectLanguage('ru')">
+      <span class="lang-flag">🇷🇺</span>
+      <span>Русский</span>
+    </button>
+    <button class="lang-btn soon" id="langEsBtn" onclick="showToast('🇪🇸 Coming soon!')">
+      <span class="lang-flag">🇪🇸</span>
+      <span>Español (Soon)</span>
+    </button>
+  </div>
+</div>
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
@@ -2714,8 +2854,9 @@ function renderArtists() {
   const displayArtists = [...promoted.slice(0, 8), ...others.slice(0, 10 - Math.min(promoted.length, 8))];
   
   const scroll = document.getElementById('artistsScroll');
+  // Clicking on artist goes to artists page
   scroll.innerHTML = displayArtists.map(name => `
-    <div class="artist-mini-card" onclick="openArtistProfile('${name}')">
+    <div class="artist-mini-card" onclick="openPage('artists')">
       <div class="artist-mini-av" style="background-image:url('${artistProfiles[name]?.photo || PLACEHOLDER_ARTIST_PHOTO}')">
         ${getHomeArtistTagsHtml(name)}
       </div>
@@ -2737,8 +2878,9 @@ function renderVideos() {
 
 function renderArtistsGrid() {
   const grid = document.getElementById('artistsGrid');
+  // Artist cards don't open profile - just display info
   grid.innerHTML = allArtists.map(name => `
-    <div class="artist-card" onclick="openArtistProfile('${name}')">
+    <div class="artist-card">
       <div class="artist-card-image" style="background-image:url('${artistProfiles[name].photo}')">
         ${getArtistTagsHtml(name)}
       </div>
@@ -2953,8 +3095,9 @@ function searchArtists(query) {
       </div>
     `;
   } else {
+    // Search results don't open profile either
     grid.innerHTML = filtered.map(name => `
-      <div class="artist-card" onclick="openArtistProfile('${name}')">
+      <div class="artist-card">
         <div class="artist-card-image" style="background-image:url('${artistProfiles[name].photo}')">
           ${getArtistTagsHtml(name)}
         </div>
@@ -3183,6 +3326,115 @@ function showToast(msg) {
   setTimeout(() => toast.classList.remove('show'), 2500);
 }
 
+// Language selection functions
+let currentLang = '';
+
+const langTexts = {
+  en: {
+    title: '🌐 Select Language',
+    subtitle: 'Choose your preferred language',
+    welcome: '👋 Welcome!',
+    welcomeSub: 'Choose your language to continue'
+  },
+  ru: {
+    title: '🌐 Выберите язык',
+    subtitle: 'Выберите удобный язык интерфейса',
+    welcome: '👋 Добро пожаловать!',
+    welcomeSub: 'Выберите язык для продолжения'
+  }
+};
+
+function updateLanguageUI(lang) {
+  const texts = langTexts[lang] || langTexts.en;
+  const titleEl = document.getElementById('langTitle');
+  const subtitleEl = document.getElementById('langSubtitle');
+  if (titleEl) titleEl.textContent = texts.title;
+  if (subtitleEl) subtitleEl.textContent = texts.subtitle;
+  
+  // Update profile language row
+  const langRowValue = document.getElementById('profileLangValue');
+  if (langRowValue) {
+    langRowValue.textContent = lang === 'ru' ? 'Русский' : 'English';
+  }
+}
+
+function showLanguageOverlay() {
+  const overlay = document.getElementById('langOverlay');
+  if (overlay) {
+    overlay.classList.add('active');
+  }
+}
+
+function hideLanguageOverlay() {
+  const overlay = document.getElementById('langOverlay');
+  if (overlay) {
+    overlay.classList.remove('active');
+  }
+}
+
+async function selectLanguage(lang) {
+  if (!lang || lang === 'es') return; // Don't select Spanish yet
+  
+  currentLang = lang;
+  updateLanguageUI(lang);
+  
+  // Save to server
+  const initData = getTelegramInitData();
+  if (initData && API_BASE) {
+    try {
+      await fetch(`${API_BASE}/miniapp/set_language`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData, lang })
+      });
+    } catch (e) {
+      console.error('Failed to save language:', e);
+    }
+  }
+  
+  // Hide overlay
+  hideLanguageOverlay();
+  
+  // Show success toast
+  const successMsg = lang === 'ru' ? '✅ Язык изменён!' : '✅ Language changed!';
+  showToast(successMsg);
+}
+
+async function checkLanguageAndShowOverlay() {
+  const initData = getTelegramInitData();
+  
+  // Try to get profile with language
+  if (initData && API_BASE) {
+    try {
+      const res = await fetch(`${API_BASE}/miniapp/profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const savedLang = data.lang;
+        
+        if (!savedLang || savedLang === '') {
+          // No language selected - show overlay
+          setTimeout(showLanguageOverlay, 500);
+        } else {
+          // Language already selected - update UI
+          currentLang = savedLang;
+          updateLanguageUI(savedLang);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to check language:', e);
+      // Show overlay on error
+      setTimeout(showLanguageOverlay, 500);
+    }
+  } else {
+    // No initData - show overlay
+    setTimeout(showLanguageOverlay, 500);
+  }
+}
+
 // Initialize everything
 (async function init() {
   // Render placeholders first
@@ -3201,6 +3453,9 @@ function showToast(msg) {
   // Initialize user
   await initTelegramWebAppUser();
   updateCTAButtons();
+  
+  // Check language and show overlay if needed
+  await checkLanguageAndShowOverlay();
 })();
 </script>
 
