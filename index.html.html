@@ -2621,6 +2621,17 @@ async function initTelegramWebAppUser() {
       else if (u > 3) serverShowSubscribe = false;
       else serverShowSubscribe = !!profile.trial_used;
     }
+    // Update expiry toggle based on saved preference
+    if (typeof profile.notify_expiry === "boolean") {
+      const expiryToggle = document.getElementById("expiryToggle");
+      if (expiryToggle) {
+        if (profile.notify_expiry) {
+          expiryToggle.classList.add("on");
+        } else {
+          expiryToggle.classList.remove("on");
+        }
+      }
+    }
     if (profile.full_name) {
       const nameParts = profile.full_name.split(" ");
       currentUser = {
