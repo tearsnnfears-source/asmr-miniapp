@@ -2143,6 +2143,8 @@ let currentUser = null;
 let serverDaysLeft = null;
 /** null until /miniapp/profile responds; then from show_subscribe_button */
 let serverShowSubscribe = null;
+/** Flag to track if artists have been loaded from API */
+let artistsLoadedFromAPI = false;
 const API_BASE = window.__MINIAPP_API_BASE__ || "https://asmr-bot-production.up.railway.app";
 const INFINITE_SUB_DAYS_THRESHOLD = 9000;
 const MAX_ALLOWED_DAYS = 60;
@@ -2503,13 +2505,27 @@ async function initTelegramWebAppUser() {
 
 // Fetch artists from API and update profiles
 async function fetchArtistsFromAPI() {
-  if (!API_BASE) return null;
+  if (!API_BASE) {
+    showToast('⚠️ API_BASE not set');
+    return null;
+  }
   try {
-    const res = await fetch(`${API_BASE}/miniapp/artists`);
-    if (!res.ok) return null;
+    const url = `${API_BASE}/miniapp/artists`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      showToast('⚠️ Artists API error: ' + res.status);
+      return null;
+    }
     const data = await res.json();
+    console.log('Full artists API response:', JSON.stringify(data).substring(0, 500));
+    if (data.artists && data.artists.length > 0) {
+      // Log first artist's data to see structure
+      console.log('First artist data:', JSON.stringify(data.artists[0]));
+      showToast('✅ Loaded ' + data.artists.length + ' artists from DB');
+    }
     return data.artists || [];
-  } catch (_) {
+  } catch (e) {
+    showToast('⚠️ Artists fetch error: ' + e.message);
     return null;
   }
 }
@@ -2517,29 +2533,39 @@ async function fetchArtistsFromAPI() {
 // Apply artist data from API to local profiles
 async function initArtistsFromAPI() {
   const apiArtists = await fetchArtistsFromAPI();
-  if (apiArtists && Array.isArray(apiArtists)) {
+  if (apiArtists && Array.isArray(apiArtists) && apiArtists.length > 0) {
+    // Create a case-insensitive map for matching
+    const nameMap = {};
+    for (const name of Object.keys(artistProfiles)) {
+      nameMap[name.toLowerCase()] = name;
+    }
+    
+    let matched = 0;
+    let added = 0;
+    
     for (const artist of apiArtists) {
-      if (artistProfiles[artist.name]) {
+      // Try exact match first, then case-insensitive
+      let targetName = artistProfiles[artist.name] ? artist.name : nameMap[artist.name.toLowerCase()];
+      
+      if (targetName) {
         // Update photo if available
         if (artist.photo_url) {
-          artistProfiles[artist.name].photo = artist.photo_url;
+          artistProfiles[targetName].photo = artist.photo_url;
         }
         // Update profile photo if available
         if (artist.profile_photo_url) {
-          artistProfiles[artist.name].profilePhoto = artist.profile_photo_url;
+          artistProfiles[targetName].profilePhoto = artist.profile_photo_url;
         }
         // Update stats
         if (artist.photos !== undefined) {
-          artistProfiles[artist.name].photos = artist.photos;
+          artistProfiles[targetName].photos = artist.photos;
         }
         if (artist.videos !== undefined) {
-          artistProfiles[artist.name].videos = artist.videos;
+          artistProfiles[targetName].videos = artist.videos;
         }
-      }
-    }
-    // Also add any new artists from API that aren't in the hardcoded list
-    for (const artist of apiArtists) {
-      if (!artistProfiles[artist.name]) {
+        matched++;
+      } else {
+        // Add new artist from API
         allArtists.push(artist.name);
         artistProfiles[artist.name] = {
           photo: artist.photo_url || PLACEHOLDER_ARTIST_PHOTO,
@@ -2547,8 +2573,15 @@ async function initArtistsFromAPI() {
           photos: artist.photos || 0,
           videos: artist.videos || 0
         };
+        added++;
       }
     }
+    // Re-render artists after updating from API
+    renderArtists();
+    renderArtistsGrid();
+    showToast(`✅ ${matched} matched, ${added} new artists from DB!`);
+  } else {
+    showToast('ℹ️ Using default artists (no DB data)');
   }
 }
 
@@ -3017,10 +3050,7 @@ function showToast(msg) {
 
 // Initialize everything
 (async function init() {
-  // Load artists from API
-  await initArtistsFromAPI();
-  
-  // Render everything
+  // Render placeholders first
   renderArtists();
   renderVideos();
   renderArtistsGrid();
@@ -3028,6 +3058,9 @@ function showToast(msg) {
   renderFAQ();
   renderPricingCards();
   renderPaymentMethods();
+  
+  // THEN load artists from API and re-render
+  await initArtistsFromAPI();
   
   // Initialize user
   await initTelegramWebAppUser();
