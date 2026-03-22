@@ -2016,7 +2016,7 @@ body {
           <div class="row-label">Expiry reminder</div>
           <div class="row-sublabel">3 days before end</div>
         </div>
-        <div class="toggle on" onclick="this.classList.toggle('on'); event.stopPropagation()"></div>
+        <div class="toggle on" id="expiryToggle" onclick="toggleExpiryReminder(this)"></div>
       </div>
     </div>
 
@@ -3308,6 +3308,28 @@ function showToast(msg) {
   toast.textContent = msg;
   toast.classList.add('show');
   setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// Expiry reminder toggle function
+async function toggleExpiryReminder(element) {
+  element.classList.toggle('on');
+  const isOn = element.classList.contains('on');
+  
+  // Save to server
+  const initData = getTelegramInitData();
+  if (initData && API_BASE) {
+    try {
+      await fetch(`${API_BASE}/miniapp/set_notify_expiry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData, notify_expiry: isOn })
+      });
+      const msg = isOn ? '🔔 Expiry reminders enabled' : '🔕 Expiry reminders disabled';
+      showToast(msg);
+    } catch (e) {
+      console.error('Failed to save notification preference:', e);
+    }
+  }
 }
 
 // Language selection functions
