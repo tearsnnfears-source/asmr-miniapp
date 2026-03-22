@@ -2511,21 +2511,26 @@ async function fetchArtistsFromAPI() {
   }
   try {
     const url = `${API_BASE}/miniapp/artists`;
+    console.log('Fetching artists from URL:', url);
     const res = await fetch(url);
+    console.log('Artists response status:', res.status);
     if (!res.ok) {
       showToast('⚠️ Artists API error: ' + res.status);
       return null;
     }
     const data = await res.json();
-    console.log('Full artists API response:', JSON.stringify(data).substring(0, 500));
+    console.log('Full artists API response:', JSON.stringify(data).substring(0, 1000));
     if (data.artists && data.artists.length > 0) {
       // Log first artist's data to see structure
       console.log('First artist data:', JSON.stringify(data.artists[0]));
+      console.log('First artist has photo_url?', !!data.artists[0].photo_url);
+      console.log('First artist has profile_photo_url?', !!data.artists[0].profile_photo_url);
       showToast('✅ Loaded ' + data.artists.length + ' artists from DB');
     }
     return data.artists || [];
   } catch (e) {
     showToast('⚠️ Artists fetch error: ' + e.message);
+    console.error('Artists fetch error:', e);
     return null;
   }
 }
@@ -2542,44 +2547,55 @@ async function initArtistsFromAPI() {
     
     let matched = 0;
     let added = 0;
+    let updatedPhotos = 0;
+    let updatedStats = 0;
     
     for (const artist of apiArtists) {
       // Try exact match first, then case-insensitive
       let targetName = artistProfiles[artist.name] ? artist.name : nameMap[artist.name.toLowerCase()];
       
       if (targetName) {
-        // Update photo if available
-        if (artist.photo_url) {
+        // Debug log the raw values
+        console.log(`Artist ${targetName}: photo_url=`, artist.photo_url, ', profile_photo_url=', artist.profile_photo_url);
+        
+        // Update photo - use any truthy value (not just non-empty string)
+        const hasPhoto = artist.photo_url && String(artist.photo_url).trim().length > 0;
+        const hasProfilePhoto = artist.profile_photo_url && String(artist.profile_photo_url).trim().length > 0;
+        
+        console.log(`  hasPhoto=`, hasPhoto, ', hasProfilePhoto=', hasProfilePhoto);
+        
+        if (hasPhoto) {
           artistProfiles[targetName].photo = artist.photo_url;
+          updatedPhotos++;
         }
-        // Update profile photo if available
-        if (artist.profile_photo_url) {
+        if (hasProfilePhoto) {
           artistProfiles[targetName].profilePhoto = artist.profile_photo_url;
         }
-        // Update stats
-        if (artist.photos !== undefined) {
+        // Update stats - always update if present (even if 0)
+        if (artist.photos !== undefined && artist.photos !== null) {
           artistProfiles[targetName].photos = artist.photos;
+          updatedStats++;
         }
-        if (artist.videos !== undefined) {
+        if (artist.videos !== undefined && artist.videos !== null) {
           artistProfiles[targetName].videos = artist.videos;
+          updatedStats++;
         }
         matched++;
       } else {
         // Add new artist from API
         allArtists.push(artist.name);
         artistProfiles[artist.name] = {
-          photo: artist.photo_url || PLACEHOLDER_ARTIST_PHOTO,
-          profilePhoto: artist.profile_photo_url || null,
+          photo: (artist.photo_url && artist.photo_url.trim()) ? artist.photo_url : PLACEHOLDER_ARTIST_PHOTO,
+          profilePhoto: (artist.profile_photo_url && artist.profile_photo_url.trim()) ? artist.profile_photo_url : null,
           photos: artist.photos || 0,
           videos: artist.videos || 0
         };
         added++;
       }
     }
-    // Re-render artists after updating from API
-    renderArtists();
-    renderArtistsGrid();
-    showToast(`✅ ${matched} matched, ${added} new artists from DB!`);
+    // Debug: show first 3 artists' data
+    const debugInfo = apiArtists.slice(0, 3).map(a => `${a.name}: p=${a.photo_url?.substring(0,20)||'null'},pp=${a.profile_photo_url?.substring(0,20)||'null'}`).join(' | ');
+    showToast(`DB: ${matched}m ${updatedPhotos}p ${updatedStats}s +${added}n | ${debugInfo}`);
   } else {
     showToast('ℹ️ Using default artists (no DB data)');
   }
