@@ -2258,6 +2258,40 @@ let videoTitles = [
   'Soft Spoken'
 ];
 
+// Videos from API
+let allVideos = [];
+
+// Fetch videos from API
+async function fetchVideosFromAPI() {
+  if (!API_BASE) {
+    // Return fallback if no API base
+    return [];
+  }
+  try {
+    const url = `${API_BASE}/miniapp/videos`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.log('Videos API returned:', res.status);
+      return [];
+    }
+    const data = await res.json();
+    if (data.videos && data.videos.length > 0) {
+      return data.videos;
+    }
+    return [];
+  } catch (e) {
+    console.error('Videos fetch error:', e);
+    return [];
+  }
+}
+
+// Initialize videos from API
+async function initVideosFromAPI() {
+  allVideos = await fetchVideosFromAPI();
+  renderVideos();
+  renderVideosGrid();
+}
+
 const faqs = [
   { q: 'How do I access the group?', a: "After subscribing, you'll receive an invite link automatically. Just click it to join." },
   { q: 'Does it auto-renew?', a: 'Yes! Your subscription will automatically renew on the day it expires. You can cancel anytime.' },
@@ -2854,13 +2888,31 @@ function renderArtists() {
 
 function renderVideos() {
   const scroll = document.getElementById('videosScroll');
-  scroll.innerHTML = videoTitles.slice(0, 5).map((title, i) => `
-    <div class="video-mini-card">
-      <div class="video-mini-thumb">🎬<div class="video-dur">41:07</div></div>
-      <div class="video-mini-title">${title}</div>
-      <div class="video-mini-artist">${allArtists[i]}</div>
-    </div>
-  `).join('');
+  
+  // Use videos from API if available, otherwise fall back to placeholder
+  const videosToShow = allVideos.length > 0 ? allVideos.slice(0, 5) : [];
+  
+  if (videosToShow.length > 0) {
+    // Use actual video data from API
+    scroll.innerHTML = videosToShow.map(v => `
+      <div class="video-mini-card">
+        <div class="video-mini-thumb" onclick="openVideoModal('${encodeURIComponent(v.embed_url || v.url)}', '${encodeURIComponent(v.title)}')">
+          🎬<div class="video-dur">${v.duration || '—'}</div>
+        </div>
+        <div class="video-mini-title">${v.title}</div>
+        <div class="video-mini-artist">${v.artist_name}</div>
+      </div>
+    `).join('');
+  } else {
+    // Fallback to placeholder
+    scroll.innerHTML = videoTitles.slice(0, 5).map((title, i) => `
+      <div class="video-mini-card">
+        <div class="video-mini-thumb">🎬<div class="video-dur">41:07</div></div>
+        <div class="video-mini-title">${title}</div>
+        <div class="video-mini-artist">${allArtists[i] || 'Artist'}</div>
+      </div>
+    `).join('');
+  }
 }
 
 function renderArtistsGrid() {
@@ -3463,6 +3515,18 @@ async function checkLanguageAndShowOverlay() {
   // setTimeout(showLanguageOverlay, 500);
 }
 
+// Video modal functions
+let currentVideoUrl = '';
+let currentVideoTitle = '';
+
+function openVideoModal(url, title) {
+  currentVideoUrl = decodeURIComponent(url);
+  currentVideoTitle = decodeURIComponent(title);
+  // For now, just open the video URL in a new tab
+  // Could be enhanced with a modal player
+  window.open(currentVideoUrl, '_blank', 'noopener');
+}
+
 // Initialize everything
 (async function init() {
   // Render placeholders first
@@ -3477,6 +3541,9 @@ async function checkLanguageAndShowOverlay() {
   
   // THEN load artists from API and re-render
   await initArtistsFromAPI();
+  
+  // Load videos from API
+  await initVideosFromAPI();
   
   // Initialize user
   await initTelegramWebAppUser();
