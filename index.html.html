@@ -1660,6 +1660,39 @@ body {
 .footer-btn.active .footer-btn-label {
   color: var(--pink);
 }
+
+/* ── ARTIST TAGS ── */
+.artist-tag {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  z-index: 5;
+}
+
+.artist-tag-hot {
+  background: linear-gradient(135deg, #FF6B6B, #FF4757);
+  color: white;
+}
+
+.artist-tag-new {
+  background: linear-gradient(135deg, #4ECDC4, #44A08D);
+  color: white;
+}
+
+.artist-tag-prom {
+  background: linear-gradient(135deg, #FFD93D, #F59E0B);
+  color: #1E1E20;
+}
+
+.artist-card {
+  position: relative;
+}
 </style>
 </head>
 <body>
@@ -2504,6 +2537,11 @@ async function initArtistsFromAPI() {
           artistProfiles[targetName].videos = artist.videos;
           updatedStats++;
         }
+        // Update tags
+        if (artist.tag_hot !== undefined) artistProfiles[targetName].tag_hot = artist.tag_hot;
+        if (artist.tag_new !== undefined) artistProfiles[targetName].tag_new = artist.tag_new;
+        if (artist.tag_prom !== undefined) artistProfiles[targetName].tag_prom = artist.tag_prom;
+        
         matched++;
       } else {
         // Add new artist from API
@@ -2512,7 +2550,10 @@ async function initArtistsFromAPI() {
           photo: (artist.photo_url && artist.photo_url.trim()) ? artist.photo_url : PLACEHOLDER_ARTIST_PHOTO,
           profilePhoto: (artist.profile_photo_url && artist.profile_photo_url.trim()) ? artist.profile_photo_url : null,
           photos: artist.photos || 0,
-          videos: artist.videos || 0
+          videos: artist.videos || 0,
+          tag_hot: artist.tag_hot || false,
+          tag_new: artist.tag_new || false,
+          tag_prom: artist.tag_prom || false
         };
         added++;
       }
@@ -2559,11 +2600,34 @@ function updateStatsBanner() {
   }
 }
 
+// Get tags HTML for artist card
+function getArtistTagsHtml(name) {
+  const profile = artistProfiles[name];
+  if (!profile) return '';
+  
+  let tagsHtml = '';
+  if (profile.tag_hot) {
+    tagsHtml += '<div class="artist-tag artist-tag-hot">🔥 HOT</div>';
+  }
+  if (profile.tag_new) {
+    tagsHtml += '<div class="artist-tag artist-tag-new">✨ NEW</div>';
+  }
+  // Prom tag doesn't show visually
+  return tagsHtml;
+}
+
 function renderArtists() {
+  // Get promoted artists first, then others - max 10 total
+  const promoted = allArtists.filter(name => artistProfiles[name]?.tag_prom);
+  const others = allArtists.filter(name => !artistProfiles[name]?.tag_prom);
+  const displayArtists = [...promoted.slice(0, 8), ...others.slice(0, 10 - Math.min(promoted.length, 8))];
+  
   const scroll = document.getElementById('artistsScroll');
-  scroll.innerHTML = allArtists.slice(0, 10).map(name => `
+  scroll.innerHTML = displayArtists.map(name => `
     <div class="artist-mini-card" onclick="openArtistProfile('${name}')">
-      <div class="artist-mini-av" style="background-image:url('${artistProfiles[name]?.photo || PLACEHOLDER_ARTIST_PHOTO}')"></div>
+      <div class="artist-mini-av" style="background-image:url('${artistProfiles[name]?.photo || PLACEHOLDER_ARTIST_PHOTO}')">
+        ${getArtistTagsHtml(name)}
+      </div>
       <div class="artist-mini-name">${name.split(' ')[0]}</div>
     </div>
   `).join('');
@@ -2584,7 +2648,9 @@ function renderArtistsGrid() {
   const grid = document.getElementById('artistsGrid');
   grid.innerHTML = allArtists.map(name => `
     <div class="artist-card" onclick="openArtistProfile('${name}')">
-      <div class="artist-card-image" style="background-image:url('${artistProfiles[name].photo}')"></div>
+      <div class="artist-card-image" style="background-image:url('${artistProfiles[name].photo}')">
+        ${getArtistTagsHtml(name)}
+      </div>
       <div class="artist-card-info">
         <div class="artist-card-name">${name}</div>
         <div class="artist-card-meta">${artistProfiles[name].photos} photos · ${artistProfiles[name].videos} videos</div>
