@@ -2893,11 +2893,22 @@ function renderVideos() {
   const videosToShow = allVideos.length > 0 ? allVideos.slice(0, 5) : [];
   
   if (videosToShow.length > 0) {
-    // Use actual video data from API
+    // Use actual video data from API - embed inline player
     scroll.innerHTML = videosToShow.map(v => `
       <div class="video-mini-card">
-        <div class="video-mini-thumb" onclick="openVideoModal('${encodeURIComponent(v.embed_url || v.url)}', '${encodeURIComponent(v.title)}')">
-          🎬<div class="video-dur">${v.duration || '—'}</div>
+        <div class="video-mini-thumb" style="background:transparent;cursor:pointer" onclick="toggleVideoPlay(this, '${encodeURIComponent(v.embed_url || v.url)}')">
+          <div class="video-player-container" style="display:none;width:100%;height:100%;border-radius:8px;overflow:hidden">
+            <iframe 
+              src="${v.embed_url || v.url}?autoplay=true" 
+              style="width:100%;height:100%;border:none;border-radius:8px" 
+              allow="autoplay; fullscreen; encrypted-media" 
+              allowfullscreen>
+            </iframe>
+          </div>
+          <div class="video-play-overlay" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);border-radius:8px">
+            <span style="font-size:32px">▶️</span>
+          </div>
+          <div class="video-dur">${v.duration || '—'}</div>
         </div>
         <div class="video-mini-title">${v.title}</div>
         <div class="video-mini-artist">${v.artist_name}</div>
@@ -2912,6 +2923,25 @@ function renderVideos() {
         <div class="video-mini-artist">${allArtists[i] || 'Artist'}</div>
       </div>
     `).join('');
+  }
+}
+
+// Toggle video play inline
+function toggleVideoPlay(element, videoUrl) {
+  const container = element.querySelector('.video-player-container');
+  const overlay = element.querySelector('.video-play-overlay');
+  
+  if (container.style.display === 'none') {
+    // Show video player
+    const url = decodeURIComponent(videoUrl);
+    container.innerHTML = `<iframe src="${url}?autoplay=true" style="width:100%;height:100%;border:none;border-radius:8px" allow="autoplay; fullscreen; encrypted-media" allowfullscreen></iframe>`;
+    container.style.display = 'block';
+    overlay.style.display = 'none';
+  } else {
+    // Hide video player
+    container.style.display = 'none';
+    container.innerHTML = '';
+    overlay.style.display = 'flex';
   }
 }
 
