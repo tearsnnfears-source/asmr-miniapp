@@ -2449,31 +2449,17 @@ async function initTelegramWebAppUser() {
 // Fetch artists from API and update profiles
 async function fetchArtistsFromAPI() {
   if (!API_BASE) {
-    showToast('⚠️ API_BASE not set');
     return null;
   }
   try {
     const url = `${API_BASE}/miniapp/artists`;
-    console.log('Fetching artists from URL:', url);
     const res = await fetch(url);
-    console.log('Artists response status:', res.status);
     if (!res.ok) {
-      showToast('⚠️ Artists API error: ' + res.status);
       return null;
     }
     const data = await res.json();
-    console.log('Full artists API response:', JSON.stringify(data).substring(0, 1000));
-    if (data.artists && data.artists.length > 0) {
-      // Log first artist's data to see structure
-      console.log('First artist data:', JSON.stringify(data.artists[0]));
-      console.log('First artist has photo_url?', !!data.artists[0].photo_url);
-      console.log('First artist has profile_photo_url?', !!data.artists[0].profile_photo_url);
-      showToast('✅ Loaded ' + data.artists.length + ' artists from DB');
-    }
     return data.artists || [];
   } catch (e) {
-    showToast('⚠️ Artists fetch error: ' + e.message);
-    console.error('Artists fetch error:', e);
     return null;
   }
 }
@@ -2498,14 +2484,9 @@ async function initArtistsFromAPI() {
       let targetName = artistProfiles[artist.name] ? artist.name : nameMap[artist.name.toLowerCase()];
       
       if (targetName) {
-        // Debug log the raw values
-        console.log(`Artist ${targetName}: photo_url=`, artist.photo_url, ', profile_photo_url=', artist.profile_photo_url);
-        
         // Update photo - use any truthy value (not just non-empty string)
         const hasPhoto = artist.photo_url && String(artist.photo_url).trim().length > 0;
         const hasProfilePhoto = artist.profile_photo_url && String(artist.profile_photo_url).trim().length > 0;
-        
-        console.log(`  hasPhoto=`, hasPhoto, ', hasProfilePhoto=', hasProfilePhoto);
         
         if (hasPhoto) {
           artistProfiles[targetName].photo = artist.photo_url;
@@ -2536,17 +2517,11 @@ async function initArtistsFromAPI() {
         added++;
       }
     }
-    // Debug: show first 3 artists' data
-    const debugInfo = apiArtists.slice(0, 3).map(a => `${a.name}: p=${a.photo_url?.substring(0,20)||'null'},pp=${a.profile_photo_url?.substring(0,20)||'null'}`).join(' | ');
-    showToast(`DB: ${matched}m ${updatedPhotos}p ${updatedStats}s +${added}n | ${debugInfo}`);
-    
     // Force re-render of all views
     renderArtists();
     renderArtistsGrid();
     renderVideos();
     renderVideosGrid();
-  } else {
-    showToast('ℹ️ Using default artists (no DB data)');
   }
 }
 
