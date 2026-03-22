@@ -1846,6 +1846,35 @@ body {
 .artist-card {
   position: relative;
 }
+
+/* ── PAYMENT OVERLAYS ── */
+.pay-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(14, 14, 15, 0.85); backdrop-filter: blur(8px);
+  z-index: 1000; display: none; align-items: center; justify-content: center;
+  flex-direction: column; opacity: 0; transition: opacity 0.3s ease;
+}
+.pay-overlay.active { display: flex; opacity: 1; }
+
+.spinner {
+  width: 50px; height: 50px; border: 4px solid rgba(255, 126, 200, 0.2);
+  border-top-color: var(--pink); border-radius: 50%;
+  animation: spin 1s linear infinite; margin-bottom: 20px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.pay-status-text {
+  font-family: 'Bebas Neue', sans-serif; font-size: 24px; color: var(--text); letter-spacing: 1px;
+}
+
+.success-checkmark {
+  width: 80px; height: 80px; background: rgba(74, 222, 128, 0.15);
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  color: var(--success); font-size: 40px; margin-bottom: 20px;
+  transform: scale(0); transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.success-checkmark.show { transform: scale(1); }
+
 </style>
 </head>
 <body>
@@ -3251,6 +3280,58 @@ function applyPromo() {
   }
 }
 
+// Красивые анимации загрузки
+function showPaymentOverlay(text, isLoading) {
+  let overlay = document.getElementById('payOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'payOverlay';
+    overlay.className = 'pay-overlay';
+    overlay.innerHTML = `
+      <div id="paySpinner" class="spinner"></div>
+      <div id="paySuccessIcon" class="success-checkmark">✓</div>
+      <div id="payStatusText" class="pay-status-text">Processing...</div>
+    `;
+    document.body.appendChild(overlay);
+  }
+  
+  const spinner = document.getElementById('paySpinner');
+  const icon = document.getElementById('paySuccessIcon');
+  const statusText = document.getElementById('payStatusText');
+  
+  statusText.textContent = text;
+  
+  if (isLoading) {
+    spinner.style.display = 'block';
+    icon.classList.remove('show');
+    icon.style.display = 'none';
+  } else {
+    spinner.style.display = 'none';
+    icon.style.display = 'flex';
+    setTimeout(() => icon.classList.add('show'), 50);
+  }
+  
+  overlay.classList.add('active');
+}
+
+function hidePaymentOverlay() {
+  const overlay = document.getElementById('payOverlay');
+  if (overlay) {
+    overlay.classList.remove('active');
+    setTimeout(() => overlay.style.display = 'none', 300);
+  }
+}
+
+function processPayStarsLocally(days) {
+  const currentDays = typeof serverDaysLeft === "number" ? serverDaysLeft : (isSubscribed ? 30 : 0);
+  serverDaysLeft = currentDays + days;
+  isSubscribed = true;
+  serverShowSubscribe = false;
+  updateCTAButtons();
+  openPage('home'); // Сразу возвращаем пользователя на главную, чтобы показать успех
+  showToast('🎉 Subscription updated!');
+}
+
 async function openPaymentLink() {
   const plan = plans[selectedPlan];
   const method = methods[selectedMethod];
@@ -3267,74 +3348,82 @@ async function openPaymentLink() {
   
   const tg = window.Telegram?.WebApp;
   const initData = getTelegramInitData();
-  
   let paymentUrl = '';
   
   switch(selectedMethod) {
     case 0: // Card via Tribute
       paymentUrl = PAYMENT_URLS.tribute;
+      if (tg && typeof tg.openLink === 'function') tg.openLink(paymentUrl);
+      else window.open(paymentUrl, '_blank', 'noopener');
       break;
-    case 1: // TG Stars - create invoice via API
+      
+    case 1: // TG Stars - ОПЛАТА ВНУТРИ ПРИЛОЖЕНИЯ
       try {
-        showToast('⏳ Creating invoice...');
+        showPaymentOverlay('Generating Invoice...', true);
         const res = await fetch(`${API_BASE}/miniapp/create_stars_invoice`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            initData,
-            days: plan.days 
-          })
+          body: JSON.stringify({ initData, days: plan.days })
         });
         const data = await res.json().catch(() => ({}));
+        
         if (data.invoice_link) {
-          paymentUrl = data.invoice_link;
+          hidePaymentOverlay(); // Прячем загрузку перед показом окна Телеграма
+          
+          if (tg && typeof tg.openInvoice === 'function') {
+             // Открываем нативное окно Telegram Stars
+             tg.openInvoice(data.invoice_link, function(status) {
+                if (status === 'paid') {
+                    showPaymentOverlay('Payment Successful!', false);
+                    setTimeout(() => {
+                        hidePaymentOverlay();
+                        processPayStarsLocally(plan.days);
+                    }, 2500);
+                } else if (status === 'failed') {
+                    showToast('❌ Payment failed');
+                } else if (status === 'cancelled') {
+                    showToast('ℹ️ Payment cancelled');
+                } else if (status === 'pending') {
+                    showToast('⏳ Payment is pending');
+                }
+             });
+          } else {
+             // Фолбэк, если человек сидит с древней версии ТГ
+             tg.openLink(data.invoice_link);
+          }
         } else {
-          // Fallback - open payment bot inline
-          paymentUrl = `https://t.me/${tg?.initDataUnsafe?.bot?.username || 'asmrLeaksBot'}?start=pay_stars_${plan.days}`;
+          hidePaymentOverlay();
+          showToast('❌ Could not generate invoice: ' + (data.error || 'Unknown error'));
         }
       } catch (e) {
-        // Fallback to bot
-        paymentUrl = `https://t.me/asmrLeaksBot?start=pay_stars_${plan.days}`;
+        hidePaymentOverlay();
+        showToast('❌ Network error');
       }
       break;
+      
     case 2: // СБП via YooMoney
       try {
-        showToast('⏳ Creating payment link...');
+        showPaymentOverlay('Creating link...', true);
         const res = await fetch(`${API_BASE}/miniapp/create_yoomoney_payment`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            initData,
-            days: plan.days 
-          })
+          body: JSON.stringify({ initData, days: plan.days })
         });
         const data = await res.json().catch(() => ({}));
+        hidePaymentOverlay();
+        
         if (data.payment_url) {
-          paymentUrl = data.payment_url;
+          if (tg && typeof tg.openLink === 'function') tg.openLink(data.payment_url);
+          else window.open(data.payment_url, '_blank', 'noopener');
         } else {
-          // Fallback to bot
-          paymentUrl = `https://t.me/asmrLeaksBot?start=pay_yoomoney_${plan.days}`;
+          showToast('❌ Error creating YooMoney link');
         }
       } catch (e) {
-        paymentUrl = `https://t.me/asmrLeaksBot?start=pay_yoomoney_${plan.days}`;
+        hidePaymentOverlay();
+        showToast('❌ Network error');
       }
       break;
-    case 3: // Crypto
-      showToast('🚧 Crypto payments coming soon');
-      return;
-    default:
-      showToast('⚠️ Please select a payment method');
-      return;
   }
-  
-  // Open payment link
-  if (tg && typeof tg.openLink === 'function') {
-    tg.openLink(paymentUrl);
-  } else {
-    window.open(paymentUrl, '_blank', 'noopener');
-  }
-  
-  showToast(`Opening ${method.name} payment...`);
 }
 
 function processPay() {
