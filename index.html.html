@@ -2069,52 +2069,11 @@ body {
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
-const allArtists = [
-  'Moona ASMR', 'HoneyGirl', 'Reneserealrm', 'Emma', 'Ruby ASMR', 
-  'HeatheredEffect', 'Rose ASMR', 'Malinkaa98', 'Mood ASMR', 'Soly ASMR',
-  'Puffin ASMR', 'Trinki ASMR', 'SkepticalPickle ASMR', 'Akuma ASMR', 'Tysria',
-  'The Sounds of Girls', 'Jinx ASMR', 'Beebee ASMR', 'Diddly ASMR', 'Its_Bunnii ASMR',
-  'Maimy', 'Nyan ASMR', 'Tangerin', 'BusyB', 'Kotya ASMR',
-  'BellaRama', 'Beka', 'Malaika', 'Mewlies ASMR', 'Miinu Inu',
-  'LinaNeyeon', 'FoxenKin', 'Bilochka ASMR', 'TheNicoleT', 'Nananightray',
-  'JazzMeow', 'Lyrica', 'Leyna Inu', 'Veronika ASMR', 'Tanya Melson ASMR',
-  'Florescent', 'Amouranth', 'Maddy ASMR', 'Telishamaree', 'Ginger ASMR',
-  'KittyKlaw', 'LunaRexx', 'Arina', 'SL Lauren', 'Alexis ASMR',
-  'Orenda ASMR', 'Valeriya ASMR', 'Amy ASMR', 'Wan ASMR', 'Emilyuwo ASMR',
-  'Kailey Mae ASMR', 'Cherry Crush ASMR', 'Arilove ASMR', 'SacredXO', 'ASMRbyK',
-  'Claudy ASMR', 'ArianaRealTV', 'Emma My Space', 'Laurel Jeune', 'ESTHEROlive',
-  'Onuri', 'Amyrosebutt', 'BunnyAyumi', 'All Bella', 'Holly Rosi ASMR',
-  'ElisabeteXO ASMR', 'Malina ASMR', 'Lei ASMR', 'Bunny Marthy', 'Trisha Fisher',
-  'JadetheJaguar', 'White Spa ASMR', 'Vico ASMR', 'Corneliusthecat', 'Smizzles',
-  'Mimi_fun', 'Alice Delish', 'Sarene Wild', 'Fifi_lurks', 'Jenfoxx',
-  'PekeASMR', 'Lexinkin', 'Senadeska', 'Lin ASMR', 'Lerka',
-  'Mazzybelle', 'Castaway', 'Sofifrenchfry', 'SleepySab', 'Sabrina Vaz'
-];
-
-const videoTitles = [
-  'Ear Eating ASMR', 'Deep Whisper', 'Tapping Tingles', 'Sleep Session',
-  'Personal Attention', 'Binaural ASMR', 'Brain Tingles', 'Close Whisper',
-  'Relaxing Sounds', 'Tingles & Whispers'
-];
-
-const VERONIKA_PROFILE_PHOTO = 'https://i.ibb.co/7xjYTFQn/photo-2026-01-14-07-10-54.jpg';
+// Placeholder constant for artists without photos
 const PLACEHOLDER_ARTIST_PHOTO = 'https://placehold.co/500x600/1E1E20/8A8A8A?text=No+Photo';
 
-// Artist photos - card thumbnail
-const artistPhotos = {
-  'TheNicoleT': 'https://i.ibb.co/C51P9hQK/photo-2026-03-05-18-38-24.jpg',
-  'Beebee': 'https://i.ibb.co/r257m0XB/photo-2026-03-04-13-15-17.jpg',
-  'Reneserealrm': 'https://i.ibb.co/yrDn5bM/photo-2026-03-22-01-58-40.jpg',
-  'HoneyGirl': 'https://i.ibb.co/rGk1mFL7/photo-2026-03-22-01-58-23.jpg',
-  'Moona ASMR': 'https://i.ibb.co/bMhVtDRf/photo-2026-03-22-01-58-13.jpg',
-};
-
-// Artist profile photos - full background
-const artistProfilePhotos = {
-  'TheNicoleT': 'https://i.ibb.co/C51P9hQK/photo-2026-03-05-18-38-24.jpg',
-  'Beebee': 'https://i.ibb.co/r257m0XB/photo-2026-03-04-13-15-17.jpg',
-  'Moona ASMR': 'https://i.ibb.co/fG9v1RTh/photo-2026-03-22-02-03-56.jpg',
-};
+// Placeholder video titles - will be updated from DB
+let videoTitles = ['Loading...'];
 
 const faqs = [
   { q: 'How do I access the group?', a: "After subscribing, you'll receive an invite link automatically. Just click it to join." },
@@ -2148,26 +2107,10 @@ let artistsLoadedFromAPI = false;
 const API_BASE = window.__MINIAPP_API_BASE__ || "https://asmr-bot-production.up.railway.app";
 const INFINITE_SUB_DAYS_THRESHOLD = 9000;
 const MAX_ALLOWED_DAYS = 60;
-const artistProfiles = Object.fromEntries(
-  allArtists.map(name => [name, { photo: PLACEHOLDER_ARTIST_PHOTO, photos: 0, videos: 0 }])
-);
-artistProfiles['Veronika ASMR'] = {
-  photo: VERONIKA_PROFILE_PHOTO,
-  photos: 12,
-  videos: 8
-};
 
-// Apply custom photos
-for (const [name, photo] of Object.entries(artistPhotos)) {
-  if (artistProfiles[name]) {
-    artistProfiles[name].photo = photo;
-  }
-}
-for (const [name, photo] of Object.entries(artistProfilePhotos)) {
-  if (artistProfiles[name]) {
-    artistProfiles[name].profilePhoto = photo;
-  }
-}
+// Artists will be populated from API
+let allArtists = [];
+let artistProfiles = {};
 
 function getInitials(fullName) {
   const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
