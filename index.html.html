@@ -2046,7 +2046,7 @@ body {
     </div>
 
     <div class="support-options">
-      <div class="support-card" onclick="showToast('💬 Opening Telegram...')">
+      <div class="support-card" onclick="openTelegramChat('sonnnnnua')">
         <div class="support-icon">💬</div>
         <div>
           <div class="support-title">Chat with Support</div>
@@ -2054,7 +2054,7 @@ body {
         </div>
         <div style="color:var(--muted);font-size:12px">→</div>
       </div>
-      <div class="support-card" onclick="showToast('🐛 Report a Bug')">
+      <div class="support-card" onclick="openTelegramChat('sonnnnnua')">
         <div class="support-icon">🐛</div>
         <div>
           <div class="support-title">Report a Bug</div>
@@ -2062,7 +2062,7 @@ body {
         </div>
         <div style="color:var(--muted);font-size:12px">→</div>
       </div>
-      <div class="support-card" onclick="showToast('💡 Suggest a Feature')">
+      <div class="support-card" onclick="openTelegramChat('sonnnnnua')">
         <div class="support-icon">💡</div>
         <div>
           <div class="support-title">Suggest a Feature</div>
@@ -2268,7 +2268,7 @@ let videoTitles = [
 
 const faqs = [
   { q: 'How do I access the group?', a: "After subscribing, you'll receive an invite link automatically. Just click it to join." },
-  { q: 'Does it auto-renew?', a: 'No! We never charge you automatically. Renew manually when you want.' },
+  { q: 'Does it auto-renew?', a: 'Yes! Your subscription will automatically renew on the day it expires. You can cancel anytime.' },
   { q: 'Can I try for free?', a: 'Yes! New users get 3 free days. Just tap "Try Free" in the main menu.' },
   { q: 'I paid but no access?', a: 'Contact support — we usually fix it within minutes.' },
 ];
@@ -3319,6 +3319,18 @@ function showToast(msg) {
   toast.textContent = msg;
   toast.classList.add('show');
   setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// Open Telegram chat function
+function openTelegramChat(username) {
+  const cleanUsername = username.replace('@', '');
+  const tg = window.Telegram?.WebApp;
+  const url = `https://t.me/${cleanUsername}`;
+  if (tg && typeof tg.openLink === 'function') {
+    tg.openLink(url);
+  } else {
+    window.open(url, '_blank', 'noopener');
+  }
 }
 
 // Expiry reminder toggle function
