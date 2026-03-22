@@ -2539,6 +2539,12 @@ async function initArtistsFromAPI() {
     // Debug: show first 3 artists' data
     const debugInfo = apiArtists.slice(0, 3).map(a => `${a.name}: p=${a.photo_url?.substring(0,20)||'null'},pp=${a.profile_photo_url?.substring(0,20)||'null'}`).join(' | ');
     showToast(`DB: ${matched}m ${updatedPhotos}p ${updatedStats}s +${added}n | ${debugInfo}`);
+    
+    // Force re-render of all views
+    renderArtists();
+    renderArtistsGrid();
+    renderVideos();
+    renderVideosGrid();
   } else {
     showToast('ℹ️ Using default artists (no DB data)');
   }
@@ -2727,6 +2733,10 @@ function openPage(page) {
   document.querySelectorAll('.footer-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`footer-${page}`)?.classList.add('active');
   if (page === 'favorites') loadFavorites();
+  // Re-render artists when opening artists page
+  if (page === 'artists' && allArtists.length > 0) {
+    renderArtistsGrid();
+  }
 }
 
 function showArtistsPage() {
