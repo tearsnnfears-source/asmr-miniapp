@@ -353,6 +353,7 @@ body {
   transition: border-color 0.2s;
   background-size: cover;
   background-position: center;
+  position: relative;
 }
 
 .artist-mini-card:active .artist-mini-av {
@@ -362,10 +363,36 @@ body {
 .artist-mini-name {
   font-size: 9px;
   font-weight: 500;
-  color: var(--text);
+  color: var(--lime);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Home page artist tags - above avatar */
+.artist-mini-tag {
+  position: absolute;
+  top: -10px;
+  left: 0;
+  right: 0;
+  padding: 2px 4px;
+  border-radius: 4px 4px 0 0;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+  z-index: 6;
+}
+
+.artist-mini-tag-hot {
+  background: linear-gradient(135deg, #C86BFF, #9B4DCA);
+  color: white;
+}
+
+.artist-mini-tag-new {
+  background: linear-gradient(135deg, #44C8FF, #2E8BC0);
+  color: white;
 }
 
 /* ── NEW VIDEOS SECTION ── */
@@ -634,11 +661,12 @@ body {
   font-size: 12px;
   font-weight: 500;
   margin-bottom: 4px;
+  color: var(--pink);
 }
 
 .artist-card-meta {
   font-size: 10px;
-  color: var(--muted);
+  color: var(--lime);
 }
 
 /* ── VIDEOS PAGE ── */
@@ -2481,34 +2509,46 @@ async function initTelegramWebAppUser() {
 
 // Fallback artists in case API fails
 const FALLBACK_ARTISTS = [
-  'Moona ASMR', 'HoneyGirl', 'Reneserealrm', 'Emma', 'Ruby ASMR', 
-  'HeatheredEffect', 'Rose ASMR', 'Malinkaa98', 'Mood ASMR', 'Soly ASMR',
-  'Veronika ASMR', 'TheNicoleT', 'Beebee', 'JazzMeow', 'Lyrica'
+  { name: 'Moona ASMR', photos: 45, videos: 12, tag_hot: false, tag_new: false, tag_prom: false },
+  { name: 'HoneyGirl', photos: 38, videos: 8, tag_hot: true, tag_new: false, tag_prom: false },
+  { name: 'Reneserealrm', photos: 52, videos: 15, tag_hot: false, tag_new: true, tag_prom: false },
+  { name: 'Emma', photos: 28, videos: 6, tag_hot: false, tag_new: false, tag_prom: false },
+  { name: 'Ruby ASMR', photos: 33, videos: 9, tag_hot: true, tag_new: false, tag_prom: true },
+  { name: 'HeatheredEffect', photos: 41, videos: 11, tag_hot: false, tag_new: false, tag_prom: false },
+  { name: 'Rose ASMR', photos: 29, videos: 7, tag_hot: false, tag_new: true, tag_prom: false },
+  { name: 'Malinkaa98', photos: 36, videos: 10, tag_hot: false, tag_new: false, tag_prom: false },
+  { name: 'Mood ASMR', photos: 44, videos: 13, tag_hot: true, tag_new: false, tag_prom: true },
+  { name: 'Soly ASMR', photos: 31, videos: 8, tag_hot: false, tag_new: false, tag_prom: false },
+  { name: 'Veronika ASMR', photos: 12, videos: 8, tag_hot: false, tag_new: false, tag_prom: false },
+  { name: 'TheNicoleT', photos: 48, videos: 14, tag_hot: true, tag_new: false, tag_prom: true },
+  { name: 'Beebee', photos: 55, videos: 16, tag_hot: false, tag_new: true, tag_prom: true },
+  { name: 'JazzMeow', photos: 27, videos: 5, tag_hot: false, tag_new: false, tag_prom: false },
+  { name: 'Lyrica', photos: 39, videos: 9, tag_hot: false, tag_new: false, tag_prom: false }
 ];
 
 // Fetch artists from API and update profiles
 async function fetchArtistsFromAPI() {
   if (!API_BASE) {
     // Return fallback if no API base
-    return FALLBACK_ARTISTS.map(name => ({ name, photos: 0, videos: 0 }));
+    return FALLBACK_ARTISTS;
   }
   try {
     const url = `${API_BASE}/miniapp/artists`;
     const res = await fetch(url);
     if (!res.ok) {
       console.log('Artists API returned:', res.status);
-      return null;
+      return FALLBACK_ARTISTS;
     }
     const data = await res.json();
     if (data.artists && data.artists.length > 0) {
       return data.artists;
     }
     // If API returns empty, use fallback
-    return FALLBACK_ARTISTS.map(name => ({ name, photos: 0, videos: 0 }));
+    return FALLBACK_ARTISTS;
   } catch (e) {
     console.error('Artists fetch error:', e);
     // Return fallback on error
-    return FALLBACK_ARTISTS.map(name => ({ name, photos: 0, videos: 0 }));
+    return FALLBACK_ARTISTS;
   }
 }
 
@@ -2581,6 +2621,12 @@ async function initArtistsFromAPI() {
     
     // Update stats banner on home page
     updateStatsBanner();
+    
+    // Show toast with tag counts for debugging
+    const hotCount = Object.values(artistProfiles).filter(p => !!p.tag_hot || p.tag_hot === 'true').length;
+    const newCount = Object.values(artistProfiles).filter(p => !!p.tag_new || p.tag_new === 'true').length;
+    const promCount = Object.values(artistProfiles).filter(p => !!p.tag_prom || p.tag_prom === 'true').length;
+    console.log('Tags loaded: hot=' + hotCount + ', new=' + newCount + ', prom=' + promCount);
   }
 }
 
@@ -2615,7 +2661,26 @@ function updateStatsBanner() {
   }
 }
 
-// Get tags HTML for artist card
+// Get tags HTML for home page - above avatar
+function getHomeArtistTagsHtml(name) {
+  const profile = artistProfiles[name];
+  if (!profile) return '';
+  
+  // Force convert to boolean to handle string "true" from API
+  const isHot = !!profile.tag_hot || profile.tag_hot === 'true';
+  const isNew = !!profile.tag_new || profile.tag_new === 'true';
+  
+  if (isHot) {
+    return '<div class="artist-mini-tag artist-mini-tag-hot">HOT</div>';
+  }
+  if (isNew) {
+    return '<div class="artist-mini-tag artist-mini-tag-new">NEW</div>';
+  }
+  
+  return '';
+}
+
+// Get tags HTML for All Artists page - corner badge
 function getArtistTagsHtml(name) {
   const profile = artistProfiles[name];
   if (!profile) return '';
@@ -2646,7 +2711,7 @@ function renderArtists() {
   scroll.innerHTML = displayArtists.map(name => `
     <div class="artist-mini-card" onclick="openArtistProfile('${name}')">
       <div class="artist-mini-av" style="background-image:url('${artistProfiles[name]?.photo || PLACEHOLDER_ARTIST_PHOTO}')">
-        ${getArtistTagsHtml(name)}
+        ${getHomeArtistTagsHtml(name)}
       </div>
       <div class="artist-mini-name">${name.split(' ')[0]}</div>
     </div>
@@ -2861,7 +2926,6 @@ function closeArtistProfile() {
 
 function searchArtists(query) {
   const searchClear = document.getElementById('searchClear');
-  const subtitle = document.getElementById('artistsSubtitle');
   
   if (query.length > 0) {
     searchClear.classList.add('active');
@@ -2882,18 +2946,18 @@ function searchArtists(query) {
         <div style="font-size: 14px">No artists found</div>
       </div>
     `;
-    subtitle.textContent = 'No results';
   } else {
     grid.innerHTML = filtered.map(name => `
       <div class="artist-card" onclick="openArtistProfile('${name}')">
-        <div class="artist-card-image" style="background-image:url('${artistProfiles[name].photo}')"></div>
+        <div class="artist-card-image" style="background-image:url('${artistProfiles[name].photo}')">
+          ${getArtistTagsHtml(name)}
+        </div>
         <div class="artist-card-info">
           <div class="artist-card-name">${name}</div>
           <div class="artist-card-meta">${artistProfiles[name].photos} photos · ${artistProfiles[name].videos} videos</div>
         </div>
       </div>
     `).join('');
-    subtitle.textContent = `${filtered.length} creator${filtered.length !== 1 ? 's' : ''}`;
   }
 }
 
