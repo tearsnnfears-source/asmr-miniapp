@@ -3402,14 +3402,38 @@ async function selectLanguage(lang) {
 
 let languageChecked = false;
 
+function getStoredLanguage() {
+  try {
+    return localStorage.getItem('app_language');
+  } catch (e) {
+    return null;
+  }
+}
+
+function setStoredLanguage(lang) {
+  try {
+    localStorage.setItem('app_language', lang);
+  } catch (e) {
+    // Ignore storage errors
+  }
+}
+
 async function checkLanguageAndShowOverlay() {
-  // Prevent multiple checks
+  // Prevent multiple checks per session
   if (languageChecked) return;
   languageChecked = true;
   
+  // First check localStorage - most reliable
+  const storedLang = getStoredLanguage();
+  if (storedLang && (storedLang === 'en' || storedLang === 'ru' || storedLang === 'es')) {
+    currentLang = storedLang;
+    updateLanguageUI(storedLang);
+    return;
+  }
+  
   const initData = getTelegramInitData();
   
-  // Try to get profile with language
+  // Try to get profile with language from server
   if (initData && API_BASE) {
     try {
       const res = await fetch(`${API_BASE}/miniapp/profile`, {
@@ -3422,30 +3446,21 @@ async function checkLanguageAndShowOverlay() {
         const savedLang = data.lang;
         
         // Only show overlay if NO valid language is set
-        // Valid languages: 'en', 'ru', 'es'
-        if (!savedLang || savedLang === '' || savedLang === null || savedLang === undefined) {
-          // No language selected - show overlay
-          setTimeout(showLanguageOverlay, 500);
-        } else if (savedLang === 'en' || savedLang === 'ru' || savedLang === 'es') {
-          // Language already selected - update UI only
+        if (savedLang && (savedLang === 'en' || savedLang === 'ru' || savedLang === 'es')) {
+          // Language from server - save to localStorage and update UI
           currentLang = savedLang;
+          setStoredLanguage(savedLang);
           updateLanguageUI(savedLang);
-        } else {
-          // Unknown language value - show overlay
-          setTimeout(showLanguageOverlay, 500);
+          return;
         }
-      } else {
-        // API error - don't show overlay
-        console.log('Profile API error, not showing language overlay');
       }
     } catch (e) {
       console.error('Failed to check language:', e);
-      // Don't show overlay on network error
     }
-  } else {
-    // No initData - don't show overlay
-    console.log('No initData, not showing language overlay');
   }
+  
+  // No valid language found - show overlay
+  setTimeout(showLanguageOverlay, 500);
 }
 
 // Initialize everything
