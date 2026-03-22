@@ -369,30 +369,36 @@ body {
   text-overflow: ellipsis;
 }
 
-/* Home page artist tags - above avatar */
+/* Home page artist tags - dot + label at bottom */
 .artist-mini-tag {
   position: absolute;
-  top: -10px;
-  left: 0;
-  right: 0;
-  padding: 2px 4px;
-  border-radius: 4px 4px 0 0;
+  bottom: 4px;
+  left: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
   font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  text-align: center;
   z-index: 6;
 }
 
 .artist-mini-tag-hot {
-  background: linear-gradient(135deg, #C86BFF, #9B4DCA);
-  color: white;
+  background: rgba(200, 107, 255, 0.95);
+  color: #CCFF00;
+  text-shadow: 0 0 6px rgba(204, 255, 0, 0.9);
+  box-shadow: 0 0 8px rgba(200, 107, 255, 0.6);
 }
 
 .artist-mini-tag-new {
-  background: linear-gradient(135deg, #44C8FF, #2E8BC0);
-  color: white;
+  background: rgba(68, 200, 255, 0.95);
+  color: #CCFF00;
+  text-shadow: 0 0 6px rgba(204, 255, 0, 0.9);
+  box-shadow: 0 0 8px rgba(68, 200, 255, 0.6);
 }
 
 /* ── NEW VIDEOS SECTION ── */
