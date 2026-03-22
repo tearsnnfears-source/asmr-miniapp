@@ -637,9 +637,8 @@ body {
 }
 
 .artist-card-meta {
-  font-size: 12px;
-  color: var(--lime);
-  font-weight: 500;
+  font-size: 10px;
+  color: var(--muted);
 }
 
 /* ── VIDEOS PAGE ── */
@@ -2070,33 +2069,7 @@ body {
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
-const videoTitles = [
-  'Ear Eating ASMR', 'Deep Whisper', 'Tapping Tingles', 'Sleep Session',
-  'Personal Attention', 'Binaural ASMR', 'Brain Tingles', 'Close Whisper',
-  'Relaxing Sounds', 'Tingles & Whispers'
-];
-
-const VERONIKA_PROFILE_PHOTO = 'https://i.ibb.co/7xjYTFQn/photo-2026-01-14-07-10-54.jpg';
-const PLACEHOLDER_ARTIST_PHOTO = 'https://placehold.co/500x600/1E1E20/8A8A8A?text=No+Photo';
-
-// Artist photos - card thumbnail (fallback if no API data)
-const artistPhotosFallback = {
-  'TheNicoleT': 'https://i.ibb.co/C51P9hQK/photo-2026-03-05-18-38-24.jpg',
-  'Beebee': 'https://i.ibb.co/r257m0XB/photo-2026-03-04-13-15-17.jpg',
-  'Reneserealrm': 'https://i.ibb.co/yrDn5bM/photo-2026-03-22-01-58-40.jpg',
-  'HoneyGirl': 'https://i.ibb.co/rGk1mFL7/photo-2026-03-22-01-58-23.jpg',
-  'Moona ASMR': 'https://i.ibb.co/bMhVtDRf/photo-2026-03-22-01-58-13.jpg',
-};
-
-// Artist profile photos - full background (fallback if no API data)
-const artistProfilePhotosFallback = {
-  'TheNicoleT': 'https://i.ibb.co/C51P9hQK/photo-2026-03-05-18-38-24.jpg',
-  'Beebee': 'https://i.ibb.co/r257m0XB/photo-2026-03-04-13-15-17.jpg',
-  'Moona ASMR': 'https://i.ibb.co/fG9v1RTh/photo-2026-03-22-02-03-56.jpg',
-};
-
-// Fallback list of all artists
-const fallbackAllArtists = [
+const allArtists = [
   'Moona ASMR', 'HoneyGirl', 'Reneserealrm', 'Emma', 'Ruby ASMR', 
   'HeatheredEffect', 'Rose ASMR', 'Malinkaa98', 'Mood ASMR', 'Soly ASMR',
   'Puffin ASMR', 'Trinki ASMR', 'SkepticalPickle ASMR', 'Akuma ASMR', 'Tysria',
@@ -2118,69 +2091,30 @@ const fallbackAllArtists = [
   'Mazzybelle', 'Castaway', 'Sofifrenchfry', 'SleepySab', 'Sabrina Vaz'
 ];
 
-// Load artists from API - this will be called on init
-let allArtists = [];
-let artistPhotos = {};
-let artistProfilePhotos = {};
+const videoTitles = [
+  'Ear Eating ASMR', 'Deep Whisper', 'Tapping Tingles', 'Sleep Session',
+  'Personal Attention', 'Binaural ASMR', 'Brain Tingles', 'Close Whisper',
+  'Relaxing Sounds', 'Tingles & Whispers'
+];
 
-async function loadArtistsFromAPI() {
-  try {
-    const res = await fetch(`${API_BASE}/miniapp/artists`);
-    const data = await res.json();
-    
-    if (data.artists && data.artists.length > 0) {
-      allArtists = data.artists.map(a => a.name);
-      
-      // Build photo objects from API data
-      for (const artist of data.artists) {
-        if (artist.photo_url) {
-          artistPhotos[artist.name] = artist.photo_url;
-        }
-        if (artist.profile_photo_url) {
-          artistProfilePhotos[artist.name] = artist.profile_photo_url;
-        }
-      }
-      
-      // Create artistProfiles entries for all artists from API
-      for (const name of allArtists) {
-        if (!artistProfiles[name]) {
-          artistProfiles[name] = { 
-            photo: artistPhotos[name] || PLACEHOLDER_ARTIST_PHOTO, 
-            photos: 0, 
-            videos: 0 
-          };
-        }
-      }
-      
-      // Update photos/videos counts from API
-      for (const artist of data.artists) {
-        if (artistProfiles[artist.name]) {
-          artistProfiles[artist.name].photos = artist.photos || 0;
-          artistProfiles[artist.name].videos = artist.videos || 0;
-          artistProfiles[artist.name].photo = artist.photo_url || artistProfiles[artist.name].photo;
-          artistProfiles[artist.name].profilePhoto = artist.profile_photo_url;
-        }
-      }
-      
-      console.log(`Loaded ${allArtists.length} artists from API`);
-      return true;
-    } else {
-      // Use fallback data
-      allArtists = fallbackAllArtists;
-      artistPhotos = artistPhotosFallback;
-      artistProfilePhotos = artistProfilePhotosFallback;
-      console.log('No artists in DB, using fallback data');
-      return false;
-    }
-  } catch (e) {
-    console.error('Failed to load artists:', e);
-    // Use fallback data on error
-    allArtists = fallbackAllArtists;
-    artistPhotos = artistPhotosFallback;
-    artistProfilePhotos = artistProfilePhotosFallback;
-    return false;
-  }
-}
+const VERONIKA_PROFILE_PHOTO = 'https://i.ibb.co/7xjYTFQn/photo-2026-01-14-07-10-54.jpg';
+const PLACEHOLDER_ARTIST_PHOTO = 'https://placehold.co/500x600/1E1E20/8A8A8A?text=No+Photo';
+
+// Artist photos - card thumbnail
+const artistPhotos = {
+  'TheNicoleT': 'https://i.ibb.co/C51P9hQK/photo-2026-03-05-18-38-24.jpg',
+  'Beebee': 'https://i.ibb.co/r257m0XB/photo-2026-03-04-13-15-17.jpg',
+  'Reneserealrm': 'https://i.ibb.co/yrDn5bM/photo-2026-03-22-01-58-40.jpg',
+  'HoneyGirl': 'https://i.ibb.co/rGk1mFL7/photo-2026-03-22-01-58-23.jpg',
+  'Moona ASMR': 'https://i.ibb.co/bMhVtDRf/photo-2026-03-22-01-58-13.jpg',
+};
+
+// Artist profile photos - full background
+const artistProfilePhotos = {
+  'TheNicoleT': 'https://i.ibb.co/C51P9hQK/photo-2026-03-05-18-38-24.jpg',
+  'Beebee': 'https://i.ibb.co/r257m0XB/photo-2026-03-04-13-15-17.jpg',
+  'Moona ASMR': 'https://i.ibb.co/fG9v1RTh/photo-2026-03-22-02-03-56.jpg',
+};
 
 const faqs = [
   { q: 'How do I access the group?', a: "After subscribing, you'll receive an invite link automatically. Just click it to join." },
@@ -2212,9 +2146,26 @@ let serverShowSubscribe = null;
 const API_BASE = window.__MINIAPP_API_BASE__ || "https://asmr-bot-production.up.railway.app";
 const INFINITE_SUB_DAYS_THRESHOLD = 9000;
 const MAX_ALLOWED_DAYS = 60;
+const artistProfiles = Object.fromEntries(
+  allArtists.map(name => [name, { photo: PLACEHOLDER_ARTIST_PHOTO, photos: 0, videos: 0 }])
+);
+artistProfiles['Veronika ASMR'] = {
+  photo: VERONIKA_PROFILE_PHOTO,
+  photos: 12,
+  videos: 8
+};
 
-// Artist profiles - will be populated after loadArtistsFromAPI()
-let artistProfiles = {};
+// Apply custom photos
+for (const [name, photo] of Object.entries(artistPhotos)) {
+  if (artistProfiles[name]) {
+    artistProfiles[name].photo = photo;
+  }
+}
+for (const [name, photo] of Object.entries(artistProfilePhotos)) {
+  if (artistProfiles[name]) {
+    artistProfiles[name].profilePhoto = photo;
+  }
+}
 
 function getInitials(fullName) {
   const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
@@ -3013,35 +2964,15 @@ function showToast(msg) {
   setTimeout(() => toast.classList.remove('show'), 2500);
 }
 
-// Load artists from API first, then render everything
-loadArtistsFromAPI().then(() => {
-  // Initialize artistProfiles with fallback data if empty
-  if (Object.keys(artistProfiles).length === 0) {
-    for (const name of allArtists) {
-      artistProfiles[name] = { 
-        photo: artistPhotos[name] || PLACEHOLDER_ARTIST_PHOTO, 
-        photos: 0, 
-        videos: 0 
-      };
-    }
-    // Add Veronika with special data
-    artistProfiles['Veronika ASMR'] = {
-      photo: VERONIKA_PROFILE_PHOTO,
-      photos: 12,
-      videos: 8
-    };
-  }
-  
-  renderArtists();
-  renderVideos();
-  renderArtistsGrid();
-  renderVideosGrid();
-  renderFAQ();
-  renderPricingCards();
-  renderPaymentMethods();
-  initTelegramWebAppUser();
-  updateCTAButtons();
-});
+renderArtists();
+renderVideos();
+renderArtistsGrid();
+renderVideosGrid();
+renderFAQ();
+renderPricingCards();
+renderPaymentMethods();
+initTelegramWebAppUser();
+updateCTAButtons();
 </script>
 
 </body>
