@@ -2522,6 +2522,40 @@ async function initArtistsFromAPI() {
     renderArtistsGrid();
     renderVideos();
     renderVideosGrid();
+    
+    // Update stats banner on home page
+    updateStatsBanner();
+  }
+}
+
+// Update stats banner with actual data from database
+function updateStatsBanner() {
+  let totalPhotos = 0;
+  let totalVideos = 0;
+  
+  for (const name of Object.keys(artistProfiles)) {
+    totalPhotos += (artistProfiles[name].photos || 0);
+    totalVideos += (artistProfiles[name].videos || 0);
+  }
+  
+  const totalArtists = allArtists.length;
+  
+  // Update home page stats banner
+  const statsBanner = document.querySelector('.preview-section + div');
+  if (statsBanner) {
+    statsBanner.innerHTML = `
+      <div style="font-size:16px;font-weight:600;color:var(--lime)">${totalPhotos.toLocaleString()} Photos</div>
+      <div style="width:1px;height:20px;background:rgba(204,255,0,0.3)"></div>
+      <div style="font-size:16px;font-weight:600;color:var(--lime)">${totalVideos.toLocaleString()} Videos</div>
+      <div style="width:1px;height:20px;background:rgba(204,255,0,0.3)"></div>
+      <div style="font-size:16px;font-weight:600;color:var(--lime)">${totalArtists} Artists</div>
+    `;
+  }
+  
+  // Update All Artists page stats
+  const artistsStats = document.getElementById('artistsStats');
+  if (artistsStats) {
+    artistsStats.textContent = `${totalPhotos.toLocaleString()} Photos · ${totalVideos.toLocaleString()} Videos`;
   }
 }
 
@@ -2711,6 +2745,7 @@ function openPage(page) {
   // Re-render artists when opening artists page
   if (page === 'artists' && allArtists.length > 0) {
     renderArtistsGrid();
+    updateStatsBanner();
   }
 }
 
@@ -3002,6 +3037,7 @@ function showToast(msg) {
   renderFAQ();
   renderPricingCards();
   renderPaymentMethods();
+  updateStatsBanner();
   
   // THEN load artists from API and re-render
   await initArtistsFromAPI();
