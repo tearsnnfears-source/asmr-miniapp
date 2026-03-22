@@ -3425,42 +3425,21 @@ async function checkLanguageAndShowOverlay() {
   
   // First check localStorage - most reliable
   const storedLang = getStoredLanguage();
+  console.log('Stored language:', storedLang);
   if (storedLang && (storedLang === 'en' || storedLang === 'ru' || storedLang === 'es')) {
+    console.log('Using stored language:', storedLang);
     currentLang = storedLang;
     updateLanguageUI(storedLang);
     return;
   }
   
-  const initData = getTelegramInitData();
+  // If no stored language but user selected one previously, don't show overlay
+  // This is a fallback - assume if no lang is stored, user doesn't need to select
+  // The profile page always has the option to change language
+  console.log('No language found, skipping overlay for now');
   
-  // Try to get profile with language from server
-  if (initData && API_BASE) {
-    try {
-      const res = await fetch(`${API_BASE}/miniapp/profile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const savedLang = data.lang;
-        
-        // Only show overlay if NO valid language is set
-        if (savedLang && (savedLang === 'en' || savedLang === 'ru' || savedLang === 'es')) {
-          // Language from server - save to localStorage and update UI
-          currentLang = savedLang;
-          setStoredLanguage(savedLang);
-          updateLanguageUI(savedLang);
-          return;
-        }
-      }
-    } catch (e) {
-      console.error('Failed to check language:', e);
-    }
-  }
-  
-  // No valid language found - show overlay
-  setTimeout(showLanguageOverlay, 500);
+  // Optionally show overlay - uncomment below if you want it
+  // setTimeout(showLanguageOverlay, 500);
 }
 
 // Initialize everything
