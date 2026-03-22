@@ -2479,21 +2479,36 @@ async function initTelegramWebAppUser() {
   }
 }
 
+// Fallback artists in case API fails
+const FALLBACK_ARTISTS = [
+  'Moona ASMR', 'HoneyGirl', 'Reneserealrm', 'Emma', 'Ruby ASMR', 
+  'HeatheredEffect', 'Rose ASMR', 'Malinkaa98', 'Mood ASMR', 'Soly ASMR',
+  'Veronika ASMR', 'TheNicoleT', 'Beebee', 'JazzMeow', 'Lyrica'
+];
+
 // Fetch artists from API and update profiles
 async function fetchArtistsFromAPI() {
   if (!API_BASE) {
-    return null;
+    // Return fallback if no API base
+    return FALLBACK_ARTISTS.map(name => ({ name, photos: 0, videos: 0 }));
   }
   try {
     const url = `${API_BASE}/miniapp/artists`;
     const res = await fetch(url);
     if (!res.ok) {
+      console.log('Artists API returned:', res.status);
       return null;
     }
     const data = await res.json();
-    return data.artists || [];
+    if (data.artists && data.artists.length > 0) {
+      return data.artists;
+    }
+    // If API returns empty, use fallback
+    return FALLBACK_ARTISTS.map(name => ({ name, photos: 0, videos: 0 }));
   } catch (e) {
-    return null;
+    console.error('Artists fetch error:', e);
+    // Return fallback on error
+    return FALLBACK_ARTISTS.map(name => ({ name, photos: 0, videos: 0 }));
   }
 }
 
@@ -2606,13 +2621,18 @@ function getArtistTagsHtml(name) {
   if (!profile) return '';
   
   let tagsHtml = '';
-  if (profile.tag_hot) {
+  
+  // Force convert to boolean to handle string "true" from API
+  const isHot = !!profile.tag_hot || profile.tag_hot === 'true';
+  const isNew = !!profile.tag_new || profile.tag_new === 'true';
+  
+  if (isHot) {
     tagsHtml += '<div class="artist-tag artist-tag-hot">🔥 HOT</div>';
   }
-  if (profile.tag_new) {
+  if (isNew) {
     tagsHtml += '<div class="artist-tag artist-tag-new">✨ NEW</div>';
   }
-  // Prom tag doesn't show visually
+  
   return tagsHtml;
 }
 
