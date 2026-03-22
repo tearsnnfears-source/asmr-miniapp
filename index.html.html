@@ -3415,24 +3415,22 @@ async function checkLanguageAndShowOverlay() {
         const data = await res.json();
         const savedLang = data.lang;
         
+        // Only show overlay if NO language is set (empty or undefined)
         if (!savedLang || savedLang === '') {
           // No language selected - show overlay
           setTimeout(showLanguageOverlay, 500);
         } else {
-          // Language already selected - update UI
+          // Language already selected - update UI only
           currentLang = savedLang;
           updateLanguageUI(savedLang);
         }
       }
     } catch (e) {
       console.error('Failed to check language:', e);
-      // Show overlay on error
-      setTimeout(showLanguageOverlay, 500);
+      // Don't show overlay on network error - just use default
     }
-  } else {
-    // No initData - show overlay
-    setTimeout(showLanguageOverlay, 500);
   }
+  // If no initData, don't show overlay either
 }
 
 // Initialize everything
