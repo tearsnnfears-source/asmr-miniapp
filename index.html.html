@@ -2501,11 +2501,62 @@ async function initTelegramWebAppUser() {
   }
 }
 
+// Fetch artists from API and update profiles
+async function fetchArtistsFromAPI() {
+  if (!API_BASE) return null;
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/artists`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.artists || [];
+  } catch (_) {
+    return null;
+  }
+}
+
+// Apply artist data from API to local profiles
+async function initArtistsFromAPI() {
+  const apiArtists = await fetchArtistsFromAPI();
+  if (apiArtists && Array.isArray(apiArtists)) {
+    for (const artist of apiArtists) {
+      if (artistProfiles[artist.name]) {
+        // Update photo if available
+        if (artist.photo_url) {
+          artistProfiles[artist.name].photo = artist.photo_url;
+        }
+        // Update profile photo if available
+        if (artist.profile_photo_url) {
+          artistProfiles[artist.name].profilePhoto = artist.profile_photo_url;
+        }
+        // Update stats
+        if (artist.photos !== undefined) {
+          artistProfiles[artist.name].photos = artist.photos;
+        }
+        if (artist.videos !== undefined) {
+          artistProfiles[artist.name].videos = artist.videos;
+        }
+      }
+    }
+    // Also add any new artists from API that aren't in the hardcoded list
+    for (const artist of apiArtists) {
+      if (!artistProfiles[artist.name]) {
+        allArtists.push(artist.name);
+        artistProfiles[artist.name] = {
+          photo: artist.photo_url || PLACEHOLDER_ARTIST_PHOTO,
+          profilePhoto: artist.profile_photo_url || null,
+          photos: artist.photos || 0,
+          videos: artist.videos || 0
+        };
+      }
+    }
+  }
+}
+
 function renderArtists() {
   const scroll = document.getElementById('artistsScroll');
   scroll.innerHTML = allArtists.slice(0, 10).map(name => `
     <div class="artist-mini-card" onclick="openArtistProfile('${name}')">
-      <div class="artist-mini-av" style="background-image:url('${artistProfiles[name].photo}')"></div>
+      <div class="artist-mini-av" style="background-image:url('${artistProfiles[name]?.photo || PLACEHOLDER_ARTIST_PHOTO}')"></div>
       <div class="artist-mini-name">${name.split(' ')[0]}</div>
     </div>
   `).join('');
@@ -2964,15 +3015,24 @@ function showToast(msg) {
   setTimeout(() => toast.classList.remove('show'), 2500);
 }
 
-renderArtists();
-renderVideos();
-renderArtistsGrid();
-renderVideosGrid();
-renderFAQ();
-renderPricingCards();
-renderPaymentMethods();
-initTelegramWebAppUser();
-updateCTAButtons();
+// Initialize everything
+(async function init() {
+  // Load artists from API
+  await initArtistsFromAPI();
+  
+  // Render everything
+  renderArtists();
+  renderVideos();
+  renderArtistsGrid();
+  renderVideosGrid();
+  renderFAQ();
+  renderPricingCards();
+  renderPaymentMethods();
+  
+  // Initialize user
+  await initTelegramWebAppUser();
+  updateCTAButtons();
+})();
 </script>
 
 </body>
