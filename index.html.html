@@ -3017,12 +3017,34 @@ function getArtistTagsHtml(name) {
   return tagsHtml;
 }
 
+// Helper function to get promo priority for home page
+function getArtistPromPriority(name) {
+  const profile = artistProfiles[name];
+  if (!profile) return 0;
+  const isProm = !!profile.tag_prom || profile.tag_prom === 'true';
+  const isNew = !!profile.tag_new || profile.tag_new === 'true';
+  const isHot = !!profile.tag_hot || profile.tag_hot === 'true';
+  
+  if (!isProm) return 0;
+  
+  // Priority: NEW+Prom > HOT+Prom > Just Prom
+  if (isNew && isProm) return 3;
+  if (isHot && isProm) return 2;
+  if (isProm) return 1;
+  
+  return 0;
+}
+
 function renderArtists() {
-  // Sort: NEW first, then HOT, then by total content
+  // Sort for home page:Prom artists first with priority, then by content
   const sortedArtists = [...allArtists].sort((a, b) => {
-    const priorityA = getArtistTagPriority(a);
-    const priorityB = getArtistTagPriority(b);
-    if (priorityA !== priorityB) return priorityB - priorityA;
+    const promA = getArtistPromPriority(a);
+    const promB = getArtistPromPriority(b);
+    
+    // If different promo priorities, higher comes first
+    if (promA !== promB) return promB - promA;
+    
+    // If same promo priority, sort by total content
     return getArtistTotalContent(b) - getArtistTotalContent(a);
   });
   
