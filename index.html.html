@@ -1875,9 +1875,118 @@ body {
 }
 .success-checkmark.show { transform: scale(1); }
 
+/* ── SPLASH SCREEN ── */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: linear-gradient(160deg, #0e0510 0%, #0e0e0f 50%, #050e05 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.splash.hiding {
+  opacity: 0;
+  transform: scale(1.04);
+  pointer-events: none;
+}
+
+.splash-glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 30% 40%, rgba(255,126,200,0.18) 0%, transparent 55%),
+    radial-gradient(ellipse at 70% 60%, rgba(200,107,255,0.1) 0%, transparent 45%);
+  pointer-events: none;
+}
+
+.splash-logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 52px;
+  letter-spacing: 4px;
+  color: #fff;
+  margin-bottom: 4px;
+  position: relative;
+  z-index: 1;
+}
+
+.splash-logo span { color: var(--pink); }
+
+.splash-tagline {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 48px;
+  position: relative;
+  z-index: 1;
+}
+
+.splash-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 28px;
+  margin-bottom: 40px;
+  position: relative;
+  z-index: 1;
+}
+
+.splash-bar {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--pink);
+  animation: splashWave var(--dur) ease-in-out infinite var(--delay);
+}
+
+@keyframes splashWave {
+  0%, 100% { height: 4px; opacity: 0.3; }
+  50% { height: var(--h); opacity: 0.9; }
+}
+
+.splash-dots {
+  display: flex;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.splash-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255,126,200,0.4);
+  animation: splashDot 1.4s ease-in-out infinite;
+}
+
+.splash-dot:nth-child(2) { animation-delay: 0.2s; }
+.splash-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes splashDot {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; background: var(--pink); }
+}
+
 </style>
 </head>
 <body>
+
+<!-- SPLASH SCREEN -->
+<div class="splash" id="splash">
+  <div class="splash-glow"></div>
+  <div class="splash-logo">ASMR<span>.</span>LEAKS</div>
+  <div class="splash-tagline">Loading your content</div>
+  <div class="splash-bars" id="splashBars"></div>
+  <div class="splash-dots">
+    <div class="splash-dot"></div>
+    <div class="splash-dot"></div>
+    <div class="splash-dot"></div>
+  </div>
+</div>
 
 <!-- HEADER -->
 <div class="header">
@@ -3145,11 +3254,15 @@ function openPage(page) {
   document.querySelectorAll('.footer-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`footer-${page}`)?.classList.add('active');
   if (page === 'favorites') loadFavorites();
-  // Re-render artists when opening artists page
   if (page === 'artists' && allArtists.length > 0) {
     renderArtistsGrid();
     updateStatsBanner();
   }
+  // Scroll page to top
+  const scroll = pageEl?.querySelector('.page-scroll');
+  if (scroll) scroll.scrollTop = 0;
+  const mc = pageEl?.querySelector('.main-container');
+  if (mc) mc.scrollTop = 0;
 }
 
 function showArtistsPage() {
@@ -3269,36 +3382,6 @@ function closeTrialModal() {
   document.getElementById('trialModal').classList.remove('active');
 }
 
-// removed - replaced above
-
-// ── Invite modal ──
-function openInviteModal() {
-  document.getElementById('inviteModal').classList.add('active');
-}
-
-function closeInviteModal() {
-  document.getElementById('inviteModal').classList.remove('active');
-}
-
-function openGroupLink(e) {
-  e.preventDefault();
-  const tg = window.Telegram?.WebApp;
-  const url = 'https://t.me/+_jo33xmvLUk1MWJi';
-  if (tg && typeof tg.openLink === 'function') tg.openLink(url);
-  else window.open(url, '_blank', 'noopener');
-  closeInviteModal();
-}
-
-function processPayStarsLocally(days) {
-  const currentDays = typeof serverDaysLeft === "number" ? serverDaysLeft : (isSubscribed ? 30 : 0);
-  serverDaysLeft = currentDays + days;
-  isSubscribed = true;
-  serverShowSubscribe = false;
-  updateCTAButtons();
-  openPage('home');
-  setTimeout(openInviteModal, 400);
-}
-
 async function confirmTrial() {
   const initData = getTelegramInitData();
   if (!initData) {
@@ -3401,7 +3484,15 @@ function hidePaymentOverlay() {
   }
 }
 
-// removed - replaced above
+function processPayStarsLocally(days) {
+  const currentDays = typeof serverDaysLeft === "number" ? serverDaysLeft : (isSubscribed ? 30 : 0);
+  serverDaysLeft = currentDays + days;
+  isSubscribed = true;
+  serverShowSubscribe = false;
+  updateCTAButtons();
+  openPage('home');
+  setTimeout(openInviteModal, 400);
+}
 
 async function openPaymentLink() {
   const plan = plans[selectedPlan];
@@ -3689,20 +3780,45 @@ async function checkLanguageAndShowOverlay() {
   // setTimeout(showLanguageOverlay, 500);
 }
 
-// Video modal functions
-let currentVideoUrl = '';
-let currentVideoTitle = '';
+// ── Invite modal ──
+function openInviteModal() {
+  document.getElementById('inviteModal').classList.add('active');
+}
+function closeInviteModal() {
+  document.getElementById('inviteModal').classList.remove('active');
+}
+function openGroupLink(e) {
+  e.preventDefault();
+  const tg = window.Telegram?.WebApp;
+  const url = 'https://t.me/+_jo33xmvLUk1MWJi';
+  if (tg && typeof tg.openLink === 'function') tg.openLink(url);
+  else window.open(url, '_blank', 'noopener');
+  closeInviteModal();
+}
 
-function openVideoModal(url, title) {
-  currentVideoUrl = decodeURIComponent(url);
-  currentVideoTitle = decodeURIComponent(title);
-  // For now, just open the video URL in a new tab
-  // Could be enhanced with a modal player
-  window.open(currentVideoUrl, '_blank', 'noopener');
+// ── Splash ──
+function hideSplash() {
+  const splash = document.getElementById('splash');
+  if (!splash) return;
+  splash.classList.add('hiding');
+  setTimeout(() => { splash.style.display = 'none'; }, 520);
 }
 
 // Initialize everything
 (async function init() {
+  // Build splash wave bars
+  const bars = document.getElementById('splashBars');
+  if (bars) {
+    const heights = [8,14,22,32,40,32,22,14,8,14,22,32,22,14,8];
+    const delays  = ['0s','0.1s','0.2s','0.15s','0.25s','0.05s','0.3s','0.1s','0.2s','0.15s','0.05s','0.2s','0.1s','0.3s','0.15s'];
+    heights.forEach((h, i) => {
+      const b = document.createElement('div');
+      b.className = 'splash-bar';
+      b.style.cssText = `--h:${h}px;--dur:${(0.7 + i*0.07).toFixed(2)}s;--delay:${delays[i % delays.length]}`;
+      bars.appendChild(b);
+    });
+  }
+
   // Render placeholders first
   renderArtists();
   renderVideos();
@@ -3712,19 +3828,19 @@ function openVideoModal(url, title) {
   renderPricingCards();
   renderPaymentMethods();
   updateStatsBanner();
-  
-  // THEN load artists from API and re-render
-  await initArtistsFromAPI();
-  
-  // Load videos from API
-  await initVideosFromAPI();
-  
-  // Initialize user
-  await initTelegramWebAppUser();
+
+  // Load data in parallel
+  await Promise.all([
+    initArtistsFromAPI(),
+    initVideosFromAPI(),
+    initTelegramWebAppUser(),
+  ]);
+
   updateCTAButtons();
-  
-  // Check language and show overlay if needed
   await checkLanguageAndShowOverlay();
+
+  // Hide splash after everything is ready
+  setTimeout(hideSplash, 300);
 })();
 </script>
 
