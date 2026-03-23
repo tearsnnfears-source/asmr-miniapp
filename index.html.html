@@ -2161,7 +2161,9 @@ body {
     </div>
 
     <div style="padding:0 16px 16px" id="subscribeBtnContainer">
-      <!-- Original button removed -->
+      <button class="btn-primary" id="payBtn" onclick="processPay()">
+        💳 Subscribe — €15 / 30 days
+      </button>
     </div>
     
     <!-- Stylish Subscribe Button After Promo -->
@@ -2221,6 +2223,28 @@ body {
     <button class="btn-primary" onclick="confirmTrial()" style="width:100%;background:linear-gradient(135deg, #CCFF00, #B3E600);color:#0E0E0F;border:none;border-radius:14px;padding:15px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(204,255,0,0.3);">
       🎁 Get 3 Days Free
     </button>
+  </div>
+</div>
+
+<!-- INVITE MODAL -->
+<div class="modal" id="inviteModal">
+  <div class="modal-content" style="text-align:center">
+    <button class="modal-close" onclick="closeInviteModal()">×</button>
+    <div style="font-size:52px;margin-bottom:12px">🎉</div>
+    <div class="modal-title">You're <span>In!</span></div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6;font-weight:300">
+      Your subscription is active.<br>Join the private group now:
+    </div>
+    <a href="https://t.me/+_jo33xmvLUk1MWJi"
+       onclick="openGroupLink(event)"
+       style="display:flex;align-items:center;justify-content:center;gap:10px;
+              background:linear-gradient(135deg,var(--pink),#FF4A9E);
+              color:#0E0E0F;border-radius:14px;padding:16px;
+              font-size:15px;font-weight:600;text-decoration:none;
+              box-shadow:0 4px 16px rgba(255,126,200,0.4);margin-bottom:12px">
+      ✈️ Join ASMR LEAKS Group
+    </a>
+    <div style="font-size:11px;color:var(--muted)">Link is personal · don't share it</div>
   </div>
 </div>
 
@@ -2327,7 +2351,9 @@ const faqs = [
 ];
 
 const plans = [
+  { name: '1 Week', price: '€2', per: '€0.29/day', days: 7, save: null, featured: false, soon: false },
   { name: '1 Month', price: '€6', per: '€0.20/day', days: 30, save: null, featured: true, soon: false },
+  { name: '3 Months', price: '€15', per: '—', days: 90, save: null, featured: false, soon: true },
 ];
 
 const methods = [
@@ -2337,7 +2363,7 @@ const methods = [
   { icon:'₿', name:'Crypto', desc:'Coming soon', soon:true },
 ];
 
-let selectedPlan = 0;
+let selectedPlan = 1;
 let selectedMethod = 0;
 let isSubscribed = false;
 let currentUser = null;
@@ -2911,16 +2937,6 @@ function renderArtists() {
   `).join('');
 }
 
-// Добавь эту функцию ПЕРЕД renderVideos()
-function getBunnyThumb(embedUrl) {
-  if (!embedUrl) return null;
-  // embed_url формат: https://iframe.mediadelivery.net/embed/621300/VIDEO_ID
-  const match = embedUrl.match(/embed\/(\d+)\/([a-f0-9-]+)/i);
-  if (!match) return null;
-  const [, libraryId, videoId] = match;
-  return `https://iframe.mediadelivery.net/thumbnail/${libraryId}/${videoId}`;
-}
-
 function renderVideos() {
   const scroll = document.getElementById('videosScroll');
   
@@ -2930,10 +2946,7 @@ function renderVideos() {
   if (videosToShow.length > 0) {
     // Use actual video data from API - embed inline player
     scroll.innerHTML = videosToShow.map(v => {
-   const thumb = v.thumbnail_url || getBunnyThumb(v.embed_url);
-const thumbStyle = thumb
-  ? `background-image:url('${thumb}');background-size:cover;background-position:center;`
-  : "background:linear-gradient(135deg,#1E1E20,#252527);";
+      const thumbStyle = v.thumbnail_url ? "background-image:url('" + v.thumbnail_url + "');background-size:cover;background-position:center;" : "background:linear-gradient(135deg,#44C8FF,#6B8FFF);";
       return '<div class="video-mini-card"><div class="video-mini-thumb" style="' + thumbStyle + 'cursor:pointer" onclick="toggleVideoPlay(this,\'' + encodeURIComponent(v.embed_url || v.url) + '\')"><div class="video-player-container" style="display:none;width:100%;height:100%;border-radius:8px;overflow:hidden"><iframe src="' + (v.embed_url || v.url) + '?autoplay=true" style="width:100%;height:100%;border:none;border-radius:8px" allow="autoplay; fullscreen; encrypted-media" allowfullscreen></iframe></div><div class="video-play-overlay" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);border-radius:8px"><span style="font-size:32px">▶️</span></div><div class="video-dur">' + (v.duration || '—') + '</div></div><div class="video-mini-title">' + v.title + '</div><div class="video-mini-artist">' + v.artist_name + '</div></div>';
     }).join('');
   } else {
@@ -3256,14 +3269,71 @@ function closeTrialModal() {
   document.getElementById('trialModal').classList.remove('active');
 }
 
-function confirmTrial() {
-  if (serverDaysLeft === null || serverDaysLeft < 3) serverDaysLeft = 3;
+// removed - replaced above
+
+// ── Invite modal ──
+function openInviteModal() {
+  document.getElementById('inviteModal').classList.add('active');
+}
+
+function closeInviteModal() {
+  document.getElementById('inviteModal').classList.remove('active');
+}
+
+function openGroupLink(e) {
+  e.preventDefault();
+  const tg = window.Telegram?.WebApp;
+  const url = 'https://t.me/+_jo33xmvLUk1MWJi';
+  if (tg && typeof tg.openLink === 'function') tg.openLink(url);
+  else window.open(url, '_blank', 'noopener');
+  closeInviteModal();
+}
+
+function processPayStarsLocally(days) {
+  const currentDays = typeof serverDaysLeft === "number" ? serverDaysLeft : (isSubscribed ? 30 : 0);
+  serverDaysLeft = currentDays + days;
   isSubscribed = true;
-  serverShowSubscribe = true;
+  serverShowSubscribe = false;
   updateCTAButtons();
+  openPage('home');
+  setTimeout(openInviteModal, 400);
+}
+
+async function confirmTrial() {
+  const initData = getTelegramInitData();
+  if (!initData) {
+    showToast('⚠️ Open from Telegram');
+    return;
+  }
   closeTrialModal();
-  showToast('🎁 3 free days activated!');
-  refreshFavoritesBadgesOnly();
+  showPaymentOverlay('Activating trial...', true);
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/free_trial`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData }),
+    });
+    const data = await res.json().catch(() => ({}));
+    hidePaymentOverlay();
+    if (res.status === 409) {
+      showToast('⚠️ Free trial already used');
+      return;
+    }
+    if (!res.ok) {
+      showToast(data.error || '❌ Could not activate trial');
+      return;
+    }
+    serverDaysLeft = data.days_left ?? 3;
+    isSubscribed = true;
+    serverShowSubscribe = false;
+    updateCTAButtons();
+    refreshFavoritesBadgesOnly();
+    openPage('home');
+    setTimeout(openInviteModal, 400);
+  } catch (_) {
+    hidePaymentOverlay();
+    showToast('❌ Network error');
+  }
 }
 
 // Payment URLs from bot config
@@ -3331,15 +3401,7 @@ function hidePaymentOverlay() {
   }
 }
 
-function processPayStarsLocally(days) {
-  const currentDays = typeof serverDaysLeft === "number" ? serverDaysLeft : (isSubscribed ? 30 : 0);
-  serverDaysLeft = currentDays + days;
-  isSubscribed = true;
-  serverShowSubscribe = false;
-  updateCTAButtons();
-  openPage('home'); // Сразу возвращаем пользователя на главную, чтобы показать успех
-  showToast('🎉 Subscription updated!');
-}
+// removed - replaced above
 
 async function openPaymentLink() {
   const plan = plans[selectedPlan];
