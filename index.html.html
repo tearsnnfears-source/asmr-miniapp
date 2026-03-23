@@ -2454,7 +2454,7 @@ async function fetchVideosFromAPI() {
         embedUrl: v.embed_url || v.url,
         duration: v.duration || "00:00",
         date: v.created_at ? new Date(v.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        thumbnailUrl: v.thumbnail_url
+        thumbnailUrl: v.thumbnail_url || v.thumbnail_url
       }));
       console.log('Loaded', allUpdates.length, 'videos from API');
     }
@@ -2464,15 +2464,15 @@ async function fetchVideosFromAPI() {
 }
 
 function renderUpdates() {
-  // Home page - show 5 items
+  // Home page - show 5 items (no autoplay)
   const scroll = document.getElementById('updatesScroll');
   if (scroll) {
     scroll.innerHTML = allUpdates.slice(0, 5).map(update => `
       <div class="update-mini-card" onclick="openUpdateDetail(${update.id})">
         <div class="update-mini-thumb">
           <iframe 
-            src="${update.embedUrl}?autoplay=false&mute=1" 
-            allow="autoplay; encrypted-media" 
+            src="${update.embedUrl}?autoplay=false" 
+            allow="encrypted-media" 
             allowfullscreen>
           </iframe>
           <div class="update-duration">${update.duration}</div>
@@ -2485,7 +2485,7 @@ function renderUpdates() {
 }
 
 function renderUpdatesGrid() {
-  // Updates page - show 10 items
+  // Updates page - show 10 items (no autoplay)
   const grid = document.getElementById('updatesGrid');
   if (grid) {
     const displayUpdates = allUpdates.slice(0, 10);
@@ -2493,8 +2493,8 @@ function renderUpdatesGrid() {
       <div class="update-card" onclick="openUpdateDetail(${update.id})">
         <div class="update-card-thumb">
           <iframe 
-            src="${update.embedUrl}?autoplay=false&mute=1" 
-            allow="autoplay; encrypted-media" 
+            src="${update.embedUrl}?autoplay=false" 
+            allow="encrypted-media" 
             allowfullscreen>
           </iframe>
         </div>
@@ -2547,8 +2547,8 @@ function searchUpdates(query) {
       <div class="update-card" onclick="openUpdateDetail(${update.id})">
         <div class="update-card-thumb">
           <iframe 
-            src="${update.embedUrl}?autoplay=false&mute=1" 
-            allow="autoplay; encrypted-media" 
+            src="${update.embedUrl}?autoplay=false" 
+            allow="encrypted-media" 
             allowfullscreen>
           </iframe>
         </div>
