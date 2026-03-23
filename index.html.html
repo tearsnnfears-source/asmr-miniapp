@@ -2428,18 +2428,40 @@ const MAX_ALLOWED_DAYS = 60;
 let allArtists = [];
 let artistProfiles = {};
 
-// Last Updates / Preview Videos
-let allUpdates = [
-  {
-    id: 1,
-    title: "ASMR Soft Spoken",
-    embedUrl: "https://player.mediadelivery.net/embed/621300/9019a393-c9dd-4f8b-9eea-192cab12c819",
-    duration: "12:34",
-    date: "Mar 24, 2026"
-  },
-];
-
+// Last Updates / Preview Videos (will be loaded from API)
+let allUpdates = [];
 let filteredUpdates = [];
+
+// Fetch videos from API
+async function fetchVideosFromAPI() {
+  if (!API_BASE) {
+    console.log('No API_BASE, using fallback videos');
+    return;
+  }
+  try {
+    const url = `${API_BASE}/miniapp/videos?limit=20`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.log('Videos API returned:', res.status);
+      return;
+    }
+    const data = await res.json();
+    if (data.videos && data.videos.length > 0) {
+      // Convert API format to app format
+      allUpdates = data.videos.map(v => ({
+        id: v.id,
+        title: v.title,
+        embedUrl: v.embed_url || v.url,
+        duration: v.duration || "00:00",
+        date: v.created_at ? new Date(v.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        thumbnailUrl: v.thumbnail_url
+      }));
+      console.log('Loaded', allUpdates.length, 'videos from API');
+    }
+  } catch (e) {
+    console.error('Videos fetch error:', e);
+  }
+}
 
 function renderUpdates() {
   // Home page - show 5 items
@@ -3909,9 +3931,14 @@ function hideSplash() {
   // Load data in parallel
   await Promise.all([
     initArtistsFromAPI(),
+    fetchVideosFromAPI(),  // Load videos from API
     initTelegramWebAppUser(),
   ]);
 
+  // Re-render videos after loading from API
+  renderUpdates();
+  renderUpdatesGrid();
+  
   updateCTAButtons();
   await checkLanguageAndShowOverlay();
 
