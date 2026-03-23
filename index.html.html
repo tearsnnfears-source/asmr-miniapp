@@ -401,68 +401,6 @@ body {
   box-shadow: 0 0 8px rgba(68, 200, 255, 0.6);
 }
 
-/* ── NEW VIDEOS SECTION ── */
-.videos-scroll {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  scroll-behavior: smooth;
-  padding-bottom: 8px;
-}
-
-.videos-scroll::-webkit-scrollbar {
-  display: none;
-}
-
-.video-mini-card {
-  flex-shrink: 0;
-  width: 150px;
-  cursor: pointer;
-}
-
-.video-mini-thumb {
-  width: 150px;
-  height: 84px;
-  border-radius: 8px;
-  background: var(--dark3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 22px;
-  color: rgba(255,255,255,0.07);
-  margin-bottom: 6px;
-  position: relative;
-  border: 1px solid var(--border);
-}
-
-.video-dur {
-  position: absolute;
-  bottom: 4px;
-  right: 4px;
-  background: rgba(0,0,0,0.7);
-  font-size: 8px;
-  padding: 1px 5px;
-  border-radius: 3px;
-  color: rgba(255,255,255,0.8);
-}
-
-.video-mini-title {
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--text);
-  margin-bottom: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.video-mini-artist {
-  font-size: 9px;
-  color: var(--pink);
-}
-
 /* ── ARTIST PROFILE PAGE ── */
 .artist-profile-page {
   position: fixed;
@@ -641,6 +579,7 @@ body {
   overflow: hidden;
   cursor: pointer;
   transition: border-color 0.2s;
+  position: relative;
 }
 
 .artist-card:active {
@@ -673,67 +612,6 @@ body {
 .artist-card-meta {
   font-size: 10px;
   color: var(--lime);
-}
-
-/* ── VIDEOS PAGE ── */
-.videos-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  padding: 16px;
-}
-
-.video-card {
-  background: var(--dark2);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-
-.video-card:active {
-  border-color: rgba(255,126,200,0.4);
-}
-
-.video-card-thumb {
-  width: 100%;
-  height: 100px;
-  background: linear-gradient(135deg, #44C8FF, #6B8FFF);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
-  position: relative;
-}
-
-.video-card-dur {
-  position: absolute;
-  bottom: 5px;
-  right: 6px;
-  background: rgba(0,0,0,0.7);
-  font-size: 8px;
-  padding: 2px 5px;
-  border-radius: 3px;
-  color: rgba(255,255,255,0.8);
-}
-
-.video-card-info {
-  padding: 10px;
-}
-
-.video-card-title {
-  font-size: 11px;
-  font-weight: 500;
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.video-card-artist {
-  font-size: 9px;
-  color: var(--pink);
 }
 
 /* ── PAGE TITLE ── */
@@ -1975,7 +1853,6 @@ body {
 </head>
 <body>
 
-<!-- SPLASH SCREEN -->
 <div class="splash" id="splash">
   <div class="splash-glow"></div>
   <div class="splash-logo">ASMR<span>.</span>LEAKS</div>
@@ -1988,7 +1865,6 @@ body {
   </div>
 </div>
 
-<!-- HEADER -->
 <div class="header">
   <div class="header-left">
     <div class="avatar" id="headerAvatar">SR</div>
@@ -2003,12 +1879,10 @@ body {
   </div>
 </div>
 
-<!-- PAGES -->
 <div class="page active" id="page-home">
   <div class="main-container">
     <div class="content">
 
-      <!-- PREVIEW SECTION -->
       <div class="preview-section">
         <h2>Page Preview</h2>
         <div style="position:relative;width:100%;aspect-ratio:16/9;border-radius:10px;overflow:hidden;margin-bottom:10px">
@@ -2022,7 +1896,6 @@ body {
         <p class="preview-text">Watch the best ASMR content exclusively</p>
       </div>
 
-      <!-- STATS BANNER -->
       <div style="background:linear-gradient(135deg,rgba(204,255,0,0.12),rgba(204,255,0,0.05));border:1px solid rgba(204,255,0,0.25);border-radius:12px;padding:14px 16px;text-align:center;display:flex;align-items:center;justify-content:center;gap:12px">
         <div style="font-size:16px;font-weight:600;color:var(--lime)">51.534 Photos</div>
         <div style="width:1px;height:20px;background:rgba(204,255,0,0.3)"></div>
@@ -2031,7 +1904,6 @@ body {
         <div style="font-size:16px;font-weight:600;color:var(--lime)">90 Artists</div>
       </div>
 
-      <!-- CTA BUTTONS -->
       <div class="cta-section" id="ctaSection">
         <button class="btn btn-primary" id="subscribeBtnMain" onclick="openPage('payment')">
           💳 Subscribe Now
@@ -2044,7 +1916,6 @@ body {
         </button>
       </div>
 
-      <!-- ARTISTS SECTION -->
       <div>
         <div class="section-header">
           <div class="section-title">🎙 Artists</div>
@@ -2053,20 +1924,10 @@ body {
         <div class="artists-scroll" id="artistsScroll"></div>
       </div>
 
-      <!-- NEW VIDEOS SECTION -->
-      <div>
-        <div class="section-header">
-          <div class="section-title">✨ New Videos</div>
-          <button class="see-all-btn" onclick="showVideosPage()">See all →</button>
-        </div>
-        <div class="videos-scroll" id="videosScroll"></div>
-      </div>
-
     </div>
   </div>
 </div>
 
-<!-- ARTISTS PAGE -->
 <div class="page" id="page-artists">
   <div class="search-bar">
     <input 
@@ -2087,18 +1948,6 @@ body {
   </div>
 </div>
 
-<!-- VIDEOS PAGE -->
-<div class="page" id="page-videos">
-  <div class="page-scroll">
-    <div class="page-title-section">
-      <div class="page-title">All <span>Videos</span></div>
-      <div class="page-subtitle">Latest content</div>
-    </div>
-    <div class="videos-grid" id="videosGrid"></div>
-  </div>
-</div>
-
-<!-- PROFILE PAGE -->
 <div class="page" id="page-profile">
   <div class="page-scroll">
     <div class="profile-header">
@@ -2167,7 +2016,6 @@ body {
   </div>
 </div>
 
-<!-- SUPPORT PAGE -->
 <div class="page" id="page-support">
   <div class="page-scroll">
     <div style="padding:20px 16px 8px;text-align:center">
@@ -2209,7 +2057,6 @@ body {
   </div>
 </div>
 
-<!-- FAVORITES PAGE -->
 <div class="page" id="page-favorites">
   <div class="page-scroll">
     <div class="fav-head">
@@ -2238,7 +2085,6 @@ body {
   </div>
 </div>
 
-<!-- PAYMENT PAGE -->
 <div class="page" id="page-payment">
   <div class="page-scroll">
     <div style="padding:20px 16px 8px;text-align:center">
@@ -2266,7 +2112,6 @@ body {
       </div>
     </div>
 
-    <!-- Stylish Subscribe Button After Promo -->
     <div style="padding:0 16px 24px" id="stylishSubscribeBtn">
       <button onclick="openPaymentLink()" style="width:100%;border:none;border-radius:16px;padding:18px 20px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 8px 32px rgba(255,126,200,0.4);background:linear-gradient(135deg, #FF7EC8, #C86BFF);color:#FFFFFF;transition:all 0.2s;transform:scale(1);">
         <span style="font-size:20px">🚀</span>
@@ -2276,7 +2121,6 @@ body {
   </div>
 </div>
 
-<!-- ARTIST PROFILE PAGE -->
 <div class="artist-profile-page" id="artist-profile-page">
   <button class="artist-profile-back" onclick="closeArtistProfile()">‹ Back</button>
   <div class="artist-profile-bg" id="artistProfileBg"></div>
@@ -2297,7 +2141,6 @@ body {
   </div>
 </div>
 
-<!-- ADD FAVORITE MODAL -->
 <div class="modal" id="favAddModal">
   <div class="modal-content">
     <button type="button" class="modal-close" onclick="closeFavAddModal()">×</button>
@@ -2311,7 +2154,6 @@ body {
   </div>
 </div>
 
-<!-- TRIAL MODAL -->
 <div class="modal" id="trialModal">
   <div class="modal-content">
     <button class="modal-close" onclick="closeTrialModal()">×</button>
@@ -2326,7 +2168,6 @@ body {
   </div>
 </div>
 
-<!-- INVITE MODAL -->
 <div class="modal" id="inviteModal">
   <div class="modal-content" style="text-align:center">
     <button class="modal-close" onclick="closeInviteModal()">×</button>
@@ -2348,7 +2189,6 @@ body {
   </div>
 </div>
 
-<!-- FOOTER -->
 <div class="footer">
   <button class="footer-btn active" id="footer-home" onclick="openPage('home')">
     <div class="footer-btn-icon">🏠</div>
@@ -2371,10 +2211,8 @@ body {
   </button>
 </div>
 
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<!-- LANGUAGE SELECTION OVERLAY -->
 <div class="lang-overlay" id="langOverlay">
   <div class="lang-avatar" id="langAvatar">👋</div>
   <div class="lang-title" id="langTitle">🌐 Select Language</div>
@@ -2399,49 +2237,6 @@ body {
 <script>
 // Placeholder constant for artists without photos
 const PLACEHOLDER_ARTIST_PHOTO = 'https://placehold.co/500x600/1E1E20/8A8A8A?text=No+Photo';
-
-// Placeholder video titles - will be updated from DB
-let videoTitles = [
-  'Loading...',
-  'ASMR Sleep',
-  'Whispering',
-  'Tapping',
-  'Soft Spoken'
-];
-
-// Videos from API
-let allVideos = [];
-
-// Fetch videos from API
-async function fetchVideosFromAPI() {
-  if (!API_BASE) {
-    // Return fallback if no API base
-    return [];
-  }
-  try {
-    const url = `${API_BASE}/miniapp/videos`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      console.log('Videos API returned:', res.status);
-      return [];
-    }
-    const data = await res.json();
-    if (data.videos && data.videos.length > 0) {
-      return data.videos;
-    }
-    return [];
-  } catch (e) {
-    console.error('Videos fetch error:', e);
-    return [];
-  }
-}
-
-// Initialize videos from API
-async function initVideosFromAPI() {
-  allVideos = await fetchVideosFromAPI();
-  renderVideos();
-  renderVideosGrid();
-}
 
 const faqs = [
   { q: 'How do I access the group?', a: "After subscribing, you'll receive an invite link automatically. Just click it to join." },
@@ -2932,8 +2727,6 @@ async function initArtistsFromAPI() {
     // Force re-render of all views
     renderArtists();
     renderArtistsGrid();
-    renderVideos();
-    renderVideosGrid();
     
     // Update stats banner on home page
     updateStatsBanner();
@@ -3063,49 +2856,6 @@ function renderArtists() {
   `).join('');
 }
 
-function renderVideos() {
-  const scroll = document.getElementById('videosScroll');
-  
-  // Use videos from API if available, otherwise fall back to placeholder
-  const videosToShow = allVideos.length > 0 ? allVideos.slice(0, 5) : [];
-  
-  if (videosToShow.length > 0) {
-    // Use actual video data from API - embed inline player
-    scroll.innerHTML = videosToShow.map(v => {
-      const thumbStyle = v.thumbnail_url ? "background-image:url('" + v.thumbnail_url + "');background-size:cover;background-position:center;" : "background:linear-gradient(135deg,#44C8FF,#6B8FFF);";
-      return '<div class="video-mini-card"><div class="video-mini-thumb" style="' + thumbStyle + 'cursor:pointer" onclick="toggleVideoPlay(this,\'' + encodeURIComponent(v.embed_url || v.url) + '\')"><div class="video-player-container" style="display:none;width:100%;height:100%;border-radius:8px;overflow:hidden"><iframe src="' + (v.embed_url || v.url) + '?autoplay=true" style="width:100%;height:100%;border:none;border-radius:8px" allow="autoplay; fullscreen; encrypted-media" allowfullscreen></iframe></div><div class="video-play-overlay" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);border-radius:8px"><span style="font-size:32px">▶️</span></div><div class="video-dur">' + (v.duration || '—') + '</div></div><div class="video-mini-title">' + v.title + '</div><div class="video-mini-artist">' + v.artist_name + '</div></div>';
-    }).join('');
-  } else {
-    // Fallback to placeholder
-    scroll.innerHTML = videoTitles.slice(0, 5).map((title, i) => `
-      <div class="video-mini-card">
-        <div class="video-mini-thumb">🎬<div class="video-dur">41:07</div></div>
-        <div class="video-mini-title">${title}</div>
-        <div class="video-mini-artist">${allArtists[i] || 'Artist'}</div>
-      </div>
-    `).join('');
-  }
-}
-
-// Toggle video play inline
-function toggleVideoPlay(element, videoUrl) {
-  const container = element.querySelector('.video-player-container');
-  const overlay = element.querySelector('.video-play-overlay');
-  
-  if (container.style.display === 'none') {
-    // Show video player
-    const url = decodeURIComponent(videoUrl);
-    container.innerHTML = `<iframe src="${url}?autoplay=true" style="width:100%;height:100%;border:none;border-radius:8px" allow="autoplay; fullscreen; encrypted-media" allowfullscreen></iframe>`;
-    container.style.display = 'block';
-    overlay.style.display = 'none';
-  } else {
-    // Hide video player
-    container.style.display = 'none';
-    container.innerHTML = '';
-    overlay.style.display = 'flex';
-  }
-}
-
 // Helper function to get tag priority (NEW=2, HOT=1, none=0)
 function getArtistTagPriority(name) {
   const profile = artistProfiles[name];
@@ -3151,19 +2901,6 @@ function renderArtistsGrid() {
       </div>
     </div>
   `}).join('');
-}
-
-function renderVideosGrid() {
-  const grid = document.getElementById('videosGrid');
-  grid.innerHTML = videoTitles.map((title, i) => `
-    <div class="video-card">
-      <div class="video-card-thumb">🎬<div class="video-card-dur">41:07</div></div>
-      <div class="video-card-info">
-        <div class="video-card-title">${title}</div>
-        <div class="video-card-artist">${allArtists[i]}</div>
-      </div>
-    </div>
-  `).join('');
 }
 
 function renderFAQ() {
@@ -3326,10 +3063,6 @@ function showArtistsPage() {
       if (mainContainer) mainContainer.scrollTop = 0;
     }
   }, 10);
-}
-
-function showVideosPage() {
-  openPage('videos');
 }
 
 function openArtistProfile(name) {
@@ -3880,9 +3613,7 @@ function hideSplash() {
 
   // Render placeholders first
   renderArtists();
-  renderVideos();
   renderArtistsGrid();
-  renderVideosGrid();
   renderFAQ();
   renderPricingCards();
   renderPaymentMethods();
@@ -3891,7 +3622,6 @@ function hideSplash() {
   // Load data in parallel
   await Promise.all([
     initArtistsFromAPI(),
-    initVideosFromAPI(),
     initTelegramWebAppUser(),
   ]);
 
