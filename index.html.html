@@ -3078,20 +3078,35 @@ function toggleVideoPlay(element, videoUrl) {
   }
 }
 
+// Helper function to get total content count for an artist
+function getArtistTotalContent(name) {
+  const profile = artistProfiles[name];
+  if (!profile) return 0;
+  return (profile.photos || 0) + (profile.videos || 0);
+}
+
 function renderArtistsGrid() {
   const grid = document.getElementById('artistsGrid');
+  
+  // Sort artists by total content (photos + videos) - descending order (most content first)
+  const sortedArtists = [...allArtists].sort((a, b) => {
+    return getArtistTotalContent(b) - getArtistTotalContent(a);
+  });
+  
   // Artist cards don't open profile - just display info
-  grid.innerHTML = allArtists.map(name => `
+  grid.innerHTML = sortedArtists.map(name => {
+    const profile = artistProfiles[name];
+    return `
     <div class="artist-card">
-      <div class="artist-card-image" style="background-image:url('${artistProfiles[name].photo}')">
+      <div class="artist-card-image" style="background-image:url('${profile.photo}')">
         ${getArtistTagsHtml(name)}
       </div>
       <div class="artist-card-info">
         <div class="artist-card-name">${name}</div>
-        <div class="artist-card-meta">${artistProfiles[name].photos} photos · ${artistProfiles[name].videos} videos</div>
+        <div class="artist-card-meta">${profile.photos} photos · ${profile.videos} videos</div>
       </div>
     </div>
-  `).join('');
+  `}).join('');
 }
 
 function renderVideosGrid() {
@@ -3256,6 +3271,17 @@ function openPage(page) {
 
 function showArtistsPage() {
   openPage('artists');
+  // Ensure page scrolls to top so search is visible
+  setTimeout(() => {
+    window.scrollTo(0, 0);
+    const pageEl = document.getElementById('page-artists');
+    if (pageEl) {
+      const scroll = pageEl.querySelector('.page-scroll');
+      if (scroll) scroll.scrollTop = 0;
+      const mainContainer = pageEl.querySelector('.main-container');
+      if (mainContainer) mainContainer.scrollTop = 0;
+    }
+  }, 10);
 }
 
 function showVideosPage() {
