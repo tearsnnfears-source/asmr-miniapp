@@ -2161,9 +2161,7 @@ body {
     </div>
 
     <div style="padding:0 16px 16px" id="subscribeBtnContainer">
-      <button class="btn-primary" id="payBtn" onclick="processPay()">
-        💳 Subscribe — €15 / 30 days
-      </button>
+      <!-- Original button removed -->
     </div>
     
     <!-- Stylish Subscribe Button After Promo -->
@@ -2329,9 +2327,7 @@ const faqs = [
 ];
 
 const plans = [
-  { name: '1 Week', price: '€2', per: '€0.29/day', days: 7, save: null, featured: false, soon: false },
   { name: '1 Month', price: '€6', per: '€0.20/day', days: 30, save: null, featured: true, soon: false },
-  { name: '3 Months', price: '€15', per: '—', days: 90, save: null, featured: false, soon: true },
 ];
 
 const methods = [
@@ -2341,7 +2337,7 @@ const methods = [
   { icon:'₿', name:'Crypto', desc:'Coming soon', soon:true },
 ];
 
-let selectedPlan = 1;
+let selectedPlan = 0;
 let selectedMethod = 0;
 let isSubscribed = false;
 let currentUser = null;
