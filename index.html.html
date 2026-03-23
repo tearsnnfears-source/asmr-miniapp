@@ -3018,10 +3018,16 @@ function getArtistTagsHtml(name) {
 }
 
 function renderArtists() {
-  // Get promoted artists first, then others - max 10 total
-  const promoted = allArtists.filter(name => artistProfiles[name]?.tag_prom);
-  const others = allArtists.filter(name => !artistProfiles[name]?.tag_prom);
-  const displayArtists = [...promoted.slice(0, 8), ...others.slice(0, 10 - Math.min(promoted.length, 8))];
+  // Sort: NEW first, then HOT, then by total content
+  const sortedArtists = [...allArtists].sort((a, b) => {
+    const priorityA = getArtistTagPriority(a);
+    const priorityB = getArtistTagPriority(b);
+    if (priorityA !== priorityB) return priorityB - priorityA;
+    return getArtistTotalContent(b) - getArtistTotalContent(a);
+  });
+  
+  // Take top 10 artists
+  const displayArtists = sortedArtists.slice(0, 10);
   
   const scroll = document.getElementById('artistsScroll');
   // Clicking on artist goes to artists page
@@ -3078,6 +3084,17 @@ function toggleVideoPlay(element, videoUrl) {
   }
 }
 
+// Helper function to get tag priority (NEW=2, HOT=1, none=0)
+function getArtistTagPriority(name) {
+  const profile = artistProfiles[name];
+  if (!profile) return 0;
+  const isNew = !!profile.tag_new || profile.tag_new === 'true';
+  const isHot = !!profile.tag_hot || profile.tag_hot === 'true';
+  if (isNew) return 2;  // NEW highest priority
+  if (isHot) return 1;  // HOT second priority
+  return 0;
+}
+
 // Helper function to get total content count for an artist
 function getArtistTotalContent(name) {
   const profile = artistProfiles[name];
@@ -3088,8 +3105,13 @@ function getArtistTotalContent(name) {
 function renderArtistsGrid() {
   const grid = document.getElementById('artistsGrid');
   
-  // Sort artists by total content (photos + videos) - descending order (most content first)
+  // Sort artists: NEW first, then HOT, then by total content (photos + videos)
   const sortedArtists = [...allArtists].sort((a, b) => {
+    const priorityA = getArtistTagPriority(a);
+    const priorityB = getArtistTagPriority(b);
+    // If different priorities, higher priority comes first
+    if (priorityA !== priorityB) return priorityB - priorityA;
+    // If same priority, sort by total content
     return getArtistTotalContent(b) - getArtistTotalContent(a);
   });
   
