@@ -2159,6 +2159,12 @@ body {
         <button class="promo-apply" onclick="applyPromo()">Apply</button>
       </div>
     </div>
+
+    <div style="padding:0 16px 16px" id="subscribeBtnContainer">
+      <button class="btn-primary" id="payBtn" onclick="processPay()">
+        💳 Subscribe — €15 / 30 days
+      </button>
+    </div>
     
     <!-- Stylish Subscribe Button After Promo -->
     <div style="padding:0 16px 24px" id="stylishSubscribeBtn">
@@ -2323,10 +2329,10 @@ const faqs = [
 ];
 
 const plans = [
+  { name: '1 Week', price: '€2', per: '€0.29/day', days: 7, save: null, featured: false, soon: false },
   { name: '1 Month', price: '€6', per: '€0.20/day', days: 30, save: null, featured: true, soon: false },
+  { name: '3 Months', price: '€15', per: '—', days: 90, save: null, featured: false, soon: true },
 ];
-
-let selectedPlan = 0;
 
 const methods = [
   { icon:'💳', name:'Card', desc:'via Tribute' },
