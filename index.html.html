@@ -3931,13 +3931,22 @@ function hideSplash() {
   // Load data in parallel
   await Promise.all([
     initArtistsFromAPI(),
-    fetchVideosFromAPI(),  // Load videos from API
     initTelegramWebAppUser(),
   ]);
 
-  // Re-render videos after loading from API
+  // Load videos separately to ensure proper rendering
+  await fetchVideosFromAPI();
+  
+  // Re-render videos after loading from API - call both render functions
   renderUpdates();
   renderUpdatesGrid();
+  
+  // Update stats banner with videos count
+  const videosCount = allUpdates.length;
+  const updatesStats = document.getElementById('updatesStats');
+  if (updatesStats && videosCount > 0) {
+    updatesStats.textContent = `${videosCount} videos available`;
+  }
   
   updateCTAButtons();
   await checkLanguageAndShowOverlay();
