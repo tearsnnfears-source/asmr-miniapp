@@ -2245,10 +2245,7 @@ body {
       <div id="paymentTitle" style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1.5px;margin-bottom:6px">Choose <span style="color:var(--pink)">Plan</span></div>
       <div id="paymentSubtitle" style="font-size:13px;color:var(--muted);font-weight:300">Cancel anytime · No auto-renewal</div>
     </div>
-    <div id="maxDaysNotice" style="display:none;background:rgba(255,159,68,0.09);border:1px solid rgba(255,159,68,0.25);border-radius:12px;margin:0 16px 12px;padding:10px 12px;font-size:12px;color:#FFC58A">
-      You cannot have more than 60 days total.
-    </div>
-
+    
     <div style="background:rgba(200,255,68,0.07);border:1px solid rgba(200,255,68,0.18);border-radius:12px;margin:0 16px 16px;padding:10px 14px;display:flex;align-items:center;gap:10px">
       <span style="font-size:18px">🎁</span>
       <span style="font-size:12px;color:var(--lime)">New? Try <strong>3 days free</strong> — no payment needed</span>
@@ -2269,12 +2266,6 @@ body {
       </div>
     </div>
 
-    <div style="padding:0 16px 16px" id="subscribeBtnContainer">
-      <button class="btn-primary" id="payBtn" onclick="processPay()">
-        💳 Subscribe — €15 / 30 days
-      </button>
-    </div>
-    
     <!-- Stylish Subscribe Button After Promo -->
     <div style="padding:0 16px 24px" id="stylishSubscribeBtn">
       <button onclick="openPaymentLink()" style="width:100%;border:none;border-radius:16px;padding:18px 20px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 8px 32px rgba(255,126,200,0.4);background:linear-gradient(135deg, #FF7EC8, #C86BFF);color:#FFFFFF;transition:all 0.2s;transform:scale(1);">
@@ -2460,9 +2451,7 @@ const faqs = [
 ];
 
 const plans = [
-  { name: '1 Week', price: '€2', per: '€0.29/day', days: 7, save: null, featured: false, soon: false },
   { name: '1 Month', price: '€6', per: '€0.20/day', days: 30, save: null, featured: true, soon: false },
-  { name: '3 Months', price: '€15', per: '—', days: 90, save: null, featured: false, soon: true },
 ];
 
 const methods = [
