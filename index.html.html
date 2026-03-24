@@ -3910,6 +3910,18 @@ function hideSplash() {
   setTimeout(() => { splash.style.display = 'none'; }, 520);
 }
 
+const tg = window.Telegram?.WebApp;
+
+// Раскрываем приложение на всю высоту (работает во всех версиях)
+if (tg) {
+  tg.expand();
+}
+
+// Запрашиваем полноэкранный режим (требует API 7.0+)
+if (tg && tg.isVersionAtLeast('7.0')) {
+  tg.requestFullscreen();
+}
+
 // Initialize everything
 (async function init() {
   // Build splash wave bars
