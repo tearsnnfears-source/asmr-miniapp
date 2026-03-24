@@ -3357,17 +3357,26 @@ function openPage(page) {
 
 function showArtistsPage() {
   openPage('artists');
+  // Expand Telegram viewport and scroll to top - critical for mini app
+  if (window.Telegram?.WebApp) {
+    window.Telegram.WebApp.expand();
+    window.Telegram.WebApp.scrollTo(0, 0);
+  }
   // Ensure page scrolls to top so search is visible
   setTimeout(() => {
-    window.scrollTo(0, 0);
+    // Reset all scrollable containers
     const pageEl = document.getElementById('page-artists');
     if (pageEl) {
       const scroll = pageEl.querySelector('.page-scroll');
-      if (scroll) scroll.scrollTop = 0;
-      const mainContainer = pageEl.querySelector('.main-container');
-      if (mainContainer) mainContainer.scrollTop = 0;
+      if (scroll) { scroll.scrollTop = 0; scroll.scrollLeft = 0; }
     }
-  }, 10);
+    const mainContainer = document.querySelector('.main-container');
+    if (mainContainer) { mainContainer.scrollTop = 0; mainContainer.scrollLeft = 0; }
+    // Final fallback to window scroll
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, 50);
 }
 
 function openArtistProfile(name) {
