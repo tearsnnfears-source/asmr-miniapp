@@ -3776,31 +3776,102 @@ let currentLang = '';
 
 const langTexts = {
   en: {
-    title: '🌐 Select Language',
-    subtitle: 'Choose your preferred language',
-    welcome: '👋 Welcome!',
-    welcomeSub: 'Choose your language to continue'
+    pagePreview: "Page Preview", watchBest: "Watch the best ASMR content exclusively",
+    photos: "Photos", videos: "Videos", artists: "Artists",
+    subscribeNow: "💳 Subscribe Now", tryFree: "🎁 Try 3 Days Free", myFavsBtn: "⭐ My Favorites",
+    lastUpdates: "Last Updates", seeAll: "See all →",
+    allUpdatesTitle: "All Updates", newPreviewsDaily: "New previews added daily",
+    searchVideos: "Search videos...",
+    allArtistsTitle: "All Artists", searchArtists: "Search artists...",
+    daysLeftLabel: "Days Left", savedLabel: "Saved",
+    subSection: "Subscription", renewSub: "Renew Subscription",
+    notifSection: "Notifications", expiryRemind: "Expiry reminder", daysBefore: "3 days before end",
+    settingsSection: "Settings", langLabel: "Language", supportLabel: "Support",
+    howHelp: "How can we Help?", respHours: "Usually respond within a few hours",
+    chatSupport: "Chat with Support", chatDesc: "Open Telegram chat with our team",
+    reportBug: "Report a Bug", bugDesc: "Something not working? Tell us",
+    suggestFeat: "Suggest a Feature", featDesc: "We read every suggestion",
+    faqTitle: "FAQ",
+    myFavsTitle: "My Favorites", favDesc: "Save group video links — open in one tap",
+    subsOnly: "Subscribers only", favLocked: "Favorites are available when your subscription is active. Subscribe or use your free trial from Home.",
+    favNothing: "Nothing saved yet. Tap <b>Add</b> below, paste a link from the group, and give it a name.",
+    addVideoBtn: "➕ Add video",
+    choosePlan: "Choose Plan", cancelAnytime: "Cancel anytime · No auto-renewal",
+    newTryFree: "New? Try <strong>3 days free</strong> — no payment needed",
+    payMethod: "Payment Method", promoTitle: "Promo Code", promoPH: "Enter promo code", applyBtn: "Apply",
+    subscribeBtnHero: "Subscribe Now",
+    modalAddFav: "Add Favorite", modalStep12: "Step 1: paste the video link from the group.<br>Step 2: choose a short title.",
+    saveFavBtn: "✨ Save to favorites",
+    modalTryFree: "Try Free", free3DaysTotal: "🎁 3 Days Completely Free",
+    noPayReq: "No payment method required • Cancel anytime", get3DaysBtn: "🎁 Get 3 Days Free",
+    youreIn: "You're In!", subActiveJoin: "Your subscription is active.<br>Join the private group now:",
+    joinBtn: "✈️ Join ASMR LEAKS Group", linkPersonal: "Link is personal · don't share it",
+    tabHome: "Home", tabProfile: "Profile", tabFavs: "Favorites", tabSupport: "Support",
+    langSelTitle: "Select Language", langSelSub: "Choose your preferred language",
+    loading: "Loading your content"
   },
   ru: {
-    title: '🌐 Выберите язык',
-    subtitle: 'Выберите удобный язык интерфейса',
-    welcome: '👋 Добро пожаловать!',
-    welcomeSub: 'Выберите язык для продолжения'
+    pagePreview: "Превью страницы", watchBest: "Смотрите лучший ASMR контент эксклюзивно",
+    photos: "Фото", videos: "Видео", artists: "Авторы",
+    subscribeNow: "💳 Оформить подписку", tryFree: "🎁 3 дня бесплатно", myFavsBtn: "⭐ Мое избранное",
+    lastUpdates: "Последние обновления", seeAll: "Смотреть все →",
+    allUpdatesTitle: "Все Обновления", newPreviewsDaily: "Новые превью добавляются ежедневно",
+    searchVideos: "Поиск видео...",
+    allArtistsTitle: "Все Авторы", searchArtists: "Поиск авторов...",
+    daysLeftLabel: "Осталось", savedLabel: "Сохранено",
+    subSection: "Подписка", renewSub: "Продлить подписку",
+    notifSection: "Уведомления", expiryRemind: "Напоминание", daysBefore: "За 3 дня до конца",
+    settingsSection: "Настройки", langLabel: "Язык", supportLabel: "Поддержка",
+    howHelp: "Чем помочь?", respHours: "Обычно отвечаем за пару часов",
+    chatSupport: "Чат с поддержкой", chatDesc: "Связаться с нашей командой",
+    reportBug: "Сообщить об ошибке", bugDesc: "Что-то сломалось? Напишите нам",
+    suggestFeat: "Предложить идею", featDesc: "Читаем все предложения",
+    faqTitle: "Частые вопросы",
+    myFavsTitle: "Мое Избранное", favDesc: "Сохраняйте ссылки на видео в один клик",
+    subsOnly: "Только по подписке", favLocked: "Избранное доступно при активной подписке. Оформите подписку или используйте бесплатный период.",
+    favNothing: "Пока ничего нет. Нажмите <b>Добавить</b> ниже и вставьте ссылку из группы.",
+    addVideoBtn: "➕ Добавить видео",
+    choosePlan: "Выберите Тариф", cancelAnytime: "Отмена в любой момент · Без автопродления",
+    newTryFree: "Впервые? Попробуйте <strong>3 дня бесплатно</strong> — карта не нужна",
+    payMethod: "Способ оплаты", promoTitle: "Промокод", promoPH: "Введите промокод", applyBtn: "Применить",
+    subscribeBtnHero: "Оформить подписку",
+    modalAddFav: "В Избранное", modalStep12: "Шаг 1: вставьте ссылку на видео.<br>Шаг 2: укажите короткое название.",
+    saveFavBtn: "✨ Сохранить в избранное",
+    modalTryFree: "Попробуй Бесплатно", free3DaysTotal: "🎁 3 Дня Абсолютно Бесплатно",
+    noPayReq: "Карта не требуется • Отмена в любой момент", get3DaysBtn: "🎁 Получить 3 Дня",
+    youreIn: "Вы с нами!", subActiveJoin: "Подписка активна.<br>Вступайте в закрытую группу:",
+    joinBtn: "✈️ Вступить в ASMR LEAKS", linkPersonal: "Ссылка только для вас · не делитесь ей",
+    tabHome: "Главная", tabProfile: "Профиль", tabFavs: "Избранное", tabSupport: "Поддержка",
+    langSelTitle: "Выберите язык", langSelSub: "Выберите удобный язык интерфейса",
+    loading: "Загружаем контент"
   }
 };
 
 function updateLanguageUI(lang) {
-  const texts = langTexts[lang] || langTexts.en;
-  const titleEl = document.getElementById('langTitle');
-  const subtitleEl = document.getElementById('langSubtitle');
-  if (titleEl) titleEl.textContent = texts.title;
-  if (subtitleEl) subtitleEl.textContent = texts.subtitle;
+  const t = langTexts[lang] || langTexts.en;
   
-  // Update profile language row
+  // Header & Tags
+  document.querySelector('.days-left-label').textContent = lang === 'ru' ? 'дней' : 'days';
+  
+  // Profile rows
   const langRowValue = document.getElementById('profileLangValue');
-  if (langRowValue) {
-    langRowValue.textContent = lang === 'ru' ? 'Русский' : 'English';
-  }
+  if (langRowValue) langRowValue.textContent = lang === 'ru' ? 'Русский' : 'English';
+
+  // Apply to all elements with data-i18n
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key]) {
+      if (el.tagName === 'INPUT') {
+        el.placeholder = t[key];
+      } else {
+        el.innerHTML = t[key];
+      }
+    }
+  });
+  
+  // Hardcoded UI updates for specific blocks
+  if(document.getElementById('langTitle')) document.getElementById('langTitle').textContent = t.langSelTitle;
+  if(document.getElementById('langSubtitle')) document.getElementById('langSubtitle').textContent = t.langSelSub;
 }
 
 function showLanguageOverlay() {
