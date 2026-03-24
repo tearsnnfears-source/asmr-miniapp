@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>ASMR.LEAKS — Landing</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
@@ -48,7 +48,7 @@ body {
 .header {
   background: var(--dark2);
   border-bottom: 1px solid var(--border);
-  padding: 20px 16px 16px;
+  padding: calc(20px + var(--tg-safe-area-inset-top, env(safe-area-inset-top, 0px))) 16px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -56,6 +56,7 @@ body {
   z-index: 100;
   position: sticky;
   top: 0;
+  width: 100%;
 }
 
 .header-left {
@@ -3912,65 +3913,12 @@ function hideSplash() {
 
 const tg = window.Telegram?.WebApp;
 
-// Раскрываем приложение на всю высоту (работает во всех версиях)
 if (tg) {
   tg.expand();
 }
 
-// Запрашиваем полноэкранный режим (требует API 7.0+)
 if (tg && tg.isVersionAtLeast('7.0')) {
   tg.requestFullscreen();
-}
-
-// Устанавливаем CSS переменную для отступа сверху (учитывает safe area и кнопки Telegram)
-function setHeaderTopPadding() {
-  const header = document.querySelector('.header');
-  if (!header) return;
-  
-  let safeAreaTop = 0;
-  
-  // API 8.0+ в fullscreen режиме - используем safeAreaInset
-  if (tg && tg.safeAreaInset && typeof tg.safeAreaInset.top === 'number') {
-    safeAreaTop = tg.safeAreaInset.top;
-    console.log('Using tg.safeAreaInset.top:', safeAreaTop);
-  } else {
-    // Fallback: CSS переменная --tg-safe-area-top (автоматически устанавливается Telegram)
-    const cssSafeAreaTop = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tg-safe-area-top') || '0');
-    safeAreaTop = cssSafeAreaTop;
-    console.log('Using CSS --tg-safe-area-top:', safeAreaTop);
-  }
-  
-  // Минимальный отступ 16px + safe area + небольшой запас
-  const paddingTop = 20 + safeAreaTop;
-  console.log('Header padding top:', paddingTop);
-  
-  header.style.paddingTop = paddingTop + 'px';
-  document.body.style.setProperty('--header-padding-top', paddingTop + 'px');
-}
-
-// Вызываем при загрузке и при изменении размера окна
-if (tg) {
-  // Ждем когда Telegram будет полностью готов
-  tg.ready();
-  
-  // Несколько попыток с нарастающей задержкой
-  const applyPadding = () => {
-    setHeaderTopPadding();
-    // Повторяем через некоторое время на случай если DOM еще не готов
-    setTimeout(setHeaderTopPadding, 100);
-    setTimeout(setHeaderTopPadding, 300);
-    setTimeout(setHeaderTopPadding, 500);
-  };
-  
-  // Первая попытка после небольшой задержки
-  setTimeout(applyPadding, 100);
-  
-  window.addEventListener('resize', setHeaderTopPadding);
-  
-  // Также вызываем при изменении viewport
-  if (tg.onEvent) {
-    tg.onEvent('viewportChanged', setHeaderTopPadding);
-  }
 }
 
 // Initialize everything
