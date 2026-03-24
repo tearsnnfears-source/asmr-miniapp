@@ -49,6 +49,7 @@ body {
   background: var(--dark2);
   border-bottom: 1px solid var(--border);
   padding: 16px;
+  padding-top: max(16px, env(safe-area-inset-top, 16px));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3910,54 +3911,44 @@ function hideSplash() {
   setTimeout(() => { splash.style.display = 'none'; }, 520);
 }
 
-// ── Safe area / fullscreen header fix ──
-function setHeaderTopPadding() {
-  const header = document.querySelector('.header');
-  const splash = document.getElementById('splash');
-  if (!header) return;
+const tg = window.Telegram?.WebApp;
 
-  let topInset = 0;
-
-  // 1. Telegram safeAreaInset (fullscreen API 8.0+) — самый точный
-  if (tg?.safeAreaInset?.top > 0) {
-    topInset = tg.safeAreaInset.top;
-  }
-  // 2. CSS переменная которую выставляет сам Telegram
-  else {
-    const tgVar = getComputedStyle(document.documentElement)
-      .getPropertyValue('--tg-safe-area-inset-top').trim();
-    if (tgVar) topInset = parseInt(tgVar) || 0;
-  }
-  // 3. env(safe-area-inset-top) через временный элемент (iOS fallback)
-  if (!topInset) {
-    const tmp = document.createElement('div');
-    tmp.style.cssText = 'position:fixed;top:env(safe-area-inset-top,0px);height:0;pointer-events:none';
-    document.body.appendChild(tmp);
-    topInset = tmp.getBoundingClientRect().top || 0;
-    document.body.removeChild(tmp);
-  }
-
-  const padding = Math.max(topInset, 16);
-  header.style.paddingTop = padding + 'px';
-  // Splash тоже двигаем чтобы логотип не залезал под шторку
-  if (splash) {
-    splash.style.paddingTop = padding + 'px';
-  }
+// Раскрываем приложение на всю высоту (работает во всех версиях)
+if (tg) {
+  tg.expand();
 }
 
+// Запрашиваем полноэкранный режим (требует API 7.0+)
+if (tg && tg.isVersionAtLeast('7.0')) {
+  tg.requestFullscreen();
+}
+
+// Устанавливаем CSS переменную для отступа сверху (учитывает кнопки Telegram)
+function setHeaderTopPadding() {
+  const header = document.querySelector('.header');
+  if (!header) return;
+  
+  // Получаем высоту области просмотра Telegram
+  const viewportTop = tg?.viewportHeight ? (window.innerHeight - tg.viewportHeight) : 0;
+  
+  // Минимальный отступ 16px + учитываем safe-area-inset
+  const safeAreaTop = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tg-safe-area-top') || '0');
+  const paddingTop = Math.max(16, viewportTop, safeAreaTop, window.innerWidth <= 400 ? 20 : 0);
+  
+  header.style.paddingTop = paddingTop + 'px';
+  document.body.style.setProperty('--header-padding-top', paddingTop + 'px');
+}
+
+// Вызываем при загрузке и при изменении размера окна
 if (tg) {
   tg.ready();
-  // Fullscreen — запрашиваем сразу
-  if (typeof tg.requestFullscreen === 'function') tg.requestFullscreen();
-  else tg.expand();
-
   setHeaderTopPadding();
+  window.addEventListener('resize', setHeaderTopPadding);
+  
+  // Также вызываем при изменении viewport
   if (tg.onEvent) {
     tg.onEvent('viewportChanged', setHeaderTopPadding);
-    tg.onEvent('safeAreaChanged', setHeaderTopPadding);
-    tg.onEvent('fullscreenChanged', setHeaderTopPadding);
   }
-  window.addEventListener('resize', setHeaderTopPadding);
 }
 
 // Initialize everything
