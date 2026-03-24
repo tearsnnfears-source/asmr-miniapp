@@ -49,7 +49,7 @@ body {
   background: var(--dark2);
   border-bottom: 1px solid var(--border);
   padding: 16px;
-  padding-top: max(16px, env(safe-area-inset-top, 16px));
+  padding-top: 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3923,17 +3923,23 @@ if (tg && tg.isVersionAtLeast('7.0')) {
   tg.requestFullscreen();
 }
 
-// Устанавливаем CSS переменную для отступа сверху (учитывает кнопки Telegram)
+// Устанавливаем CSS переменную для отступа сверху (учитывает safe area и кнопки Telegram)
 function setHeaderTopPadding() {
   const header = document.querySelector('.header');
   if (!header) return;
   
-  // Получаем высоту области просмотра Telegram
-  const viewportTop = tg?.viewportHeight ? (window.innerHeight - tg.viewportHeight) : 0;
+  let paddingTop = 16; // Default minimum
   
-  // Минимальный отступ 16px + учитываем safe-area-inset
-  const safeAreaTop = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tg-safe-area-top') || '0');
-  const paddingTop = Math.max(16, viewportTop, safeAreaTop, window.innerWidth <= 400 ? 20 : 0);
+  // API 8.0+ в fullscreen режиме - используем safeAreaInset
+  if (tg && tg.safeAreaInset && typeof tg.safeAreaInset.top === 'number') {
+    paddingTop = Math.max(16, tg.safeAreaInset.top);
+  } else {
+    // Для более старых версий API - вычисляем из viewport
+    const viewportTop = tg?.viewportHeight ? (window.innerHeight - tg.viewportHeight) : 0;
+    // Fallback: CSS переменная --tg-safe-area-top (автоматически устанавливается Telegram)
+    const cssSafeAreaTop = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tg-safe-area-top') || '0');
+    paddingTop = Math.max(16, viewportTop, cssSafeAreaTop);
+  }
   
   header.style.paddingTop = paddingTop + 'px';
   document.body.style.setProperty('--header-padding-top', paddingTop + 'px');
