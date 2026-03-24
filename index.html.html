@@ -3928,18 +3928,22 @@ function setHeaderTopPadding() {
   const header = document.querySelector('.header');
   if (!header) return;
   
-  let paddingTop = 16; // Default minimum
+  let safeAreaTop = 0;
   
   // API 8.0+ в fullscreen режиме - используем safeAreaInset
   if (tg && tg.safeAreaInset && typeof tg.safeAreaInset.top === 'number') {
-    paddingTop = Math.max(16, tg.safeAreaInset.top);
+    safeAreaTop = tg.safeAreaInset.top;
+    console.log('Using tg.safeAreaInset.top:', safeAreaTop);
   } else {
-    // Для более старых версий API - вычисляем из viewport
-    const viewportTop = tg?.viewportHeight ? (window.innerHeight - tg.viewportHeight) : 0;
     // Fallback: CSS переменная --tg-safe-area-top (автоматически устанавливается Telegram)
     const cssSafeAreaTop = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tg-safe-area-top') || '0');
-    paddingTop = Math.max(16, viewportTop, cssSafeAreaTop);
+    safeAreaTop = cssSafeAreaTop;
+    console.log('Using CSS --tg-safe-area-top:', safeAreaTop);
   }
+  
+  // Минимальный отступ 16px + safe area
+  const paddingTop = 16 + safeAreaTop;
+  console.log('Header padding top:', paddingTop);
   
   header.style.paddingTop = paddingTop + 'px';
   document.body.style.setProperty('--header-padding-top', paddingTop + 'px');
@@ -3947,8 +3951,21 @@ function setHeaderTopPadding() {
 
 // Вызываем при загрузке и при изменении размера окна
 if (tg) {
+  // Ждем когда Telegram будет полностью готов
   tg.ready();
-  setHeaderTopPadding();
+  
+  // Несколько попыток с нарастающей задержкой
+  const applyPadding = () => {
+    setHeaderTopPadding();
+    // Повторяем через некоторое время на случай если DOM еще не готов
+    setTimeout(setHeaderTopPadding, 100);
+    setTimeout(setHeaderTopPadding, 300);
+    setTimeout(setHeaderTopPadding, 500);
+  };
+  
+  // Первая попытка после небольшой задержки
+  setTimeout(applyPadding, 100);
+  
   window.addEventListener('resize', setHeaderTopPadding);
   
   // Также вызываем при изменении viewport
