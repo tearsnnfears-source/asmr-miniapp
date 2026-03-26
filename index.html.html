@@ -2814,7 +2814,14 @@ async function loadFavorites() {
   const empty = document.getElementById("favEmpty");
   const list = document.getElementById("favList");
 
-  // 1. Защита: проверяем, открыто ли из Телеграма
+  // 1. ЖЕСТКИЙ СБРОС ВСЕХ СОСТОЯНИЙ (Исправляет наложение блоков)
+  if (locked) locked.classList.add("is-hidden");
+  if (active) active.classList.add("is-hidden");
+  if (addBtn) addBtn.classList.add("is-hidden");
+  if (empty) empty.classList.add("is-hidden");
+  if (list) list.innerHTML = "";
+
+  // 2. Проверка, открыто ли из Telegram
   if (!getTelegramInitData()) {
     if (locked) {
       locked.classList.remove("is-hidden");
@@ -2823,12 +2830,10 @@ async function loadFavorites() {
       if (h3) h3.textContent = "Open from Telegram";
       if (p) p.textContent = "Open this mini app from the bot to use favorites.";
     }
-    if (active) active.classList.add("is-hidden");
-    if (addBtn) addBtn.classList.add("is-hidden");
     return;
   }
 
-  // 2. Локальная проверка подписки (главный фикс)
+  // 3. Локальная проверка подписки
   const hasAccess = isSubscribed || (typeof serverDaysLeft === "number" && serverDaysLeft > 0);
 
   if (!hasAccess) {
@@ -2839,16 +2844,14 @@ async function loadFavorites() {
       if (h3) h3.textContent = "Subscribers only";
       if (p) p.textContent = "Favorites are available when your subscription is active. Subscribe or use your free trial from Home.";
     }
-    if (active) active.classList.add("is-hidden");
-    if (addBtn) addBtn.classList.add("is-hidden");
     applyFavoritesBadges(0);
     return;
   }
 
-  // 3. Подписка есть — делаем запрос к API
+  // 4. Запрашиваем данные у сервера
   const { ok, status, data } = await apiFavoritesList();
 
-  // Если вдруг бэкенд ответил 403 (например, подписка кончилась на сервере)
+  // Если сервер вернул 403 (рассинхрон, подписка кончилась на бэкенде)
   if (status === 403) {
     if (locked) {
       locked.classList.remove("is-hidden");
@@ -2857,25 +2860,25 @@ async function loadFavorites() {
       if (h3) h3.textContent = "Subscribers only";
       if (p) p.textContent = "Favorites are available when your subscription is active. Subscribe or use your free trial from Home.";
     }
-    if (active) active.classList.add("is-hidden");
-    if (addBtn) addBtn.classList.add("is-hidden");
     applyFavoritesBadges(0);
     return;
   }
 
-  // 4. Показываем активный блок и прячем заглушку подписки
-  if (locked) locked.classList.add("is-hidden");
+  // 5. ДОСТУП РАЗРЕШЕН — показываем рабочую область
   if (active) active.classList.remove("is-hidden");
   if (addBtn) addBtn.classList.remove("is-hidden");
 
-  // Если данные не загрузились из-за ошибки интернета
+  // Ошибка загрузки данных
   if (!ok || !data || !Array.isArray(data.items)) {
     if (data && data.error) showToast(data.error);
     else if (!ok) showToast("Could not load favorites");
+    
+    // При ошибке просто показываем пустую звезду
+    if (empty) empty.classList.remove("is-hidden");
     return;
   }
 
-  // Обновляем бейджики
+  // Обновляем счетчики
   applyFavoritesBadges(data.count || 0);
   const fl = document.getElementById("favLimitText");
   if (fl) fl.textContent = String(data.limit || 100);
@@ -2886,12 +2889,10 @@ async function loadFavorites() {
     addBtn.disabled = count >= limit;
   }
 
-  // 5. Показываем либо список, либо надпись "Nothing saved yet"
-  if (!data.items.length) {
+  // 6. Отрисовка списка или пустого состояния
+  if (data.items.length === 0) {
     if (empty) empty.classList.remove("is-hidden");
-    if (list) list.innerHTML = "";
   } else {
-    if (empty) empty.classList.add("is-hidden");
     if (list) {
       list.innerHTML = data.items.map((f) => `
         <div class="fav-card">
