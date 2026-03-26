@@ -2808,24 +2808,47 @@ function openFavoriteUrlFromBtn(btn) {
 }
 
 async function loadFavorites() {
-  const { ok, status, data } = await apiFavoritesList();
   const locked = document.getElementById("favLockedWrap");
   const active = document.getElementById("favActiveWrap");
   const addBtn = document.getElementById("favAddBtn");
   const empty = document.getElementById("favEmpty");
   const list = document.getElementById("favList");
 
+  // 1. Защита: проверяем, открыто ли из Телеграма
   if (!getTelegramInitData()) {
     if (locked) {
       locked.classList.remove("is-hidden");
-      locked.querySelector("h3").textContent = "Open from Telegram";
-      locked.querySelector("p").textContent = "Open this mini app from the bot to use favorites.";
+      const h3 = locked.querySelector("h3");
+      const p = locked.querySelector("p");
+      if (h3) h3.textContent = "Open from Telegram";
+      if (p) p.textContent = "Open this mini app from the bot to use favorites.";
     }
     if (active) active.classList.add("is-hidden");
     if (addBtn) addBtn.classList.add("is-hidden");
     return;
   }
 
+  // 2. Локальная проверка подписки (главный фикс)
+  const hasAccess = isSubscribed || (typeof serverDaysLeft === "number" && serverDaysLeft > 0);
+
+  if (!hasAccess) {
+    if (locked) {
+      locked.classList.remove("is-hidden");
+      const h3 = locked.querySelector("h3");
+      const p = locked.querySelector("p");
+      if (h3) h3.textContent = "Subscribers only";
+      if (p) p.textContent = "Favorites are available when your subscription is active. Subscribe or use your free trial from Home.";
+    }
+    if (active) active.classList.add("is-hidden");
+    if (addBtn) addBtn.classList.add("is-hidden");
+    applyFavoritesBadges(0);
+    return;
+  }
+
+  // 3. Подписка есть — делаем запрос к API
+  const { ok, status, data } = await apiFavoritesList();
+
+  // Если вдруг бэкенд ответил 403 (например, подписка кончилась на сервере)
   if (status === 403) {
     if (locked) {
       locked.classList.remove("is-hidden");
@@ -2840,25 +2863,30 @@ async function loadFavorites() {
     return;
   }
 
+  // 4. Показываем активный блок и прячем заглушку подписки
   if (locked) locked.classList.add("is-hidden");
   if (active) active.classList.remove("is-hidden");
-  if (addBtn) {
-    addBtn.classList.remove("is-hidden");
-    const count = (data && data.count) || 0;
-    const limit = (data && data.limit) || 100;
-    addBtn.disabled = count >= limit;
-  }
+  if (addBtn) addBtn.classList.remove("is-hidden");
 
+  // Если данные не загрузились из-за ошибки интернета
   if (!ok || !data || !Array.isArray(data.items)) {
     if (data && data.error) showToast(data.error);
     else if (!ok) showToast("Could not load favorites");
     return;
   }
 
+  // Обновляем бейджики
   applyFavoritesBadges(data.count || 0);
   const fl = document.getElementById("favLimitText");
   if (fl) fl.textContent = String(data.limit || 100);
 
+  if (addBtn) {
+    const count = data.count || 0;
+    const limit = data.limit || 100;
+    addBtn.disabled = count >= limit;
+  }
+
+  // 5. Показываем либо список, либо надпись "Nothing saved yet"
   if (!data.items.length) {
     if (empty) empty.classList.remove("is-hidden");
     if (list) list.innerHTML = "";
@@ -2866,14 +2894,14 @@ async function loadFavorites() {
     if (empty) empty.classList.add("is-hidden");
     if (list) {
       list.innerHTML = data.items.map((f) => `
-    <div class="fav-card">
-      <button type="button" class="fav-card-main" data-url="${escapeHtmlAttr(f.url)}" onclick="openFavoriteUrlFromBtn(this)">
-        <div class="fav-card-title">${escapeHtml(f.title)}</div>
-        <div class="fav-card-url">${escapeHtml(f.url)}</div>
-      </button>
-      <button type="button" class="fav-card-del" onclick="deleteFavorite(${f.id})" aria-label="Delete">🗑</button>
-    </div>
-  `).join("");
+        <div class="fav-card">
+          <button type="button" class="fav-card-main" data-url="${escapeHtmlAttr(f.url)}" onclick="openFavoriteUrlFromBtn(this)">
+            <div class="fav-card-title">${escapeHtml(f.title)}</div>
+            <div class="fav-card-url">${escapeHtml(f.url)}</div>
+          </button>
+          <button type="button" class="fav-card-del" onclick="deleteFavorite(${f.id})" aria-label="Delete">🗑</button>
+        </div>
+      `).join("");
     }
   }
 }
