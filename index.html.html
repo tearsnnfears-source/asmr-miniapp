@@ -3144,6 +3144,8 @@ async function initArtistsFromAPI() {
         if (artist.tag_hot !== undefined) artistProfiles[targetName].tag_hot = artist.tag_hot;
         if (artist.tag_new !== undefined) artistProfiles[targetName].tag_new = artist.tag_new;
         if (artist.tag_prom !== undefined) artistProfiles[targetName].tag_prom = artist.tag_prom;
+        // Update topic_url
+        if (artist.topic_url !== undefined) artistProfiles[targetName].topic_url = artist.topic_url || null;
         
         matched++;
       } else {
@@ -3152,6 +3154,7 @@ async function initArtistsFromAPI() {
         artistProfiles[artist.name] = {
           photo: (artist.photo_url && artist.photo_url.trim()) ? artist.photo_url : PLACEHOLDER_ARTIST_PHOTO,
           profilePhoto: (artist.profile_photo_url && artist.profile_photo_url.trim()) ? artist.profile_photo_url : null,
+          topic_url: artist.topic_url || null,
           photos: artist.photos || 0,
           videos: artist.videos || 0,
           tag_hot: artist.tag_hot || false,
@@ -3311,33 +3314,46 @@ function getArtistTotalContent(name) {
   return (profile.photos || 0) + (profile.videos || 0);
 }
 
+function openArtistTopic(name) {
+  const url = artistProfiles[name]?.topic_url;
+  if (!url) { showToast('🔗 Topic not set for this artist'); return; }
+  const tg = window.Telegram?.WebApp;
+  if (tg && typeof tg.openLink === 'function') tg.openLink(url);
+  else window.open(url, '_blank', 'noopener');
+}
+
+function buildArtistCard(name) {
+  const profile = artistProfiles[name];
+  if (!profile) return '';
+  const hasLink = !!profile.topic_url;
+  const clickAttr = hasLink ? `onclick="openArtistTopic('${name.replace(/'/g, "\\'")}')"` : '';
+  const badge = hasLink
+    ? `<div style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);border-radius:6px;padding:3px 7px;font-size:9px;color:#fff;backdrop-filter:blur(4px);letter-spacing:0.3px">▶ Open</div>`
+    : '';
+  return `
+  <div class="artist-card" ${clickAttr} style="${hasLink ? 'cursor:pointer' : ''}">
+    <div class="artist-card-image" style="background-image:url('${profile.photo}')">
+      ${getArtistTagsHtml(name)}
+      ${badge}
+    </div>
+    <div class="artist-card-info">
+      <div class="artist-card-name">${name}</div>
+      <div class="artist-card-meta">${profile.photos} photos · ${profile.videos} videos</div>
+    </div>
+  </div>`;
+}
+
 function renderArtistsGrid() {
   const grid = document.getElementById('artistsGrid');
   
-  // Sort artists: NEW first, then HOT, then by total content (photos + videos)
   const sortedArtists = [...allArtists].sort((a, b) => {
     const priorityA = getArtistTagPriority(a);
     const priorityB = getArtistTagPriority(b);
-    // If different priorities, higher priority comes first
     if (priorityA !== priorityB) return priorityB - priorityA;
-    // If same priority, sort by total content
     return getArtistTotalContent(b) - getArtistTotalContent(a);
   });
   
-  // Artist cards don't open profile - just display info
-  grid.innerHTML = sortedArtists.map(name => {
-    const profile = artistProfiles[name];
-    return `
-    <div class="artist-card">
-      <div class="artist-card-image" style="background-image:url('${profile.photo}')">
-        ${getArtistTagsHtml(name)}
-      </div>
-      <div class="artist-card-info">
-        <div class="artist-card-name">${name}</div>
-        <div class="artist-card-meta">${profile.photos} photos · ${profile.videos} videos</div>
-      </div>
-    </div>
-  `}).join('');
+  grid.innerHTML = sortedArtists.map(name => buildArtistCard(name)).join('');
 }
 
 function renderFAQ() {
@@ -3550,18 +3566,7 @@ function searchArtists(query) {
       </div>
     `;
   } else {
-    // Search results don't open profile either
-    grid.innerHTML = filtered.map(name => `
-      <div class="artist-card">
-        <div class="artist-card-image" style="background-image:url('${artistProfiles[name].photo}')">
-          ${getArtistTagsHtml(name)}
-        </div>
-        <div class="artist-card-info">
-          <div class="artist-card-name">${name}</div>
-          <div class="artist-card-meta">${artistProfiles[name].photos} photos · ${artistProfiles[name].videos} videos</div>
-        </div>
-      </div>
-    `).join('');
+    grid.innerHTML = filtered.map(name => buildArtistCard(name)).join('');
   }
 }
 
