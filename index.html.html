@@ -3801,27 +3801,14 @@ async function openPaymentLink() {
       }
       break;
       
-    case 2: // СБП via YooMoney
-      try {
-        showPaymentOverlay('Creating link...', true);
-        const res = await fetch(`${API_BASE}/miniapp/create_yoomoney_payment`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ initData, days: plan.days })
-        });
-        const data = await res.json().catch(() => ({}));
-        hidePaymentOverlay();
-        
-        if (data.payment_url) {
-          if (tg && typeof tg.openLink === 'function') tg.openLink(data.payment_url);
-          else window.open(data.payment_url, '_blank', 'noopener');
-        } else {
-          showToast('❌ Error creating YooMoney link');
-        }
-      } catch (e) {
-        hidePaymentOverlay();
-        showToast('❌ Network error');
-      }
+    case 2: // СБП — ведёт на Tribute (принимает РФ карты)
+      paymentUrl = PAYMENT_URLS.tribute;
+      if (tg && typeof tg.openLink === 'function') tg.openLink(paymentUrl);
+      else window.open(paymentUrl, '_blank', 'noopener');
+      setTimeout(() => {
+        openPage('home');
+        setTimeout(openInviteModal, 300);
+      }, 1500);
       break;
   }
 }
