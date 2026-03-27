@@ -3327,9 +3327,7 @@ function buildArtistCard(name) {
   if (!profile) return '';
   const hasLink = !!profile.topic_url;
   const clickAttr = hasLink ? `onclick="openArtistTopic('${name.replace(/'/g, "\\'")}')"` : '';
-  const badge = hasLink
-    ? `<div style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);border-radius:6px;padding:3px 7px;font-size:9px;color:#fff;backdrop-filter:blur(4px);letter-spacing:0.3px">▶ Open</div>`
-    : '';
+  const badge = '';
   return `
   <div class="artist-card" ${clickAttr} style="${hasLink ? 'cursor:pointer' : ''}">
     <div class="artist-card-image" style="background-image:url('${profile.photo}')">
