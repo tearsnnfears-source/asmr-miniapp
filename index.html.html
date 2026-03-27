@@ -3755,6 +3755,10 @@ async function openPaymentLink() {
       paymentUrl = PAYMENT_URLS.tribute;
       if (tg && typeof tg.openLink === 'function') tg.openLink(paymentUrl);
       else window.open(paymentUrl, '_blank', 'noopener');
+      setTimeout(() => {
+        openPage('home');
+        setTimeout(openInviteModal, 300);
+      }, 1500);
       break;
       
     case 1: // TG Stars - ОПЛАТА ВНУТРИ ПРИЛОЖЕНИЯ
