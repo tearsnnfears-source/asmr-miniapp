@@ -646,6 +646,130 @@ body {
   letter-spacing: 0.5px;
 }
 
+/* ── ARTIST PROFILE TABS ── */
+.artist-profile-header {
+  position: relative;
+  z-index: 3;
+  padding: 70px 20px 16px;
+  background: linear-gradient(to bottom, rgba(14,14,15,0) 0%, rgba(14,14,15,0.85) 100%);
+}
+
+.profile-tabs {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: rgba(14,14,15,0.95);
+  backdrop-filter: blur(10px);
+}
+
+.profile-tab {
+  flex: 1;
+  padding: 12px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.profile-tab.active {
+  color: var(--lime);
+  border-bottom-color: var(--lime);
+}
+
+.profile-content-area {
+  position: relative;
+  z-index: 3;
+  flex: 1;
+  overflow-y: auto;
+  background: var(--dark);
+  -webkit-overflow-scrolling: touch;
+}
+
+.profile-videos-list {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-video-card {
+  background: var(--dark2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-video-card:active { opacity: 0.7; transform: scale(0.98); }
+
+.profile-video-icon {
+  width: 44px;
+  height: 44px;
+  background: rgba(200,255,68,0.12);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.profile-video-info { flex: 1; min-width: 0; }
+
+.profile-video-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.profile-video-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+
+.profile-tag {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.profile-tag.HOT      { background: rgba(255,80,80,0.2);   color: #FF5050; border: 1px solid rgba(255,80,80,0.3); }
+.profile-tag.NEW      { background: rgba(200,255,68,0.15); color: var(--lime); border: 1px solid rgba(200,255,68,0.3); }
+.profile-tag.EXCLUSIVE{ background: rgba(255,165,0,0.15);  color: #FFA500; border: 1px solid rgba(255,165,0,0.3); }
+.profile-tag.FREE     { background: rgba(0,200,150,0.15);  color: #00C896; border: 1px solid rgba(0,200,150,0.3); }
+
+.profile-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 2px;
+}
+
+.profile-photo-item {
+  aspect-ratio: 1;
+  background: var(--dark2);
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.profile-photo-item:active { opacity: 0.7; }
+
 /* ── SEARCH ── */
 .search-bar {
   display: flex;
@@ -2349,19 +2473,31 @@ body {
 <div class="artist-profile-page" id="artist-profile-page">
   <button class="artist-profile-back" onclick="closeArtistProfile()">‹ Back</button>
   <div class="artist-profile-bg" id="artistProfileBg"></div>
-  <div class="artist-profile-content"></div>
-  <div class="artist-profile-stats">
-    <div class="artist-profile-stat" style="flex:2">
-      <div class="artist-profile-stat-val" id="artistProfileName" style="font-size:20px;color:var(--lime)">Artist Name</div>
-      <div class="artist-profile-stat-label">Creator</div>
+
+  <!-- Header -->
+  <div class="artist-profile-header">
+    <div class="artist-profile-stat-val" id="artistProfileName" style="font-size:24px;color:var(--lime);font-family:'Bebas Neue',sans-serif;letter-spacing:1px">Artist</div>
+    <div style="display:flex;gap:16px;margin-top:6px">
+      <div style="font-size:12px;color:var(--muted)">📸 <span id="profilePhotoCount">0</span></div>
+      <div style="font-size:12px;color:var(--muted)">📹 <span id="profileVideoCount">0</span></div>
     </div>
-    <div class="artist-profile-stat">
-      <div class="artist-profile-stat-val" id="profilePhotoCount">12</div>
-      <div class="artist-profile-stat-label">Photos</div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="profile-tabs">
+    <button class="profile-tab active" id="tab-videos" onclick="switchProfileTab('videos')">📹 Videos</button>
+    <button class="profile-tab" id="tab-photos" onclick="switchProfileTab('photos')">🖼 Photos</button>
+  </div>
+
+  <!-- Content -->
+  <div class="profile-content-area">
+    <div id="profileVideosTab">
+      <div id="profileVideosList" class="profile-videos-list">
+        <div style="text-align:center;padding:40px;color:var(--muted)">Loading...</div>
+      </div>
     </div>
-    <div class="artist-profile-stat">
-      <div class="artist-profile-stat-val" id="profileVideoCount">8</div>
-      <div class="artist-profile-stat-label">Videos</div>
+    <div id="profilePhotosTab" style="display:none">
+      <div id="profilePhotoGrid" class="profile-photo-grid"></div>
     </div>
   </div>
 </div>
@@ -3144,8 +3280,9 @@ async function initArtistsFromAPI() {
         if (artist.tag_hot !== undefined) artistProfiles[targetName].tag_hot = artist.tag_hot;
         if (artist.tag_new !== undefined) artistProfiles[targetName].tag_new = artist.tag_new;
         if (artist.tag_prom !== undefined) artistProfiles[targetName].tag_prom = artist.tag_prom;
-        // Update topic_url
+        // Update topic_url and has_profile
         if (artist.topic_url !== undefined) artistProfiles[targetName].topic_url = artist.topic_url || null;
+        if (artist.has_profile !== undefined) artistProfiles[targetName].has_profile = !!artist.has_profile;
         
         matched++;
       } else {
@@ -3155,6 +3292,7 @@ async function initArtistsFromAPI() {
           photo: (artist.photo_url && artist.photo_url.trim()) ? artist.photo_url : PLACEHOLDER_ARTIST_PHOTO,
           profilePhoto: (artist.profile_photo_url && artist.profile_photo_url.trim()) ? artist.profile_photo_url : null,
           topic_url: artist.topic_url || null,
+          has_profile: !!artist.has_profile,
           photos: artist.photos || 0,
           videos: artist.videos || 0,
           tag_hot: artist.tag_hot || false,
@@ -3325,14 +3463,23 @@ function openArtistTopic(name) {
 function buildArtistCard(name) {
   const profile = artistProfiles[name];
   if (!profile) return '';
-  const hasLink = !!profile.topic_url;
-  const clickAttr = hasLink ? `onclick="openArtistTopic('${name.replace(/'/g, "\\'")}')"` : '';
-  const badge = '';
+
+  // Priority: has_profile → open mini app profile
+  //           topic_url   → open group topic link
+  //           otherwise   → no click
+  let clickAttr = '';
+  if (profile.has_profile) {
+    clickAttr = `onclick="openArtistProfile('${name.replace(/'/g, "\\'")}')"`;
+  } else if (profile.topic_url) {
+    clickAttr = `onclick="openArtistTopic('${name.replace(/'/g, "\\'")}')"`;
+  }
+
+  const clickable = profile.has_profile || !!profile.topic_url;
+
   return `
-  <div class="artist-card" ${clickAttr} style="${hasLink ? 'cursor:pointer' : ''}">
+  <div class="artist-card" ${clickAttr} style="${clickable ? 'cursor:pointer' : ''}">
     <div class="artist-card-image" style="background-image:url('${profile.photo}')">
       ${getArtistTagsHtml(name)}
-      ${badge}
     </div>
     <div class="artist-card-info">
       <div class="artist-card-name">${name}</div>
@@ -3526,15 +3673,83 @@ function showArtistsPage() {
 }
 
 function openArtistProfile(name) {
-  document.getElementById('artist-profile-page').classList.add('active');
-  const profile = artistProfiles[name] || { photo: PLACEHOLDER_ARTIST_PHOTO, photos: 0, videos: 0 };
-  // Use profilePhoto for background, fall back to photo
+  const profile = artistProfiles[name] || {};
   const bgPhoto = profile.profilePhoto || profile.photo || PLACEHOLDER_ARTIST_PHOTO;
+
   document.getElementById('artistProfileBg').style.backgroundImage = `url('${bgPhoto}')`;
-  // Set artist name in lime color
   document.getElementById('artistProfileName').textContent = name;
-  document.getElementById('profilePhotoCount').textContent = profile.photos;
-  document.getElementById('profileVideoCount').textContent = profile.videos;
+  document.getElementById('profilePhotoCount').textContent = profile.photos || 0;
+  document.getElementById('profileVideoCount').textContent = profile.videos || 0;
+
+  // Reset tabs
+  switchProfileTab('videos');
+  document.getElementById('profileVideosList').innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">Loading...</div>';
+  document.getElementById('profilePhotoGrid').innerHTML = '';
+
+  document.getElementById('artist-profile-page').classList.add('active');
+
+  // Load content from API
+  loadArtistProfileContent(name);
+}
+
+async function loadArtistProfileContent(name) {
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/artist_content?name=${encodeURIComponent(name)}`);
+    const data = await res.json();
+
+    // Render videos
+    const videosList = document.getElementById('profileVideosList');
+    if (!data.videos || data.videos.length === 0) {
+      videosList.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">No videos yet</div>';
+    } else {
+      videosList.innerHTML = data.videos.map(v => {
+        const tags = (v.tags || '').split(',').filter(Boolean);
+        const tagsHtml = tags.map(t => `<span class="profile-tag ${t.trim()}">${t.trim()}</span>`).join('');
+        return `
+          <div class="profile-video-card" onclick="openVideoUrl('${v.url.replace(/'/g,"\\'")}')">
+            <div class="profile-video-icon">▶</div>
+            <div class="profile-video-info">
+              <div class="profile-video-title">${v.title || 'Video'}</div>
+              ${tagsHtml ? `<div class="profile-video-tags">${tagsHtml}</div>` : ''}
+            </div>
+            <div style="color:var(--muted);font-size:18px">›</div>
+          </div>`;
+      }).join('');
+    }
+
+    // Render photos
+    const photoGrid = document.getElementById('profilePhotoGrid');
+    if (!data.photos || data.photos.length === 0) {
+      photoGrid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);grid-column:1/-1">No photos yet</div>';
+    } else {
+      photoGrid.innerHTML = data.photos.map(p =>
+        `<div class="profile-photo-item" style="background-image:url('${p.url}')"
+              onclick="openPhotoUrl('${p.url.replace(/'/g,"\\'")}')"></div>`
+      ).join('');
+    }
+  } catch(e) {
+    document.getElementById('profileVideosList').innerHTML =
+      '<div style="text-align:center;padding:40px;color:var(--muted)">Failed to load</div>';
+  }
+}
+
+function openVideoUrl(url) {
+  const tg = window.Telegram?.WebApp;
+  if (tg && typeof tg.openLink === 'function') tg.openLink(url);
+  else window.open(url, '_blank', 'noopener');
+}
+
+function openPhotoUrl(url) {
+  const tg = window.Telegram?.WebApp;
+  if (tg && typeof tg.openLink === 'function') tg.openLink(url);
+  else window.open(url, '_blank', 'noopener');
+}
+
+function switchProfileTab(tab) {
+  document.getElementById('profileVideosTab').style.display = tab === 'videos' ? 'block' : 'none';
+  document.getElementById('profilePhotosTab').style.display = tab === 'photos' ? 'block' : 'none';
+  document.getElementById('tab-videos').classList.toggle('active', tab === 'videos');
+  document.getElementById('tab-photos').classList.toggle('active', tab === 'photos');
 }
 
 function closeArtistProfile() {
