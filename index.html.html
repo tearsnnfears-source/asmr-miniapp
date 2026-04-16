@@ -2550,6 +2550,13 @@ body {
         <div class="updates-scroll" id="updatesScroll"></div>
       </div>
 
+      <!-- Suggest an Artist -->
+      <div style="padding:0 16px 16px;text-align:center">
+        <button onclick="openSuggestModal()" style="width:100%;background:var(--dark3);border:1px solid var(--border);border-radius:14px;padding:14px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.15s">
+          💡 Suggest an Artist
+        </button>
+      </div>
+
     </div>
   </div>
 </div>
@@ -2703,28 +2710,56 @@ body {
 <div class="page" id="page-favorites">
   <div class="page-scroll">
     <div class="fav-head">
-      <h1>My <span style="color:var(--pink)">Favorites</span></h1>
-      <p>Save group video links — open in one tap</p>
-      <div class="fav-counter-pill" id="favCounterPill">
-        <span>⭐</span> <span id="favCountText">0</span> / <span id="favLimitText">100</span>
-      </div>
+      <h1>My <span style="color:var(--pink)">Library</span></h1>
+      <p>Your saved videos & custom playlists</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="profile-tabs" style="position:sticky;top:0;z-index:10">
+      <button class="profile-tab active" id="libTabFavs" onclick="switchLibTab('favs')">❤️ Favorites</button>
+      <button class="profile-tab" id="libTabPlaylists" onclick="switchLibTab('playlists')">📋 Playlists</button>
     </div>
 
     <div id="favLockedWrap" class="fav-locked-card is-hidden">
       <div class="fav-locked-icon">🔒</div>
       <h3>Subscribers only</h3>
-      <p>Favorites are available when your subscription is active. Subscribe or use your free trial from Home.</p>
+      <p>Library is available with an active subscription.</p>
     </div>
 
-    <div id="favActiveWrap">
-      <div id="favEmpty" class="fav-empty is-hidden">
-        <div class="fav-empty-icon">⭐</div>
-        <p>Nothing saved yet. Tap <b>Add</b> below, paste a link from the group, and give it a name.</p>
+    <!-- FAVORITES TAB -->
+    <div id="libFavsTab">
+      <div id="favActiveWrap">
+        <div id="favEmpty" class="fav-empty is-hidden">
+          <div class="fav-empty-icon">❤️</div>
+          <p>No favorites yet. Tap ❤️ on any video to save it here.</p>
+        </div>
+        <div id="favList" class="fav-list-wrap" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px"></div>
       </div>
-      <div id="favList" class="fav-list-wrap"></div>
     </div>
 
-    <button type="button" class="fav-add-btn" id="favAddBtn" onclick="openFavAddModal()">➕ Add video</button>
+    <!-- PLAYLISTS TAB -->
+    <div id="libPlaylistsTab" style="display:none">
+      <div style="padding:12px 16px">
+        <button onclick="openCreatePlaylistModal()" style="width:100%;background:var(--dark3);border:1px dashed rgba(255,126,200,0.3);border-radius:14px;padding:14px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;color:var(--pink);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px">
+          ➕ Create Playlist
+        </button>
+      </div>
+      <div id="playlistsList" style="padding:0 16px 16px;display:flex;flex-direction:column;gap:10px"></div>
+      <div id="playlistsEmpty" class="fav-empty is-hidden">
+        <div class="fav-empty-icon">📋</div>
+        <p>No playlists yet. Create one to organize your videos.</p>
+      </div>
+    </div>
+
+    <!-- PLAYLIST DETAIL VIEW -->
+    <div id="playlistDetailView" style="display:none">
+      <div style="padding:12px 16px;display:flex;align-items:center;gap:10px">
+        <button onclick="closePlaylistDetail()" style="background:var(--dark3);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);font-size:14px;cursor:pointer">‹ Back</button>
+        <div style="flex:1;font-size:16px;font-weight:500" id="playlistDetailName"></div>
+        <button onclick="deleteCurrentPlaylist()" style="background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.3);border-radius:8px;padding:6px 10px;color:#FF5050;font-size:12px;cursor:pointer">🗑</button>
+      </div>
+      <div id="playlistDetailItems" style="padding:0 16px 16px;display:flex;flex-direction:column;gap:10px"></div>
+    </div>
   </div>
 </div>
 
@@ -2812,13 +2847,21 @@ body {
   </div>
 
   <div class="video-wrap">
-    <video id="vpVideo" controls playsinline webkit-playsinline preload="auto" crossorigin="anonymous"></video>
+    <video id="vpVideo" controls playsinline webkit-playsinline preload="auto"></video>
   </div>
 
   <div class="video-player-body">
     <div class="video-player-info">
       <div class="video-player-info-title" id="vpInfoTitle"></div>
       <div class="video-player-info-tags" id="vpInfoTags"></div>
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <button id="vpFavBtn" onclick="toggleVideoFavorite()" style="flex:1;background:var(--dark3);border:1px solid var(--border);border-radius:10px;padding:10px;font-size:14px;font-weight:500;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all 0.15s;font-family:'DM Sans',sans-serif">
+          🤍 Favorite
+        </button>
+        <button onclick="openAddToPlaylistModal()" style="flex:1;background:var(--dark3);border:1px solid var(--border);border-radius:10px;padding:10px;font-size:14px;font-weight:500;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all 0.15s;font-family:'DM Sans',sans-serif">
+          📋 Playlist
+        </button>
+      </div>
     </div>
 
     <div class="reactions-row" id="vpReactions">
@@ -2838,7 +2881,46 @@ body {
   </div>
 </div>
 
-<!-- ═══ PAYWALL — shown when clicking a video without subscription ═══ -->
+<!-- ═══ SUGGEST ARTIST MODAL ═══ -->
+<div class="modal" id="suggestModal">
+  <div class="modal-content" style="text-align:center">
+    <button class="modal-close" onclick="closeSuggestModal()">×</button>
+    <div style="font-size:40px;margin-bottom:6px">💡</div>
+    <div class="modal-title">Suggest <span>Artist</span></div>
+    <p style="font-size:12px;color:var(--muted);margin:-4px 0 14px;line-height:1.5">Tell us who you'd like to see on ASMR.LEAKS!</p>
+    <input type="text" class="fav-input" id="suggestInput" placeholder="Artist name..." maxlength="256" autocomplete="off" style="margin-bottom:12px">
+    <button onclick="submitSuggestion()" style="width:100%;background:linear-gradient(135deg,var(--lime),#B3E600);color:#0E0E0F;border:none;border-radius:14px;padding:14px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(204,255,0,0.25)">
+      ✨ Submit
+    </button>
+  </div>
+</div>
+
+<!-- ═══ ADD TO PLAYLIST MODAL ═══ -->
+<div class="modal" id="addToPlaylistModal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeAddToPlaylistModal()">×</button>
+    <div class="modal-title">Add to <span>Playlist</span></div>
+    <div id="atpPlaylistList" style="max-height:250px;overflow-y:auto;margin:12px 0;display:flex;flex-direction:column;gap:8px"></div>
+    <button onclick="closeAddToPlaylistModal();openCreatePlaylistModal()" style="width:100%;background:var(--dark3);border:1px dashed rgba(255,126,200,0.3);border-radius:12px;padding:12px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--pink);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+      ➕ Create New Playlist
+    </button>
+  </div>
+</div>
+
+<!-- ═══ CREATE PLAYLIST MODAL ═══ -->
+<div class="modal" id="createPlaylistModal">
+  <div class="modal-content" style="text-align:center">
+    <button class="modal-close" onclick="closeCreatePlaylistModal()">×</button>
+    <div style="font-size:36px;margin-bottom:6px">📋</div>
+    <div class="modal-title">New <span>Playlist</span></div>
+    <input type="text" class="fav-input" id="newPlaylistInput" placeholder="Playlist name..." maxlength="128" autocomplete="off" style="margin:12px 0">
+    <button onclick="submitCreatePlaylist()" style="width:100%;background:linear-gradient(135deg,var(--pink),#FF4A9E);color:#0E0E0F;border:none;border-radius:14px;padding:14px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer">
+      ✨ Create
+    </button>
+  </div>
+</div>
+
+<!-- ═══ PAYWALL ═══ -->
 <div class="modal" id="paywallModal">
   <div class="modal-content" style="text-align:center">
     <button class="modal-close" onclick="closePaywallModal()">×</button>
@@ -3280,217 +3362,344 @@ function applyFavoritesBadges(count) {
   if (ft) ft.textContent = String(n);
 }
 
-async function apiFavoritesList() {
-  const initData = getTelegramInitData();
-  if (!initData) return { ok: false, status: 0, data: null };
-  try {
-    const res = await fetch(`${API_BASE}/miniapp/favorites`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ initData }),
-    });
-    const data = await res.json().catch(() => ({}));
-    return { ok: res.ok, status: res.status, data };
-  } catch (_) {
-    return { ok: false, status: 0, data: null };
-  }
-}
+// ─── LIBRARY: Favorites + Playlists ──────────────────────────────────────────
 
-async function refreshFavoritesBadgesOnly() {
-  const { ok, status, data } = await apiFavoritesList();
-  if (ok && data && typeof data.count === "number") {
-    applyFavoritesBadges(data.count);
-    const fl = document.getElementById("favLimitText");
-    if (fl && typeof data.limit === "number") fl.textContent = String(data.limit);
-  } else if (status === 403) {
-    applyFavoritesBadges(0);
-  }
-}
+let currentLibTab = 'favs';
+let currentPlaylistId = null;
 
-function openFavoriteUrlFromBtn(btn) {
-  const url = btn.getAttribute("data-url");
-  if (!url) return;
-  const tg = window.Telegram?.WebApp;
-  if (tg && typeof tg.openLink === "function") tg.openLink(url);
-  else window.open(url, "_blank", "noopener");
+function switchLibTab(tab) {
+  currentLibTab = tab;
+  document.getElementById('libTabFavs').classList.toggle('active', tab === 'favs');
+  document.getElementById('libTabPlaylists').classList.toggle('active', tab === 'playlists');
+  document.getElementById('libFavsTab').style.display = tab === 'favs' ? 'block' : 'none';
+  document.getElementById('libPlaylistsTab').style.display = tab === 'playlists' ? 'block' : 'none';
+  const detail = document.getElementById('playlistDetailView');
+  if (detail) detail.style.display = 'none';
+
+  if (tab === 'playlists') loadPlaylists();
 }
 
 async function loadFavorites() {
   const locked = document.getElementById("favLockedWrap");
   const active = document.getElementById("favActiveWrap");
-  const addBtn = document.getElementById("favAddBtn");
   const empty = document.getElementById("favEmpty");
   const list = document.getElementById("favList");
 
-  // 1. ЖЕСТКИЙ СБРОС ВСЕХ СОСТОЯНИЙ (Исправляет наложение блоков)
   if (locked) locked.classList.add("is-hidden");
   if (active) active.classList.add("is-hidden");
-  if (addBtn) addBtn.classList.add("is-hidden");
   if (empty) empty.classList.add("is-hidden");
   if (list) list.innerHTML = "";
 
-  // 2. Проверка, открыто ли из Telegram
   if (!getTelegramInitData()) {
-    if (locked) {
-      locked.classList.remove("is-hidden");
-      const h3 = locked.querySelector("h3");
-      const p = locked.querySelector("p");
-      if (h3) h3.textContent = "Open from Telegram";
-      if (p) p.textContent = "Open this mini app from the bot to use favorites.";
-    }
+    if (locked) { locked.classList.remove("is-hidden"); locked.querySelector("h3").textContent = "Open from Telegram"; }
     return;
   }
 
-  // 3. Локальная проверка подписки
   const hasAccess = isSubscribed || (typeof serverDaysLeft === "number" && serverDaysLeft > 0);
-
   if (!hasAccess) {
-    if (locked) {
-      locked.classList.remove("is-hidden");
-      const h3 = locked.querySelector("h3");
-      const p = locked.querySelector("p");
-      if (h3) h3.textContent = "Subscribers only";
-      if (p) p.textContent = "Favorites are available when your subscription is active. Subscribe or use your free trial from Home.";
-    }
+    if (locked) locked.classList.remove("is-hidden");
     applyFavoritesBadges(0);
     return;
   }
 
-  // 4. Запрашиваем данные у сервера
-  const { ok, status, data } = await apiFavoritesList();
-
-  // Если сервер вернул 403 (рассинхрон, подписка кончилась на бэкенде)
-  if (status === 403) {
-    if (locked) {
-      locked.classList.remove("is-hidden");
-      const h3 = locked.querySelector("h3");
-      const p = locked.querySelector("p");
-      if (h3) h3.textContent = "Subscribers only";
-      if (p) p.textContent = "Favorites are available when your subscription is active. Subscribe or use your free trial from Home.";
-    }
-    applyFavoritesBadges(0);
-    return;
-  }
-
-  // 5. ДОСТУП РАЗРЕШЕН — показываем рабочую область
-  if (active) active.classList.remove("is-hidden");
-  if (addBtn) addBtn.classList.remove("is-hidden");
-
-  // Ошибка загрузки данных
-  if (!ok || !data || !Array.isArray(data.items)) {
-    if (data && data.error) showToast(data.error);
-    else if (!ok) showToast("Could not load favorites");
-    
-    // При ошибке просто показываем пустую звезду
-    if (empty) empty.classList.remove("is-hidden");
-    return;
-  }
-
-  // Обновляем счетчики
-  applyFavoritesBadges(data.count || 0);
-  const fl = document.getElementById("favLimitText");
-  if (fl) fl.textContent = String(data.limit || 100);
-
-  if (addBtn) {
-    const count = data.count || 0;
-    const limit = data.limit || 100;
-    addBtn.disabled = count >= limit;
-  }
-
-  // 6. Отрисовка списка или пустого состояния
-  if (data.items.length === 0) {
-    if (empty) empty.classList.remove("is-hidden");
-  } else {
-    if (list) {
-      list.innerHTML = data.items.map((f) => `
-        <div class="fav-card">
-          <button type="button" class="fav-card-main" data-url="${escapeHtmlAttr(f.url)}" onclick="openFavoriteUrlFromBtn(this)">
-            <div class="fav-card-title">${escapeHtml(f.title)}</div>
-            <div class="fav-card-url">${escapeHtml(f.url)}</div>
-          </button>
-          <button type="button" class="fav-card-del" onclick="deleteFavorite(${f.id})" aria-label="Delete">🗑</button>
-        </div>
-      `).join("");
-    }
-  }
-}
-
-function openFavAddModal() {
-  const m = document.getElementById("favAddModal");
-  if (m) m.classList.add("active");
-  const u = document.getElementById("favUrlInput");
-  const t = document.getElementById("favTitleInput");
-  if (u) u.value = "";
-  if (t) t.value = "";
-}
-
-function closeFavAddModal() {
-  const m = document.getElementById("favAddModal");
-  if (m) m.classList.remove("active");
-}
-
-async function submitAddFavorite() {
-  const url = document.getElementById("favUrlInput")?.value.trim() || "";
-  const title = document.getElementById("favTitleInput")?.value.trim() || "";
-  if (!url.startsWith("http")) {
-    showToast("⚠️ Paste a valid link (https://…)");
-    return;
-  }
-  if (!title) {
-    showToast("⚠️ Enter a title");
-    return;
-  }
-  const initData = getTelegramInitData();
-  if (!initData) {
-    showToast("Open from Telegram");
-    return;
-  }
   try {
-    const res = await fetch(`${API_BASE}/miniapp/favorites/add`, {
+    const initData = getTelegramInitData();
+    const res = await fetch(`${API_BASE}/miniapp/favorites`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ initData, url, title }),
+      body: JSON.stringify({ initData }),
     });
-    const data = await res.json().catch(() => ({}));
-    if (res.status === 409) {
-      showToast("⚠️ Limit reached (100 favorites)");
+    if (res.status === 403) { if (locked) locked.classList.remove("is-hidden"); return; }
+    const data = await res.json();
+
+    if (active) active.classList.remove("is-hidden");
+    applyFavoritesBadges(data.count || 0);
+
+    if (!data.items || data.items.length === 0) {
+      if (empty) empty.classList.remove("is-hidden");
       return;
     }
-    if (res.status === 403) {
-      showToast("❌ Subscription required");
-      return;
-    }
-    if (!res.ok) {
-      showToast(data.error || "Could not save");
-      return;
-    }
-    closeFavAddModal();
-    showToast(`✅ «${title.slice(0, 40)}${title.length > 40 ? "…" : ""}» saved`);
-    await loadFavorites();
-  } catch (_) {
-    showToast("Network error");
+
+    list.innerHTML = data.items.map(f => {
+      const thumb = f.thumbnail_url || '';
+      const cardStyle = thumb ? `style="--thumb:url('${thumb.replace(/'/g, "\\'")}')"` : '';
+      const artist = f.artist_name || '';
+      const tags = (f.tags || '').split(',').filter(Boolean).map(t => buildTagBadge(t.trim())).join('');
+      return `
+        <div class="profile-video-card" ${cardStyle} onclick="openVideoPlayer(${f.content_id||0},'${(f.url||'').replace(/'/g,"\\'")}','${(f.title||'').replace(/'/g,"\\'")}','${artist.replace(/'/g,"\\'")}','${(f.tags||'').replace(/'/g,"\\'")}','${thumb.replace(/'/g,"\\'")}')">
+          <div class="profile-video-icon">▶</div>
+          <div class="profile-video-info">
+            <div class="profile-video-title">${escapeHtml(f.title || 'Video')}</div>
+            <div style="font-size:11px;color:var(--pink);margin-bottom:2px">${escapeHtml(artist)}</div>
+            ${tags ? '<div class="profile-video-tags">'+tags+'</div>' : ''}
+          </div>
+          <button onclick="event.stopPropagation();removeFavorite(${f.id})" style="background:none;border:none;color:var(--muted);font-size:16px;padding:4px;cursor:pointer">🗑</button>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    showToast("Failed to load favorites");
   }
 }
 
-async function deleteFavorite(id) {
+async function removeFavorite(favId) {
   const initData = getTelegramInitData();
   if (!initData) return;
   try {
-    const res = await fetch(`${API_BASE}/miniapp/favorites/delete`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ initData, id }),
+    await fetch(`${API_BASE}/miniapp/favorites/delete`, {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ initData, id: favId }),
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      showToast(data.error || "Could not delete");
-      return;
-    }
     showToast("🗑 Removed");
     await loadFavorites();
-  } catch (_) {
-    showToast("Network error");
-  }
+  } catch(_) { showToast("Error"); }
+}
+
+// ── Toggle favorite from video player ────────────────────────────────────────
+let vpIsFavorited = false;
+
+async function checkFavoriteStatus(contentId) {
+  const initData = getTelegramInitData();
+  if (!initData || !contentId) { updateFavBtn(false); return; }
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/favorites/check?initData=${encodeURIComponent(initData)}&content_id=${contentId}`);
+    const data = await res.json();
+    vpIsFavorited = !!data.favorited;
+    updateFavBtn(vpIsFavorited);
+  } catch(_) { updateFavBtn(false); }
+}
+
+function updateFavBtn(isFav) {
+  const btn = document.getElementById('vpFavBtn');
+  if (!btn) return;
+  vpIsFavorited = isFav;
+  btn.innerHTML = isFav ? '❤️ Favorited' : '🤍 Favorite';
+  btn.style.borderColor = isFav ? 'rgba(255,126,200,0.5)' : 'var(--border)';
+  btn.style.background = isFav ? 'rgba(255,126,200,0.12)' : 'var(--dark3)';
+}
+
+async function toggleVideoFavorite() {
+  const initData = getTelegramInitData();
+  if (!initData || !currentVideoId) { showToast('Open from Telegram'); return; }
+  // Optimistic
+  const wasFav = vpIsFavorited;
+  updateFavBtn(!wasFav);
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/favorites/toggle`, {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        initData, content_id: currentVideoId,
+        title: document.getElementById('vpInfoTitle')?.textContent || 'Video',
+        url: document.getElementById('vpVideo')?.src || '',
+      }),
+    });
+    const data = await res.json();
+    if (data.error) { updateFavBtn(wasFav); showToast(data.error); return; }
+    updateFavBtn(!!data.favorited);
+    showToast(data.favorited ? '❤️ Added to favorites' : '💔 Removed from favorites');
+  } catch(e) { updateFavBtn(wasFav); }
+}
+
+// ── Playlists ────────────────────────────────────────────────────────────────
+
+async function loadPlaylists() {
+  const list = document.getElementById('playlistsList');
+  const empty = document.getElementById('playlistsEmpty');
+  if (!list) return;
+  list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Loading...</div>';
+  if (empty) empty.classList.add('is-hidden');
+  try {
+    const initData = getTelegramInitData();
+    const res = await fetch(`${API_BASE}/miniapp/playlists`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({initData}),
+    });
+    const data = await res.json();
+    if (!data.playlists || data.playlists.length === 0) {
+      list.innerHTML = '';
+      if (empty) empty.classList.remove('is-hidden');
+      return;
+    }
+    list.innerHTML = data.playlists.map(pl => `
+      <div onclick="openPlaylistDetail(${pl.id},'${pl.name.replace(/'/g,"\\'")}')" style="background:var(--dark2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:all 0.15s">
+        <div style="width:44px;height:44px;background:rgba(255,126,200,0.12);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">📋</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(pl.name)}</div>
+          <div style="font-size:11px;color:var(--muted)">${pl.item_count} video${pl.item_count!==1?'s':''}</div>
+        </div>
+        <div style="color:var(--muted);font-size:18px">›</div>
+      </div>
+    `).join('');
+  } catch(e) { list.innerHTML = ''; showToast("Error loading playlists"); }
+}
+
+async function openPlaylistDetail(plId, plName) {
+  currentPlaylistId = plId;
+  document.getElementById('libFavsTab').style.display = 'none';
+  document.getElementById('libPlaylistsTab').style.display = 'none';
+  const detail = document.getElementById('playlistDetailView');
+  detail.style.display = 'block';
+  document.getElementById('playlistDetailName').textContent = plName;
+  const items = document.getElementById('playlistDetailItems');
+  items.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Loading...</div>';
+  try {
+    const initData = getTelegramInitData();
+    const res = await fetch(`${API_BASE}/miniapp/playlists/items`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({initData, playlist_id: plId}),
+    });
+    const data = await res.json();
+    if (!data.items || data.items.length === 0) {
+      items.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">Empty playlist</div>';
+      return;
+    }
+    items.innerHTML = data.items.map(v => {
+      const thumb = v.thumbnail_url || '';
+      const cardStyle = thumb ? `style="--thumb:url('${thumb.replace(/'/g, "\\'")}')"` : '';
+      const tags = (v.tags||'').split(',').filter(Boolean).map(t => buildTagBadge(t.trim())).join('');
+      return `
+        <div class="profile-video-card" ${cardStyle} onclick="openVideoPlayer(${v.id},'${(v.url||'').replace(/'/g,"\\'")}','${(v.title||'').replace(/'/g,"\\'")}','${(v.artist_name||'').replace(/'/g,"\\'")}','${(v.tags||'').replace(/'/g,"\\'")}','${thumb.replace(/'/g,"\\'")}')">
+          <div class="profile-video-icon">▶</div>
+          <div class="profile-video-info">
+            <div class="profile-video-title">${escapeHtml(v.title||'Video')}</div>
+            ${tags ? '<div class="profile-video-tags">'+tags+'</div>' : ''}
+          </div>
+          <button onclick="event.stopPropagation();removeFromPlaylist(${v.id})" style="background:none;border:none;color:var(--muted);font-size:14px;padding:4px;cursor:pointer">✕</button>
+        </div>`;
+    }).join('');
+  } catch(e) { items.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Error</div>'; }
+}
+
+function closePlaylistDetail() {
+  document.getElementById('playlistDetailView').style.display = 'none';
+  document.getElementById('libPlaylistsTab').style.display = 'block';
+  currentPlaylistId = null;
+}
+
+async function deleteCurrentPlaylist() {
+  if (!currentPlaylistId) return;
+  const initData = getTelegramInitData();
+  try {
+    await fetch(`${API_BASE}/miniapp/playlists/delete`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({initData, playlist_id: currentPlaylistId}),
+    });
+    showToast('🗑 Playlist deleted');
+    closePlaylistDetail();
+    loadPlaylists();
+  } catch(_) { showToast('Error'); }
+}
+
+async function removeFromPlaylist(contentId) {
+  if (!currentPlaylistId) return;
+  const initData = getTelegramInitData();
+  try {
+    await fetch(`${API_BASE}/miniapp/playlists/remove_item`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({initData, playlist_id: currentPlaylistId, content_id: contentId}),
+    });
+    showToast('Removed');
+    openPlaylistDetail(currentPlaylistId, document.getElementById('playlistDetailName')?.textContent||'');
+  } catch(_) { showToast('Error'); }
+}
+
+// ── Create playlist modal ────────────────────────────────────────────────────
+function openCreatePlaylistModal() { document.getElementById('createPlaylistModal').classList.add('active'); }
+function closeCreatePlaylistModal() { document.getElementById('createPlaylistModal').classList.remove('active'); document.getElementById('newPlaylistInput').value = ''; }
+
+async function submitCreatePlaylist() {
+  const name = document.getElementById('newPlaylistInput').value.trim();
+  if (!name) return;
+  const initData = getTelegramInitData();
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/playlists/create`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({initData, name}),
+    });
+    const data = await res.json();
+    if (data.error) { showToast(data.error); return; }
+    closeCreatePlaylistModal();
+    showToast('📋 Playlist created!');
+    loadPlaylists();
+    // If we were adding a video, also add it
+    if (_pendingPlaylistContentId && data.id) {
+      await fetch(`${API_BASE}/miniapp/playlists/add_item`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({initData, playlist_id: data.id, content_id: _pendingPlaylistContentId}),
+      });
+      _pendingPlaylistContentId = null;
+      showToast('Added to new playlist!');
+    }
+  } catch(e) { showToast('Error'); }
+}
+
+// ── Add to playlist from video player ────────────────────────────────────────
+let _pendingPlaylistContentId = null;
+
+async function openAddToPlaylistModal() {
+  if (!currentVideoId) return;
+  _pendingPlaylistContentId = currentVideoId;
+  const modal = document.getElementById('addToPlaylistModal');
+  modal.classList.add('active');
+  const list = document.getElementById('atpPlaylistList');
+  list.innerHTML = '<div style="text-align:center;padding:12px;color:var(--muted)">Loading...</div>';
+  try {
+    const initData = getTelegramInitData();
+    const res = await fetch(`${API_BASE}/miniapp/playlists`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({initData}),
+    });
+    const data = await res.json();
+    if (!data.playlists || data.playlists.length === 0) {
+      list.innerHTML = '<div style="text-align:center;padding:12px;color:var(--muted)">No playlists yet. Create one!</div>';
+      return;
+    }
+    list.innerHTML = data.playlists.map(pl => `
+      <button onclick="addToPlaylist(${pl.id})" style="width:100%;background:var(--dark3);border:1px solid var(--border);border-radius:10px;padding:12px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px">
+        <span style="font-size:18px">📋</span>
+        <span style="flex:1">${escapeHtml(pl.name)}</span>
+        <span style="font-size:11px;color:var(--muted)">${pl.item_count}</span>
+      </button>
+    `).join('');
+  } catch(e) { list.innerHTML = ''; }
+}
+
+function closeAddToPlaylistModal() { document.getElementById('addToPlaylistModal').classList.remove('active'); }
+
+async function addToPlaylist(playlistId) {
+  if (!_pendingPlaylistContentId) return;
+  const initData = getTelegramInitData();
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/playlists/add_item`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({initData, playlist_id: playlistId, content_id: _pendingPlaylistContentId}),
+    });
+    const data = await res.json();
+    closeAddToPlaylistModal();
+    if (data.error) showToast(data.error === 'Already in playlist' ? '⚠️ Already in this playlist' : data.error);
+    else showToast('✅ Added to playlist!');
+    _pendingPlaylistContentId = null;
+  } catch(e) { showToast('Error'); }
+}
+
+// ── Suggest Artist ───────────────────────────────────────────────────────────
+function openSuggestModal() { document.getElementById('suggestModal').classList.add('active'); }
+function closeSuggestModal() { document.getElementById('suggestModal').classList.remove('active'); document.getElementById('suggestInput').value = ''; }
+
+async function submitSuggestion() {
+  const name = document.getElementById('suggestInput').value.trim();
+  if (!name) { showToast('Enter an artist name'); return; }
+  const initData = getTelegramInitData();
+  if (!initData) { showToast('Open from Telegram'); return; }
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/suggest_artist`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({initData, artist_name: name}),
+    });
+    const data = await res.json();
+    closeSuggestModal();
+    if (data.ok) showToast('💡 Thanks! Your suggestion has been sent.');
+    else showToast(data.error || 'Error');
+  } catch(e) { showToast('Network error'); }
 }
 
 async function fetchServerProfile(initData) {
@@ -4275,29 +4484,32 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
 
   const isM3U8 = url.includes('.m3u8') || url.includes('/hls/');
   const nativeHls = video.canPlayType('application/vnd.apple.mpegurl') !== '';
+  const isAndroid = /android/i.test(navigator.userAgent);
 
-  // PRIORITY 1: native HLS (iOS Safari + Telegram iOS WebView).
-  //             Much more reliable in Telegram Mini Apps than hls.js
+  // PRIORITY 1: native HLS (iOS Safari / Telegram iOS WebView)
   // PRIORITY 2: hls.js  (Android, desktop Chrome)
   // PRIORITY 3: plain video (mp4)
 
   if (isM3U8 && nativeHls) {
     console.log('[player] using native HLS');
     video.src = url;
-    video.load();
     video.play().catch(err => console.log('[player] autoplay blocked:', err?.message));
   } else if (isM3U8 && typeof Hls !== 'undefined' && Hls.isSupported()) {
-    console.log('[player] using hls.js');
+    console.log('[player] using hls.js' + (isAndroid ? ' (Android)' : ''));
     hlsInstance = new Hls({
-      enableWorker: true,
+      enableWorker: false,            // Workers crash in Telegram Android WebView
       lowLatencyMode: false,
-      backBufferLength: 30,
-      maxBufferLength: 20,
-      maxMaxBufferLength: 60,
-      manifestLoadingTimeOut: 15000,
-      fragLoadingTimeOut:     20000,
-      fragLoadingMaxRetry:     4,
-      manifestLoadingMaxRetry: 4,
+      backBufferLength: 20,
+      maxBufferLength: 15,
+      maxMaxBufferLength: 40,
+      manifestLoadingTimeOut: 20000,
+      fragLoadingTimeOut:     25000,
+      fragLoadingMaxRetry:     6,
+      manifestLoadingMaxRetry: 6,
+      xhrSetup: function(xhr) {
+        // Avoid sending credentials — prevents CORS preflight issues
+        xhr.withCredentials = false;
+      },
     });
     hlsInstance.loadSource(url);
     hlsInstance.attachMedia(video);
@@ -4318,15 +4530,18 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
             hlsInstance.recoverMediaError();
             break;
           default:
+            // Last resort: try direct src (some Android WebViews handle HLS natively)
+            console.log('[player] fatal error, trying direct src fallback');
             hlsInstance.destroy();
             hlsInstance = null;
+            video.src = url;
+            video.play().catch(()=>{});
         }
       }
     });
   } else {
     console.log('[player] using plain video src');
     video.src = url;
-    video.load();
     video.play().catch(err => console.log('[player] autoplay blocked:', err?.message));
   }
 
@@ -4336,6 +4551,7 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
 
   loadVideoReactions(contentId);
   loadVideoComments(contentId);
+  checkFavoriteStatus(contentId);
 
   // Show comment bar only for subscribers
   const hasAccess = typeof serverDaysLeft === 'number' && serverDaysLeft > 0;
