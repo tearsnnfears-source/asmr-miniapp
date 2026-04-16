@@ -701,6 +701,7 @@ body {
 }
 
 .profile-video-card {
+  position: relative;
   background: var(--dark2);
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -710,9 +711,32 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  overflow: hidden;
+  isolation: isolate;
 }
 
-.profile-video-card:active { opacity: 0.7; transform: scale(0.98); }
+.profile-video-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--thumb, none);
+  background-size: cover;
+  background-position: center;
+  filter: blur(22px) saturate(1.2) brightness(0.55);
+  opacity: 0.9;
+  z-index: -2;
+  transform: scale(1.2);
+}
+
+.profile-video-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(22,22,23,0.55) 0%, rgba(22,22,23,0.85) 100%);
+  z-index: -1;
+}
+
+.profile-video-card:active { opacity: 0.85; transform: scale(0.98); }
 
 .profile-video-icon {
   width: 44px;
@@ -796,6 +820,20 @@ body {
 }
 .video-player-overlay.active { display: flex; }
 
+.video-player-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--vp-thumb, none);
+  background-size: cover;
+  background-position: center;
+  filter: blur(40px) saturate(1.3) brightness(0.5);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 0;
+}
+.video-player-overlay > * { position: relative; z-index: 1; }
+
 .video-player-topbar {
   display: flex;
   align-items: center;
@@ -845,7 +883,9 @@ body {
 .video-player-body {
   flex: 1;
   overflow-y: auto;
-  background: var(--dark);
+  background: rgba(14,14,15,0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   -webkit-overflow-scrolling: touch;
 }
 
@@ -4058,8 +4098,10 @@ function renderProfileVideos(videos, tagFilter) {
     const tagsHtml = tags.map(t => buildTagBadge(t.trim())).join('');
     const safeTitle = (v.title || 'Video').replace(/'/g,"\\'").replace(/"/g,'&quot;');
     const safeUrl   = (v.url||'').replace(/'/g,"\\'");
+    const safeThumb = (v.thumbnail_url||'').replace(/'/g,"\\'");
+    const cardStyle = v.thumbnail_url ? `style="--thumb:url('${v.thumbnail_url.replace(/"/g,'%22').replace(/'/g,"\\'")}')"` : '';
     return `
-      <div class="profile-video-card" onclick="openVideoPlayer(${v.id},'${safeUrl}','${safeTitle}','${currentArtistName.replace(/'/g,"\\'")}','${(v.tags||'').replace(/'/g,"\\'")}')">
+      <div class="profile-video-card" ${cardStyle} onclick="openVideoPlayer(${v.id},'${safeUrl}','${safeTitle}','${currentArtistName.replace(/'/g,"\\'")}','${(v.tags||'').replace(/'/g,"\\'")}','${safeThumb}')">
         <div class="profile-video-icon">▶</div>
         <div class="profile-video-info">
           <div class="profile-video-title">${v.title || 'Video'}</div>
@@ -4087,11 +4129,18 @@ function openPhotoUrl(url) {
 let hlsInstance = null;
 let currentVideoId = null;
 
-function openVideoPlayer(contentId, url, title, artist, tagsRaw) {
+function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
   currentVideoId = contentId;
 
   const overlay = document.getElementById('videoPlayerOverlay');
   overlay.classList.add('active');
+
+  // Blurred background from thumbnail
+  if (thumbUrl) {
+    overlay.style.setProperty('--vp-thumb', `url('${thumbUrl.replace(/'/g,"\\'")}')`);
+  } else {
+    overlay.style.removeProperty('--vp-thumb');
+  }
 
   document.getElementById('vpArtist').textContent = artist;
   document.getElementById('vpTitle').textContent = title;
@@ -4105,6 +4154,10 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw) {
   const video = document.getElementById('vpVideo');
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
 
+  // Use thumb as poster while loading
+  if (thumbUrl) video.setAttribute('poster', thumbUrl);
+  else video.removeAttribute('poster');
+
   const isM3U8 = url.includes('.m3u8') || url.includes('/hls/');
 
   if (isM3U8 && typeof Hls !== 'undefined' && Hls.isSupported()) {
@@ -4113,7 +4166,6 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw) {
     hlsInstance.attachMedia(video);
     hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => { video.play().catch(()=>{}); });
   } else if (isM3U8 && video.canPlayType('application/vnd.apple.mpegurl')) {
-    // Safari native HLS
     video.src = url;
     video.play().catch(()=>{});
   } else {
@@ -4144,24 +4196,28 @@ function closeVideoPlayer() {
 }
 
 // ── Reactions ─────────────────────────────────────────────────────────────────
-const ALL_EMOJIS = ['🔥','❤️','😮','💦','👅'];
+const ALL_EMOJIS = ['🔥','❤️','👎','💦','👅'];
+const MAX_USER_REACTIONS = 3;
+let userReactionsSet = new Set();    // local state
 
 async function loadVideoReactions(contentId) {
   try {
     const initData = window.Telegram?.WebApp?.initData || '';
     const res = await fetch(`${API_BASE}/miniapp/video/${contentId}/reactions?initData=${encodeURIComponent(initData)}`);
     const data = await res.json();
-    renderReactions(data.counts || {}, data.user_reaction);
+    userReactionsSet = new Set(data.user_reactions || []);
+    renderReactions(data.counts || {});
   } catch(e) {
-    renderReactions({}, null);
+    userReactionsSet = new Set();
+    renderReactions({});
   }
 }
 
-function renderReactions(counts, userReaction) {
+function renderReactions(counts) {
   const row = document.getElementById('vpReactions');
   row.innerHTML = ALL_EMOJIS.map(emoji => {
     const count = counts[emoji] || 0;
-    const active = emoji === userReaction ? 'active' : '';
+    const active = userReactionsSet.has(emoji) ? 'active' : '';
     return `<button class="reaction-btn ${active}" onclick="doReact('${emoji}')">
       ${emoji} <span class="reaction-count">${count > 0 ? count : ''}</span>
     </button>`;
@@ -4175,6 +4231,11 @@ async function doReact(emoji) {
     window.Telegram?.WebApp?.showAlert?.('You need a subscription to react.');
     return;
   }
+  // Client-side guard for max 3
+  if (!userReactionsSet.has(emoji) && userReactionsSet.size >= MAX_USER_REACTIONS) {
+    window.Telegram?.WebApp?.showAlert?.(`You can pick up to ${MAX_USER_REACTIONS} reactions. Tap one of your active reactions to swap it.`);
+    return;
+  }
   try {
     const res = await fetch(`${API_BASE}/miniapp/video/${currentVideoId}/react`, {
       method: 'POST',
@@ -4182,7 +4243,10 @@ async function doReact(emoji) {
       body: JSON.stringify({initData, emoji}),
     });
     const data = await res.json();
-    if (data.counts) renderReactions(data.counts, data.user_reaction);
+    if (data.counts) {
+      userReactionsSet = new Set(data.user_reactions || []);
+      renderReactions(data.counts);
+    }
   } catch(e) {}
 }
 
@@ -4205,8 +4269,11 @@ function renderComments(comments) {
   }
   list.innerHTML = comments.map(c => {
     const initial = (c.username || 'A')[0].toUpperCase();
+    const avatarHtml = c.photo_url
+      ? `<div class="comment-avatar" style="background-image:url('${c.photo_url.replace(/'/g,"\\'")}');background-size:cover;background-position:center;background-color:transparent"></div>`
+      : `<div class="comment-avatar">${initial}</div>`;
     return `<div class="comment-item">
-      <div class="comment-avatar">${initial}</div>
+      ${avatarHtml}
       <div class="comment-body">
         <div class="comment-username">@${c.username || 'Anonymous'}</div>
         <div class="comment-text">${escapeHtmlComment(c.text)}</div>
