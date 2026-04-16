@@ -3362,6 +3362,35 @@ function applyFavoritesBadges(count) {
   if (ft) ft.textContent = String(n);
 }
 
+function refreshFavoritesBadgesOnly() {
+  // Lightweight refresh — just re-count from server if available
+  const initData = typeof getTelegramInitData === 'function' ? getTelegramInitData() : null;
+  if (!initData || !API_BASE) return;
+  fetch(`${API_BASE}/miniapp/favorites`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ initData }),
+  }).then(r => r.json()).then(data => {
+    if (data && typeof data.count === 'number') applyFavoritesBadges(data.count);
+  }).catch(() => {});
+}
+
+function closeFavAddModal() {
+  const m = document.getElementById('favAddModal');
+  if (m) m.classList.remove('active');
+}
+
+function submitAddFavorite() {
+  // Legacy — use ❤️ button on video player instead
+  closeFavAddModal();
+}
+
+function openFavAddModal() {
+  // Legacy — kept for backward compat
+  const m = document.getElementById('favAddModal');
+  if (m) m.classList.add('active');
+}
+
 // ─── LIBRARY: Favorites + Playlists ──────────────────────────────────────────
 
 let currentLibTab = 'favs';
@@ -5355,39 +5384,52 @@ if (tg && tg.isVersionAtLeast('7.0')) {
   }
 
   // Render placeholders first
-  renderArtists();
-  renderArtistsGrid();
-  renderUpdates();
-  renderFAQ();
-  renderPricingCards();
-  renderPaymentMethods();
-  updateStatsBanner();
+  try {
+    renderArtists();
+    renderArtistsGrid();
+    renderUpdates();
+    renderFAQ();
+    renderPricingCards();
+    renderPaymentMethods();
+    updateStatsBanner();
+  } catch(e) { console.error('[init] render error:', e); }
 
   // Load data in parallel
-  await Promise.all([
-    initArtistsFromAPI(),
-    initTelegramWebAppUser(),
-    loadTagColors(),
-  ]);
+  try {
+    await Promise.all([
+      initArtistsFromAPI().catch(e => console.warn('[init] artists API:', e)),
+      initTelegramWebAppUser().catch(e => console.warn('[init] TG user:', e)),
+      loadTagColors().catch(e => console.warn('[init] tags:', e)),
+    ]);
+  } catch(e) { console.error('[init] parallel load error:', e); }
 
   // Load videos separately to ensure proper rendering
-  await fetchVideosFromAPI();
+  try {
+    await fetchVideosFromAPI();
+  } catch(e) { console.warn('[init] videos API:', e); }
   
   // Re-render videos after loading from API - call both render functions
-  renderUpdates();
-  renderUpdatesGrid();
+  try {
+    renderUpdates();
+    renderUpdatesGrid();
+  } catch(e) { console.warn('[init] re-render:', e); }
   
   // Update stats banner with videos count
-  const videosCount = allUpdates.length;
-  const updatesStats = document.getElementById('updatesStats');
-  if (updatesStats && videosCount > 0) {
-    updatesStats.textContent = `${videosCount} videos available`;
-  }
-  
-  updateCTAButtons();
-  await checkLanguageAndShowOverlay();
+  try {
+    const videosCount = allUpdates.length;
+    const updatesStats = document.getElementById('updatesStats');
+    if (updatesStats && videosCount > 0) {
+      updatesStats.textContent = `${videosCount} videos available`;
+    }
+    
+    updateCTAButtons();
+  } catch(e) { console.warn('[init] CTA update:', e); }
 
-  // Hide splash after everything is ready
+  try {
+    await checkLanguageAndShowOverlay();
+  } catch(e) { console.warn('[init] language check:', e); }
+
+  // Hide splash after everything is ready — ALWAYS runs
   setTimeout(hideSplash, 300);
 })();
 </script>
