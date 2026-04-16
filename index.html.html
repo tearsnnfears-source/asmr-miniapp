@@ -6,6 +6,7 @@
 <title>ASMR.LEAKS — Landing</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <style>
 :root {
   --pink: #FF7EC8;
@@ -19,7 +20,7 @@
   --dark4: #252527;
   --text: #FFFFFF;
   --muted: rgba(255,255,255,0.45);
-  --border: rgba(255,255,255,0.08);z
+  --border: rgba(255,255,255,0.08);
   --success: #4ADE80;
 }
 
@@ -746,11 +747,238 @@ body {
   border-radius: 20px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
+  /* colors set dynamically via style attr */
 }
-.profile-tag.HOT      { background: rgba(255,80,80,0.2);   color: #FF5050; border: 1px solid rgba(255,80,80,0.3); }
-.profile-tag.NEW      { background: rgba(200,255,68,0.15); color: var(--lime); border: 1px solid rgba(200,255,68,0.3); }
-.profile-tag.EXCLUSIVE{ background: rgba(255,165,0,0.15);  color: #FFA500; border: 1px solid rgba(255,165,0,0.3); }
-.profile-tag.FREE     { background: rgba(0,200,150,0.15);  color: #00C896; border: 1px solid rgba(0,200,150,0.3); }
+
+/* ── PROFILE TAG FILTER BAR ── */
+.profile-tag-filter {
+  position: relative;
+  z-index: 3;
+  padding: 10px 16px;
+  background: rgba(14,14,15,0.95);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+.profile-tag-filter::-webkit-scrollbar { display: none; }
+
+.filter-tag-btn {
+  white-space: nowrap;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--dark3);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.4px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.filter-tag-btn.active {
+  background: rgba(255,255,255,0.12);
+  color: var(--text);
+  border-color: rgba(255,255,255,0.3);
+}
+
+/* ── VIDEO PLAYER OVERLAY ── */
+.video-player-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: #000;
+  display: none;
+  flex-direction: column;
+}
+.video-player-overlay.active { display: flex; }
+
+.video-player-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(8px);
+  flex-shrink: 0;
+}
+.video-player-back {
+  background: rgba(255,255,255,0.1);
+  border: none;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.video-player-artist {
+  font-size: 12px;
+  color: var(--muted);
+}
+.video-player-title {
+  font-size: 15px;
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-wrap {
+  width: 100%;
+  background: #000;
+  flex-shrink: 0;
+  position: relative;
+}
+.video-wrap video {
+  width: 100%;
+  display: block;
+  max-height: 55vw;
+  background: #000;
+}
+
+.video-player-body {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--dark);
+  -webkit-overflow-scrolling: touch;
+}
+
+.video-player-info {
+  padding: 14px 16px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.video-player-info-title {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.video-player-info-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ── REACTIONS ── */
+.reactions-row {
+  padding: 12px 16px;
+  display: flex;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.reactions-row::-webkit-scrollbar { display: none; }
+
+.reaction-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--dark2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 7px 14px;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.15s;
+  white-space: nowrap;
+  color: var(--text);
+  flex-shrink: 0;
+}
+.reaction-btn.active {
+  background: rgba(255,126,200,0.15);
+  border-color: rgba(255,126,200,0.4);
+}
+.reaction-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  font-family: 'DM Sans', sans-serif;
+}
+.reaction-btn.active .reaction-count { color: var(--pink); }
+
+/* ── COMMENTS ── */
+.comments-section {
+  padding: 12px 16px 100px;
+}
+.comments-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 12px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.comment-item {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.comment-avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--pink), var(--purple));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  color: #0E0E0F;
+}
+.comment-body { flex: 1; }
+.comment-username {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pink);
+  margin-bottom: 2px;
+}
+.comment-text {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.45;
+  word-break: break-word;
+}
+.comment-time {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.comment-input-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0; right: 0;
+  background: var(--dark2);
+  border-top: 1px solid var(--border);
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  z-index: 510;
+}
+.comment-input {
+  flex: 1;
+  background: var(--dark3);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 10px 16px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  outline: none;
+}
+.comment-input:focus { border-color: rgba(255,126,200,0.4); }
+.comment-send-btn {
+  background: linear-gradient(135deg, var(--pink), #FF4A9E);
+  border: none;
+  border-radius: 50%;
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+.comment-send-btn:active { opacity: 0.7; }
 
 .profile-photo-grid {
   display: grid;
@@ -2489,6 +2717,11 @@ body {
     <button class="profile-tab" id="tab-photos" onclick="switchProfileTab('photos')">🖼 Photos</button>
   </div>
 
+  <!-- Tag filter (videos only) -->
+  <div class="profile-tag-filter" id="profileTagFilter" style="display:none">
+    <button class="filter-tag-btn active" data-tag="" onclick="filterByTag(this, '')">All</button>
+  </div>
+
   <!-- Content -->
   <div class="profile-content-area">
     <div id="profileVideosTab">
@@ -2499,6 +2732,43 @@ body {
     <div id="profilePhotosTab" style="display:none">
       <div id="profilePhotoGrid" class="profile-photo-grid"></div>
     </div>
+  </div>
+</div>
+
+<!-- ═══ VIDEO PLAYER OVERLAY ═══ -->
+<div class="video-player-overlay" id="videoPlayerOverlay">
+  <div class="video-player-topbar">
+    <button class="video-player-back" onclick="closeVideoPlayer()">‹</button>
+    <div style="flex:1;min-width:0">
+      <div class="video-player-artist" id="vpArtist"></div>
+      <div class="video-player-title" id="vpTitle">Video</div>
+    </div>
+  </div>
+
+  <div class="video-wrap">
+    <video id="vpVideo" controls playsinline preload="metadata"></video>
+  </div>
+
+  <div class="video-player-body">
+    <div class="video-player-info">
+      <div class="video-player-info-title" id="vpInfoTitle"></div>
+      <div class="video-player-info-tags" id="vpInfoTags"></div>
+    </div>
+
+    <div class="reactions-row" id="vpReactions">
+      <!-- filled by JS -->
+    </div>
+
+    <div class="comments-section" id="vpComments">
+      <div class="comments-title">Comments</div>
+      <div id="vpCommentsList"></div>
+    </div>
+  </div>
+
+  <!-- fixed comment input -->
+  <div class="comment-input-bar" id="vpCommentBar" style="display:none">
+    <input class="comment-input" id="vpCommentInput" placeholder="Write a comment…" maxlength="500">
+    <button class="comment-send-btn" onclick="submitComment()">➤</button>
   </div>
 </div>
 
@@ -3692,30 +3962,69 @@ function openArtistProfile(name) {
   loadArtistProfileContent(name);
 }
 
+
+// ── Tag map: name → color (loaded once) ──────────────────────────────────────
+let tagColorMap = {};
+
+async function loadTagColors() {
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/tags`);
+    const data = await res.json();
+    tagColorMap = {};
+    (data.tags || []).forEach(t => { tagColorMap[t.name] = t.color; });
+  } catch(e) {}
+}
+
+function hexToRgb(hex) {
+  // Convert #RGB or #RRGGBB to "r,g,b"
+  let h = hex.replace('#','');
+  if (h.length === 3) h = h.split('').map(c=>c+c).join('');
+  const n = parseInt(h, 16);
+  return `${(n>>16)&255},${(n>>8)&255},${n&255}`;
+}
+
+function buildTagBadge(tagName) {
+  const color = tagColorMap[tagName] || '#888888';
+  const rgb = hexToRgb(color);
+  return `<span class="profile-tag" style="color:${color};background:rgba(${rgb},0.15);border:1px solid rgba(${rgb},0.35)">${tagName}</span>`;
+}
+
+// ── Current artist video data (for filtering) ─────────────────────────────────
+let currentArtistVideos = [];
+let currentArtistName   = '';
+let activeTagFilter     = '';
+
 async function loadArtistProfileContent(name) {
+  currentArtistName = name;
+  activeTagFilter   = '';
+
   try {
     const res = await fetch(`${API_BASE}/miniapp/artist_content?name=${encodeURIComponent(name)}`);
     const data = await res.json();
 
-    // Render videos
-    const videosList = document.getElementById('profileVideosList');
-    if (!data.videos || data.videos.length === 0) {
-      videosList.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">No videos yet</div>';
+    currentArtistVideos = data.videos || [];
+
+    // Build tag filter bar
+    const filterBar = document.getElementById('profileTagFilter');
+    const usedTags = new Set();
+    currentArtistVideos.forEach(v => {
+      (v.tags || '').split(',').filter(Boolean).forEach(t => usedTags.add(t.trim()));
+    });
+
+    if (usedTags.size > 0) {
+      filterBar.style.display = 'flex';
+      filterBar.innerHTML = `<button class="filter-tag-btn active" data-tag="" onclick="filterByTag(this,'')">All</button>`;
+      usedTags.forEach(tag => {
+        const color = tagColorMap[tag] || '#888888';
+        filterBar.innerHTML += `<button class="filter-tag-btn" data-tag="${tag}"
+          style="border-color:${color}40;color:${color}"
+          onclick="filterByTag(this,'${tag.replace(/'/g,"\\'")}')"> ${tag}</button>`;
+      });
     } else {
-      videosList.innerHTML = data.videos.map(v => {
-        const tags = (v.tags || '').split(',').filter(Boolean);
-        const tagsHtml = tags.map(t => `<span class="profile-tag ${t.trim()}">${t.trim()}</span>`).join('');
-        return `
-          <div class="profile-video-card" onclick="openVideoUrl('${v.url.replace(/'/g,"\\'")}')">
-            <div class="profile-video-icon">▶</div>
-            <div class="profile-video-info">
-              <div class="profile-video-title">${v.title || 'Video'}</div>
-              ${tagsHtml ? `<div class="profile-video-tags">${tagsHtml}</div>` : ''}
-            </div>
-            <div style="color:var(--muted);font-size:18px">›</div>
-          </div>`;
-      }).join('');
+      filterBar.style.display = 'none';
     }
+
+    renderProfileVideos(currentArtistVideos, '');
 
     // Render photos
     const photoGrid = document.getElementById('profilePhotoGrid');
@@ -3724,7 +4033,7 @@ async function loadArtistProfileContent(name) {
     } else {
       photoGrid.innerHTML = data.photos.map(p =>
         `<div class="profile-photo-item" style="background-image:url('${p.url}')"
-              onclick="openPhotoUrl('${p.url.replace(/'/g,"\\'")}')"></div>`
+              onclick="openPhotoUrl('${p.url.replace(/'/g,"\\'")}')" ></div>`
       ).join('');
     }
   } catch(e) {
@@ -3733,10 +4042,39 @@ async function loadArtistProfileContent(name) {
   }
 }
 
-function openVideoUrl(url) {
-  const tg = window.Telegram?.WebApp;
-  if (tg && typeof tg.openLink === 'function') tg.openLink(url);
-  else window.open(url, '_blank', 'noopener');
+function renderProfileVideos(videos, tagFilter) {
+  const videosList = document.getElementById('profileVideosList');
+  const filtered = tagFilter
+    ? videos.filter(v => (v.tags||'').split(',').map(t=>t.trim()).includes(tagFilter))
+    : videos;
+
+  if (filtered.length === 0) {
+    videosList.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted)">${tagFilter ? 'No videos with this tag' : 'No videos yet'}</div>`;
+    return;
+  }
+
+  videosList.innerHTML = filtered.map(v => {
+    const tags = (v.tags || '').split(',').filter(Boolean);
+    const tagsHtml = tags.map(t => buildTagBadge(t.trim())).join('');
+    const safeTitle = (v.title || 'Video').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    const safeUrl   = (v.url||'').replace(/'/g,"\\'");
+    return `
+      <div class="profile-video-card" onclick="openVideoPlayer(${v.id},'${safeUrl}','${safeTitle}','${currentArtistName.replace(/'/g,"\\'")}','${(v.tags||'').replace(/'/g,"\\'")}')">
+        <div class="profile-video-icon">▶</div>
+        <div class="profile-video-info">
+          <div class="profile-video-title">${v.title || 'Video'}</div>
+          ${tagsHtml ? `<div class="profile-video-tags">${tagsHtml}</div>` : ''}
+        </div>
+        <div style="color:var(--muted);font-size:18px">›</div>
+      </div>`;
+  }).join('');
+}
+
+function filterByTag(btn, tag) {
+  activeTagFilter = tag;
+  document.querySelectorAll('.filter-tag-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderProfileVideos(currentArtistVideos, tag);
 }
 
 function openPhotoUrl(url) {
@@ -3745,11 +4083,172 @@ function openPhotoUrl(url) {
   else window.open(url, '_blank', 'noopener');
 }
 
+// ── Video Player ───────────────────────────────────────────────────────────────
+let hlsInstance = null;
+let currentVideoId = null;
+
+function openVideoPlayer(contentId, url, title, artist, tagsRaw) {
+  currentVideoId = contentId;
+
+  const overlay = document.getElementById('videoPlayerOverlay');
+  overlay.classList.add('active');
+
+  document.getElementById('vpArtist').textContent = artist;
+  document.getElementById('vpTitle').textContent = title;
+  document.getElementById('vpInfoTitle').textContent = title;
+
+  // Tags
+  const tags = (tagsRaw || '').split(',').filter(Boolean);
+  document.getElementById('vpInfoTags').innerHTML = tags.map(t => buildTagBadge(t.trim())).join('');
+
+  // Setup video with HLS.js
+  const video = document.getElementById('vpVideo');
+  if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+
+  const isM3U8 = url.includes('.m3u8') || url.includes('/hls/');
+
+  if (isM3U8 && typeof Hls !== 'undefined' && Hls.isSupported()) {
+    hlsInstance = new Hls({ enableWorker: false });
+    hlsInstance.loadSource(url);
+    hlsInstance.attachMedia(video);
+    hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => { video.play().catch(()=>{}); });
+  } else if (isM3U8 && video.canPlayType('application/vnd.apple.mpegurl')) {
+    // Safari native HLS
+    video.src = url;
+    video.play().catch(()=>{});
+  } else {
+    video.src = url;
+    video.play().catch(()=>{});
+  }
+
+  // Load reactions & comments
+  document.getElementById('vpReactions').innerHTML = '<div style="color:var(--muted);font-size:13px;padding:4px 0">Loading reactions…</div>';
+  document.getElementById('vpCommentsList').innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px 0;text-align:center">Loading…</div>';
+
+  loadVideoReactions(contentId);
+  loadVideoComments(contentId);
+
+  // Show comment bar only for subscribers
+  const hasAccess = typeof serverDaysLeft === 'number' && serverDaysLeft > 0;
+  document.getElementById('vpCommentBar').style.display = hasAccess ? 'flex' : 'none';
+}
+
+function closeVideoPlayer() {
+  const overlay = document.getElementById('videoPlayerOverlay');
+  overlay.classList.remove('active');
+  const video = document.getElementById('vpVideo');
+  video.pause();
+  video.src = '';
+  if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+  currentVideoId = null;
+}
+
+// ── Reactions ─────────────────────────────────────────────────────────────────
+const ALL_EMOJIS = ['🔥','❤️','😮','💦','👅'];
+
+async function loadVideoReactions(contentId) {
+  try {
+    const initData = window.Telegram?.WebApp?.initData || '';
+    const res = await fetch(`${API_BASE}/miniapp/video/${contentId}/reactions?initData=${encodeURIComponent(initData)}`);
+    const data = await res.json();
+    renderReactions(data.counts || {}, data.user_reaction);
+  } catch(e) {
+    renderReactions({}, null);
+  }
+}
+
+function renderReactions(counts, userReaction) {
+  const row = document.getElementById('vpReactions');
+  row.innerHTML = ALL_EMOJIS.map(emoji => {
+    const count = counts[emoji] || 0;
+    const active = emoji === userReaction ? 'active' : '';
+    return `<button class="reaction-btn ${active}" onclick="doReact('${emoji}')">
+      ${emoji} <span class="reaction-count">${count > 0 ? count : ''}</span>
+    </button>`;
+  }).join('');
+}
+
+async function doReact(emoji) {
+  if (!currentVideoId) return;
+  const initData = window.Telegram?.WebApp?.initData || '';
+  if (!initData) {
+    window.Telegram?.WebApp?.showAlert?.('You need a subscription to react.');
+    return;
+  }
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/video/${currentVideoId}/react`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({initData, emoji}),
+    });
+    const data = await res.json();
+    if (data.counts) renderReactions(data.counts, data.user_reaction);
+  } catch(e) {}
+}
+
+// ── Comments ──────────────────────────────────────────────────────────────────
+async function loadVideoComments(contentId) {
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/video/${contentId}/comments`);
+    const data = await res.json();
+    renderComments(data.comments || []);
+  } catch(e) {
+    document.getElementById('vpCommentsList').innerHTML = '';
+  }
+}
+
+function renderComments(comments) {
+  const list = document.getElementById('vpCommentsList');
+  if (comments.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:20px 0;color:var(--muted);font-size:13px">No comments yet. Be first! 👆</div>';
+    return;
+  }
+  list.innerHTML = comments.map(c => {
+    const initial = (c.username || 'A')[0].toUpperCase();
+    return `<div class="comment-item">
+      <div class="comment-avatar">${initial}</div>
+      <div class="comment-body">
+        <div class="comment-username">@${c.username || 'Anonymous'}</div>
+        <div class="comment-text">${escapeHtmlComment(c.text)}</div>
+        <div class="comment-time">${c.created_at}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function escapeHtmlComment(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+async function submitComment() {
+  if (!currentVideoId) return;
+  const input = document.getElementById('vpCommentInput');
+  const text = input.value.trim();
+  if (!text) return;
+  const initData = window.Telegram?.WebApp?.initData || '';
+  if (!initData) return;
+  input.value = '';
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/video/${currentVideoId}/comment`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({initData, text}),
+    });
+    const data = await res.json();
+    if (data.ok) await loadVideoComments(currentVideoId);
+  } catch(e) {}
+}
+
 function switchProfileTab(tab) {
   document.getElementById('profileVideosTab').style.display = tab === 'videos' ? 'block' : 'none';
   document.getElementById('profilePhotosTab').style.display = tab === 'photos' ? 'block' : 'none';
   document.getElementById('tab-videos').classList.toggle('active', tab === 'videos');
   document.getElementById('tab-photos').classList.toggle('active', tab === 'photos');
+  // show/hide tag filter only on videos tab
+  const filterBar = document.getElementById('profileTagFilter');
+  if (filterBar.children.length > 1) {
+    filterBar.style.display = tab === 'videos' ? 'flex' : 'none';
+  }
 }
 
 function closeArtistProfile() {
@@ -4360,6 +4859,7 @@ if (tg && tg.isVersionAtLeast('7.0')) {
   await Promise.all([
     initArtistsFromAPI(),
     initTelegramWebAppUser(),
+    loadTagColors(),
   ]);
 
   // Load videos separately to ensure proper rendering
