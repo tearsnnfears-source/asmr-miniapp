@@ -2838,6 +2838,37 @@ body {
   </div>
 </div>
 
+<!-- ═══ PAYWALL — shown when clicking a video without subscription ═══ -->
+<div class="modal" id="paywallModal">
+  <div class="modal-content" style="text-align:center">
+    <button class="modal-close" onclick="closePaywallModal()">×</button>
+    <div style="font-size:48px;margin-bottom:6px">🔒</div>
+    <div class="modal-title">Premium <span>Content</span></div>
+    <div id="paywallVideoTitle" style="font-size:13px;color:var(--text);margin:-2px 0 4px;font-weight:500;line-height:1.3"></div>
+    <div id="paywallVideoArtist" style="font-size:11px;color:var(--pink);margin-bottom:14px;letter-spacing:0.4px"></div>
+
+    <div style="background:rgba(255,126,200,0.08);border:1px solid rgba(255,126,200,0.2);border-radius:14px;padding:14px;margin-bottom:16px;text-align:left">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="font-size:22px">⚡</div>
+        <div style="font-size:13px;font-weight:500">Unlock full library access</div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.5">
+        Full HD videos · All artists · Comments &amp; reactions · Favorites · Private group
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="paywallSubscribe()"
+      style="width:100%;background:linear-gradient(135deg, var(--pink), #FF4A9E);color:#0E0E0F;border:none;border-radius:14px;padding:15px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(255,126,200,0.35);margin-bottom:10px">
+      💳 Subscribe Now
+    </button>
+
+    <button id="paywallTrialBtn" onclick="paywallTrial()"
+      style="width:100%;background:transparent;color:var(--lime);border:1px solid rgba(204,255,0,0.4);border-radius:14px;padding:13px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;display:none;align-items:center;justify-content:center;gap:6px">
+      🎁 Try 3 Days Free
+    </button>
+  </div>
+</div>
+
 <div class="modal" id="favAddModal">
   <div class="modal-content">
     <button type="button" class="modal-close" onclick="closeFavAddModal()">×</button>
@@ -3499,6 +3530,7 @@ async function initTelegramWebAppUser() {
       else if (u > INFINITE_SUB_DAYS_THRESHOLD) serverShowSubscribe = false;
       else if (u > 3) serverShowSubscribe = false;
       else serverShowSubscribe = !!profile.trial_used;
+      window.__profileTrialUsed = !!profile.trial_used;
     }
     // Update expiry toggle based on saved preference
     if (typeof profile.notify_expiry === "boolean") {
@@ -4126,9 +4158,12 @@ function renderProfileVideos(videos, tagFilter) {
     const safeUrl   = (v.url||'').replace(/'/g,"\\'");
     const safeThumb = (v.thumbnail_url||'').replace(/'/g,"\\'");
     const cardStyle = v.thumbnail_url ? `style="--thumb:url('${v.thumbnail_url.replace(/"/g,'%22').replace(/'/g,"\\'")}')"` : '';
+    const hasAccess = typeof serverDaysLeft === 'number' && serverDaysLeft > 0;
+    const iconContent = hasAccess ? '▶' : '🔒';
+    const iconStyle = hasAccess ? '' : 'background:rgba(255,126,200,0.14);';
     return `
       <div class="profile-video-card" ${cardStyle} onclick="openVideoPlayer(${v.id},'${safeUrl}','${safeTitle}','${currentArtistName.replace(/'/g,"\\'")}','${(v.tags||'').replace(/'/g,"\\'")}','${safeThumb}')">
-        <div class="profile-video-icon">▶</div>
+        <div class="profile-video-icon" style="${iconStyle}">${iconContent}</div>
         <div class="profile-video-info">
           <div class="profile-video-title">${v.title || 'Video'}</div>
           ${tagsHtml ? `<div class="profile-video-tags">${tagsHtml}</div>` : ''}
@@ -4155,7 +4190,57 @@ function openPhotoUrl(url) {
 let hlsInstance = null;
 let currentVideoId = null;
 
+// ── Paywall modal ─────────────────────────────────────────────────────────────
+let _paywallPending = null;  // { contentId, url, title, artist, tagsRaw, thumbUrl }
+
+function hasVideoAccess() {
+  return typeof serverDaysLeft === 'number' && serverDaysLeft > 0;
+}
+
+function showPaywall(title, artist) {
+  document.getElementById('paywallVideoTitle').textContent  = title || '';
+  document.getElementById('paywallVideoArtist').textContent = artist ? `from ${artist}` : '';
+
+  // Show trial button only if trial hasn't been used
+  const trialBtn = document.getElementById('paywallTrialBtn');
+  const trialUsed = !!window.__profileTrialUsed;
+  trialBtn.style.display = trialUsed ? 'none' : 'flex';
+
+  document.getElementById('paywallModal').classList.add('active');
+}
+
+function closePaywallModal() {
+  document.getElementById('paywallModal').classList.remove('active');
+  _paywallPending = null;
+}
+
+function paywallSubscribe() {
+  closePaywallModal();
+  if (typeof openPage === 'function') openPage('payment');
+}
+
+async function paywallTrial() {
+  // Reuse existing trial flow
+  closePaywallModal();
+  if (typeof confirmTrial === 'function') {
+    await confirmTrial();
+    // After trial is granted, auto-open the video the user was trying to watch
+    if (_paywallPending && hasVideoAccess()) {
+      const p = _paywallPending;
+      _paywallPending = null;
+      openVideoPlayer(p.contentId, p.url, p.title, p.artist, p.tagsRaw, p.thumbUrl);
+    }
+  }
+}
+
 function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
+  // ── PAYWALL GATE ─────────────────────────────────────────────────────────────
+  if (!hasVideoAccess()) {
+    _paywallPending = { contentId, url, title, artist, tagsRaw, thumbUrl };
+    showPaywall(title, artist);
+    return;
+  }
+
   currentVideoId = contentId;
 
   const overlay = document.getElementById('videoPlayerOverlay');
@@ -4521,6 +4606,12 @@ function updateCTAButtons() {
     subscribeBtnMain.classList.add('hidden');
   }
   updatePaymentUI();
+
+  // Flip 🔒 ↔ ▶ on video cards when access changes
+  if (typeof renderProfileVideos === 'function' &&
+      Array.isArray(currentArtistVideos) && currentArtistVideos.length > 0) {
+    renderProfileVideos(currentArtistVideos, activeTagFilter || '');
+  }
 }
 
 function openTrialModal() {
@@ -4558,10 +4649,17 @@ async function confirmTrial() {
     serverDaysLeft = data.days_left ?? 3;
     isSubscribed = true;
     serverShowSubscribe = false;
+    window.__profileTrialUsed = true;
     updateCTAButtons();
     refreshFavoritesBadgesOnly();
-    openPage('home');
-    setTimeout(openInviteModal, 400);
+
+    // If this was triggered from the paywall, don't kick back to home
+    if (!_paywallPending) {
+      openPage('home');
+      setTimeout(openInviteModal, 400);
+    } else {
+      showToast('🎁 3 free days activated!');
+    }
   } catch (_) {
     hidePaymentOverlay();
     showToast('❌ Network error');
