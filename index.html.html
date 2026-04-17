@@ -2748,6 +2748,8 @@ body {
     </div>
     <!-- Artist filter chips -->
     <div class="av-filter-bar" id="avArtistFilter"></div>
+    <!-- Tag filter chips -->
+    <div class="av-filter-bar" id="avTagFilter" style="display:none;padding-top:0"></div>
     <div class="updates-grid" id="updatesGrid"></div>
     <button class="av-load-more hidden" id="avLoadMore" onclick="avLoadMore()">Load more…</button>
   </div>
@@ -3351,6 +3353,7 @@ let avPage = 0;
 const AV_PAGE_SIZE = 20;
 let avSearch = '';
 let avArtist = '';
+let avTag = '';
 let avTotalLoaded = 0;
 let avHasMore = false;
 let avAllVideos = [];  // full client-side pool loaded once
@@ -3376,11 +3379,37 @@ function _avCardHtml(v) {
 
 function _avFiltered() {
   const q = avSearch.toLowerCase();
-  const a = avArtist;
-  return avAllVideos.filter(v =>
-    (!q || v.title.toLowerCase().includes(q) || (v.artistName||'').toLowerCase().includes(q)) &&
-    (!a || v.artistName === a)
-  );
+  return avAllVideos.filter(v => {
+    if (q && !v.title.toLowerCase().includes(q) && !(v.artistName||'').toLowerCase().includes(q)) return false;
+    if (avArtist && v.artistName !== avArtist) return false;
+    if (avTag) {
+      const vtags = (v.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+      if (!vtags.includes(avTag)) return false;
+    }
+    return true;
+  });
+}
+
+function _avBuildTagFilter() {
+  const bar = document.getElementById('avTagFilter');
+  if (!bar) return;
+  const filtered = avArtist ? avAllVideos.filter(v => !avArtist || v.artistName === avArtist) : avAllVideos;
+  const tags = [...new Set(filtered.flatMap(v => (v.tags||'').split(',').map(t=>t.trim()).filter(Boolean)))].sort();
+  if (!tags.length) { bar.innerHTML = ''; bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  bar.innerHTML = [
+    `<button class="av-filter-chip${avTag===''?' active':''}" onclick="avSetTag('')">All</button>`,
+    ...tags.map(t => `<button class="av-filter-chip${avTag===t?' active':''}" onclick="avSetTag('${t.replace(/'/g,"\\'")}')">
+      ${t}
+    </button>`)
+  ].join('');
+}
+
+function avSetTag(name) {
+  avTag = name;
+  avPage = 0;
+  _avBuildTagFilter();
+  _avRender(false);
 }
 
 function _avRender(append) {
@@ -3421,11 +3450,12 @@ async function _avEnsureLoaded() {
       embedUrl: v.embed_url || v.url,
       thumbnailUrl: v.thumbnail_url || '',
       artistName: v.artist_name || '',
+      tags: v.tags || '',
       duration: v.duration || '',
       date: v.created_at ? new Date(v.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''
     }));
   } catch(e) {
-    avAllVideos = allUpdates.map(u => ({...u, artistName: u.artistName || ''}));
+    avAllVideos = allUpdates.map(u => ({...u, artistName: u.artistName || '', tags: u.tags || ''}));
   }
 }
 
@@ -3435,11 +3465,12 @@ function renderUpdatesGrid() {
 
 async function showUpdatesPage() {
   openPage('updates');
-  avPage = 0; avSearch = ''; avArtist = '';
+  avPage = 0; avSearch = ''; avArtist = ''; avTag = '';
   document.getElementById('updatesSearch').value = '';
   document.getElementById('updatesSearchClear')?.classList.remove('active');
   await _avEnsureLoaded();
   _avBuildArtistFilter();
+  _avBuildTagFilter();
   _avRender(false);
   setTimeout(() => {
     const pageEl = document.getElementById('page-updates');
@@ -3469,8 +3500,10 @@ function avClearSearch() {
 
 function avSetArtist(name) {
   avArtist = name;
+  avTag = '';
   avPage = 0;
   _avBuildArtistFilter();
+  _avBuildTagFilter();
   _avRender(false);
 }
 
@@ -3488,7 +3521,7 @@ function openUpdateDetail(id) {
   }
 
   // Open in video player overlay
-  openVideoPlayer(v.id, v.embedUrl, v.title, v.artistName || '', '', v.thumbnailUrl || '');
+  openVideoPlayer(v.id, v.embedUrl, v.title, v.artistName || '', v.tags || '', v.thumbnailUrl || '');
 }
 
 function getInitials(fullName) {
@@ -4784,7 +4817,7 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
   } else {
     overlay.style.removeProperty('--vp-thumb');
   }
-  const artistBgUrl = artistProfiles[artist]?.profile_photo_url;
+  const artistBgUrl = artistProfiles[artist]?.profilePhoto;
   if (artistBgUrl) {
     overlay.style.setProperty('--vp-artist-bg', `url('${artistBgUrl.replace(/'/g,"\\'")}')`);
   } else {
@@ -5048,11 +5081,25 @@ const COMMENT_BADGE_COLORS = {
   FOUNDER: '#E040FB', EARLY:  '#FF6D00', DONOR:  '#FF4081',
 };
 const COMMENT_BADGE_TEXT_DARK = new Set(['VIP','TESTER','OLD']);
+let customBadgeColors = {};  // loaded from /miniapp/custom_badges
+
+async function loadCustomBadges() {
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/custom_badges`);
+    if (!res.ok) return;
+    const data = await res.json();
+    (data.badges || []).forEach(b => { customBadgeColors[b.name] = b.color; });
+  } catch(e) {}
+}
+
+function _badgeColor(name) {
+  return COMMENT_BADGE_COLORS[name] || customBadgeColors[name] || '#888';
+}
 
 function _renderCommentBadges(badges) {
   if (!badges || !badges.length) return '';
   return badges.slice(0, 3).map(b => {
-    const bg = COMMENT_BADGE_COLORS[b] || '#aaa';
+    const bg = _badgeColor(b);
     const color = COMMENT_BADGE_TEXT_DARK.has(b) ? '#0E0E0F' : '#fff';
     return `<span class="comment-badge" style="background:${bg};color:${color}">${b}</span>`;
   }).join('');
@@ -5168,13 +5215,12 @@ function updateCTAButtons() {
     serverShowSubscribe === true ||
     (serverShowSubscribe === null && !hasAccess);
 
-  const BADGE_COLORS = { VIP:'#CCFF00', TESTER:'#00E5FF', OLD:'#FFD740', FOUNDER:'#E040FB', EARLY:'#FF6D00', DONOR:'#FF4081' };
   const BADGE_TEXT_DARK = new Set(['VIP','TESTER','OLD']);
   const BADGE_LABELS = { VIP: 'VIP ∞' };
   const activeBadges = serverBadges.length ? serverBadges : (isInfiniteSub ? ['VIP'] : []);
 
   function _makeBadgeSpan(b, extraClass) {
-    const bg = BADGE_COLORS[b] || '#aaa';
+    const bg = _badgeColor(b);
     const clr = BADGE_TEXT_DARK.has(b) ? '#0E0E0F' : '#fff';
     const label = BADGE_LABELS[b] || b;
     return `<span class="vip-badge show badge-${b}${extraClass?' '+extraClass:''}" style="background:${bg};color:${clr}">${label}</span>`;
@@ -5772,6 +5818,7 @@ if (tg) {
       initArtistsFromAPI().catch(e => console.warn('[init] artists:', e)),
       initTelegramWebAppUser().catch(e => console.warn('[init] TG user:', e)),
       loadTagColors().catch(e => console.warn('[init] tags:', e)),
+      loadCustomBadges().catch(e => console.warn('[init] custom badges:', e)),
     ]);
   } catch(e) { console.error('[init] parallel load:', e); }
 
