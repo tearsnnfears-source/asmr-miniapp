@@ -3160,7 +3160,7 @@ body {
     <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6;font-weight:300">
       Your subscription is active.<br>Join the private group now:
     </div>
-    <a href="https://t.me/+_jo33xmvLUk1MWJi"
+    <a id="inviteJoinBtn" href="#"
        onclick="openGroupLink(event)"
        style="display:flex;align-items:center;justify-content:center;gap:10px;
               background:linear-gradient(135deg,var(--pink),#FF4A9E);
@@ -3169,7 +3169,7 @@ body {
               box-shadow:0 4px 16px rgba(255,126,200,0.4);margin-bottom:12px">
       ✈️ Join ASMR LEAKS Group
     </a>
-    <div style="font-size:11px;color:var(--muted)">Link is personal · don't share it</div>
+    <div style="font-size:11px;color:var(--muted)">Link is personal · don't share it · expires in 72h</div>
   </div>
 </div>
 
@@ -5404,7 +5404,6 @@ function processPayStarsLocally(days) {
   serverShowSubscribe = false;
   updateCTAButtons();
   openPage('home');
-  setTimeout(openInviteModal, 400);
 }
 
 async function openPaymentLink() {
@@ -5427,16 +5426,16 @@ async function openPaymentLink() {
   
   switch(selectedMethod) {
     case 0: // Card via Tribute
+    case 2: // SBP via Tribute
       paymentUrl = PAYMENT_URLS.tribute;
       if (tg && typeof tg.openLink === 'function') tg.openLink(paymentUrl);
       else window.open(paymentUrl, '_blank', 'noopener');
-      setTimeout(() => {
-        openPage('home');
-        setTimeout(openInviteModal, 300);
-      }, 1500);
+      openPage('home');
+      showToast('💳 Complete payment on Tribute, then return here for your access link');
+      startInvitePolling();
       break;
-      
-    case 1: // TG Stars - ОПЛАТА ВНУТРИ ПРИЛОЖЕНИЯ
+
+    case 1: // TG Stars
       try {
         showPaymentOverlay('Generating Invoice...', true);
         const res = await fetch(`${API_BASE}/miniapp/create_stars_invoice`, {
@@ -5445,19 +5444,18 @@ async function openPaymentLink() {
           body: JSON.stringify({ initData, days: plan.days })
         });
         const data = await res.json().catch(() => ({}));
-        
+
         if (data.invoice_link) {
-          hidePaymentOverlay(); // Прячем загрузку перед показом окна Телеграма
-          
+          hidePaymentOverlay();
           if (tg && typeof tg.openInvoice === 'function') {
-             // Открываем нативное окно Telegram Stars
              tg.openInvoice(data.invoice_link, function(status) {
                 if (status === 'paid') {
                     showPaymentOverlay('Payment Successful!', false);
                     setTimeout(() => {
                         hidePaymentOverlay();
                         processPayStarsLocally(plan.days);
-                    }, 2500);
+                        startInvitePolling();
+                    }, 2000);
                 } else if (status === 'failed') {
                     showToast('❌ Payment failed');
                 } else if (status === 'cancelled') {
@@ -5467,7 +5465,6 @@ async function openPaymentLink() {
                 }
              });
           } else {
-             // Фолбэк, если человек сидит с древней версии ТГ
              tg.openLink(data.invoice_link);
           }
         } else {
@@ -5478,16 +5475,6 @@ async function openPaymentLink() {
         hidePaymentOverlay();
         showToast('❌ Network error');
       }
-      break;
-      
-    case 2: // СБП — ведёт на Tribute (принимает РФ карты)
-      paymentUrl = PAYMENT_URLS.tribute;
-      if (tg && typeof tg.openLink === 'function') tg.openLink(paymentUrl);
-      else window.open(paymentUrl, '_blank', 'noopener');
-      setTimeout(() => {
-        openPage('home');
-        setTimeout(openInviteModal, 300);
-      }, 1500);
       break;
   }
 }
@@ -5756,7 +5743,9 @@ async function checkLanguageAndShowOverlay() {
 }
 
 // ── Invite modal ──
-function openInviteModal() {
+function openInviteModal(link) {
+  const btn = document.getElementById('inviteJoinBtn');
+  if (btn && link) btn.href = link;
   document.getElementById('inviteModal').classList.add('active');
 }
 function closeInviteModal() {
@@ -5765,10 +5754,45 @@ function closeInviteModal() {
 function openGroupLink(e) {
   e.preventDefault();
   const tg = window.Telegram?.WebApp;
-  const url = 'https://t.me/+_jo33xmvLUk1MWJi';
+  const url = document.getElementById('inviteJoinBtn')?.href || '';
+  if (!url || url === '#' || url === window.location.href) return;
   if (tg && typeof tg.openLink === 'function') tg.openLink(url);
   else window.open(url, '_blank', 'noopener');
   closeInviteModal();
+}
+
+// ── Invite polling ──────────────────────────────────────────────────────────
+let _invitePoller = null;
+
+async function checkPendingInvite() {
+  try {
+    const initData = getTelegramInitData();
+    if (!initData) return null;
+    const res = await fetch(`${API_BASE}/miniapp/check_invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData })
+    });
+    const data = await res.json();
+    return data.invite_link || null;
+  } catch(e) { return null; }
+}
+
+function startInvitePolling() {
+  if (_invitePoller) return;
+  let tries = 0;
+  _invitePoller = setInterval(async () => {
+    tries++;
+    if (tries > 72) { // 6 min max
+      clearInterval(_invitePoller); _invitePoller = null; return;
+    }
+    const link = await checkPendingInvite();
+    if (link) {
+      clearInterval(_invitePoller); _invitePoller = null;
+      updateCTAButtons();
+      openInviteModal(link);
+    }
+  }, 5000);
 }
 
 // ── Splash ──
@@ -5840,6 +5864,12 @@ if (tg) {
   try {
     await checkLanguageAndShowOverlay();
   } catch(e) { console.warn('[init] lang:', e); }
+
+  // Check for pending invite link (user returning after payment)
+  try {
+    const pendingLink = await checkPendingInvite();
+    if (pendingLink) setTimeout(() => openInviteModal(pendingLink), 800);
+  } catch(e) {}
 
   // ALWAYS hide splash — even if everything above crashed
   setTimeout(hideSplash, 300);
