@@ -2552,7 +2552,7 @@ body {
 
       <!-- Suggest an Artist -->
       <div style="padding:0 16px 16px">
-        <button onclick="openSuggestModal()" style="width:100%;background:linear-gradient(135deg,#C86BFF,#FF7EC8);border:none;border-radius:14px;padding:16px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(200,107,255,0.35);transition:all 0.15s">
+        <button onclick="openSuggestModal()" style="width:100%;background:linear-gradient(135deg,#C86BFF,#FF7EC8);border:none;border-radius:14px;padding:16px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(200,107,255,0.35)">
           💡 Suggest an Artist
         </button>
       </div>
@@ -3361,6 +3361,21 @@ function applyFavoritesBadges(count) {
   const ft = document.getElementById("favCountText");
   if (ft) ft.textContent = String(n);
 }
+
+function refreshFavoritesBadgesOnly() {
+  const initData = typeof getTelegramInitData === 'function' ? getTelegramInitData() : null;
+  if (!initData || !API_BASE) return;
+  fetch(`${API_BASE}/miniapp/favorites`, {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ initData }),
+  }).then(r => r.json()).then(data => {
+    if (data && typeof data.count === 'number') applyFavoritesBadges(data.count);
+  }).catch(() => {});
+}
+
+function closeFavAddModal() { const m = document.getElementById('favAddModal'); if (m) m.classList.remove('active'); }
+function submitAddFavorite() { closeFavAddModal(); }
+function openFavAddModal() { const m = document.getElementById('favAddModal'); if (m) m.classList.add('active'); }
 
 // ─── LIBRARY: Favorites + Playlists ──────────────────────────────────────────
 
@@ -4474,10 +4489,10 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
   const video = document.getElementById('vpVideo');
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
 
-  // Clear previous source properly
+  // Clear previous source
   video.pause();
   video.removeAttribute('src');
-  video.innerHTML = '';  // remove any <source> children
+  video.innerHTML = '';
   try { video.load(); } catch(_) {}
 
   // Use thumb as poster while loading
@@ -4487,123 +4502,63 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
   const isM3U8 = url.includes('.m3u8') || url.includes('/hls/');
   const nativeHls = video.canPlayType('application/vnd.apple.mpegurl') !== '';
   const isAndroid = /android/i.test(navigator.userAgent);
-  const isTgWebView = /Telegram/i.test(navigator.userAgent);
   const hlsAvailable = typeof Hls !== 'undefined' && Hls.isSupported();
 
-  console.log('[player] setup:', { isM3U8, nativeHls, isAndroid, isTgWebView, hlsAvailable, url: url.substring(0, 80) });
+  console.log('[player]', { isM3U8, nativeHls, isAndroid, hlsAvailable, url: url.substring(0, 80) });
 
-  // Show loading state
+  // Error overlay helper
   const vpWrap = video.parentElement;
-  let errOverlay = vpWrap.querySelector('.vp-error');
-  if (errOverlay) errOverlay.remove();
-
+  let errEl = vpWrap.querySelector('.vp-error');
+  if (errEl) errEl.remove();
   function showVideoError(msg) {
     let el = vpWrap.querySelector('.vp-error');
-    if (!el) {
-      el = document.createElement('div');
-      el.className = 'vp-error';
-      el.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);z-index:2;gap:12px;padding:20px;text-align:center';
-      vpWrap.appendChild(el);
-    }
-    el.innerHTML = `
-      <div style="font-size:32px">⚠️</div>
-      <div style="font-size:14px;color:var(--text)">${msg}</div>
-      <button onclick="window.open('${url.replace(/'/g,"\\'")}','_blank')" style="background:var(--pink);color:#000;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">
-        Open in Browser
-      </button>
-    `;
+    if (!el) { el = document.createElement('div'); el.className = 'vp-error'; el.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);z-index:2;gap:12px;padding:20px;text-align:center'; vpWrap.appendChild(el); }
+    el.innerHTML = '<div style="font-size:32px">⚠️</div><div style="font-size:14px;color:#fff">'+msg+'</div><button onclick="window.open(\''+url.replace(/'/g,"\\'")+'\',\'_blank\')" style="background:var(--pink);color:#000;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer">Open in Browser</button>';
   }
 
-  function tryPlay() {
-    const p = video.play();
-    if (p && p.catch) p.catch(err => {
-      console.log('[player] autoplay blocked:', err?.message);
-      // On Android, autoplay is often blocked — that's OK, user can tap play
-    });
-  }
+  function tryPlay() { video.play().catch(e => console.log('[player] autoplay blocked:', e?.message)); }
 
   if (isM3U8 && nativeHls && !isAndroid) {
-    // iOS Safari / macOS Safari — native HLS is best
-    console.log('[player] using native HLS (Safari)');
+    console.log('[player] native HLS (Safari)');
     video.src = url;
     tryPlay();
-
   } else if (isM3U8 && hlsAvailable) {
-    // Android + Desktop Chrome — hls.js via MSE
-    console.log('[player] using hls.js');
-
+    console.log('[player] hls.js');
     hlsInstance = new Hls({
       enableWorker: false,
       lowLatencyMode: false,
-      startLevel: -1,                 // auto quality
-      capLevelToPlayerSize: true,     // don't load 4K on a phone
+      startLevel: -1,
+      capLevelToPlayerSize: true,
       maxBufferLength: 15,
       maxMaxBufferLength: 30,
       manifestLoadingTimeOut: 20000,
-      levelLoadingTimeOut:    15000,
-      fragLoadingTimeOut:     25000,
-      fragLoadingMaxRetry:     6,
+      fragLoadingTimeOut: 25000,
+      fragLoadingMaxRetry: 6,
       manifestLoadingMaxRetry: 4,
-      levelLoadingMaxRetry:    4,
-      xhrSetup: function(xhr, xhrUrl) {
-        xhr.withCredentials = false;
-      },
+      xhrSetup: function(xhr) { xhr.withCredentials = false; },
     });
-
     let recoveryAttempts = 0;
-    const MAX_RECOVERY = 3;
-
-    hlsInstance.on(Hls.Events.MANIFEST_PARSED, (e, data) => {
-      console.log('[player] manifest parsed, levels:', data.levels?.length);
-      tryPlay();
-    });
-
-    hlsInstance.on(Hls.Events.ERROR, (event, data) => {
-      console.warn('[player] hls error:', data.type, data.details, data.fatal ? 'FATAL' : '', data.response?.code);
-
+    hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => { console.log('[player] manifest OK'); tryPlay(); });
+    hlsInstance.on(Hls.Events.ERROR, (ev, data) => {
+      console.warn('[player] hls err:', data.type, data.details, data.fatal);
       if (data.fatal) {
         recoveryAttempts++;
-        if (recoveryAttempts > MAX_RECOVERY) {
-          console.error('[player] max recovery attempts reached');
-          hlsInstance.destroy(); hlsInstance = null;
-          showVideoError('Video failed to load. Try opening in browser.');
-          return;
-        }
-
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-          console.log('[player] network error, retrying...');
-          setTimeout(() => hlsInstance?.startLoad(), 1000);
-        } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-          console.log('[player] media error, recovering...');
-          hlsInstance.recoverMediaError();
-        } else {
-          console.log('[player] fatal, trying direct src...');
-          hlsInstance.destroy(); hlsInstance = null;
-          // Last resort — try direct src (won't work on Chrome but might on some WebViews)
-          video.src = url;
-          tryPlay();
-        }
+        if (recoveryAttempts > 3) { hlsInstance.destroy(); hlsInstance = null; showVideoError('Video failed to load'); return; }
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) { setTimeout(() => hlsInstance?.startLoad(), 1000); }
+        else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) { hlsInstance.recoverMediaError(); }
+        else { hlsInstance.destroy(); hlsInstance = null; video.src = url; tryPlay(); }
       }
     });
-
-    // IMPORTANT: attachMedia BEFORE loadSource on some Android WebViews
     hlsInstance.attachMedia(video);
     hlsInstance.loadSource(url);
-
   } else if (isM3U8 && nativeHls) {
-    // Android with native HLS support (rare but possible)
-    console.log('[player] using native HLS (Android fallback)');
+    console.log('[player] native HLS (Android)');
     video.src = url;
     tryPlay();
-
   } else if (isM3U8) {
-    // HLS not supported at all — show error with external link
-    console.error('[player] HLS not supported in this browser');
-    showVideoError('Your browser doesn\'t support HLS video playback.');
-
+    showVideoError('HLS not supported in this browser');
   } else {
-    // Plain mp4 / webm
-    console.log('[player] using plain video src');
+    console.log('[player] plain src');
     video.src = url;
     tryPlay();
   }
@@ -4627,11 +4582,9 @@ function closeVideoPlayer() {
   const video = document.getElementById('vpVideo');
   video.pause();
   video.removeAttribute('src');
-  video.innerHTML = '';
   try { video.load(); } catch(_) {}
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   currentVideoId = null;
-  // Remove any error overlay
   const errEl = document.querySelector('.vp-error');
   if (errEl) errEl.remove();
 }
@@ -5423,39 +5376,45 @@ if (tg && tg.isVersionAtLeast('7.0')) {
   }
 
   // Render placeholders first
-  renderArtists();
-  renderArtistsGrid();
-  renderUpdates();
-  renderFAQ();
-  renderPricingCards();
-  renderPaymentMethods();
-  updateStatsBanner();
+  try {
+    renderArtists();
+    renderArtistsGrid();
+    renderUpdates();
+    renderFAQ();
+    renderPricingCards();
+    renderPaymentMethods();
+    updateStatsBanner();
+  } catch(e) { console.error('[init] render error:', e); }
 
   // Load data in parallel
-  await Promise.all([
-    initArtistsFromAPI(),
-    initTelegramWebAppUser(),
-    loadTagColors(),
-  ]);
+  try {
+    await Promise.all([
+      initArtistsFromAPI().catch(e => console.warn('[init] artists:', e)),
+      initTelegramWebAppUser().catch(e => console.warn('[init] TG user:', e)),
+      loadTagColors().catch(e => console.warn('[init] tags:', e)),
+    ]);
+  } catch(e) { console.error('[init] parallel load:', e); }
 
-  // Load videos separately to ensure proper rendering
-  await fetchVideosFromAPI();
+  try {
+    await fetchVideosFromAPI();
+  } catch(e) { console.warn('[init] videos:', e); }
   
-  // Re-render videos after loading from API - call both render functions
-  renderUpdates();
-  renderUpdatesGrid();
-  
-  // Update stats banner with videos count
-  const videosCount = allUpdates.length;
-  const updatesStats = document.getElementById('updatesStats');
-  if (updatesStats && videosCount > 0) {
-    updatesStats.textContent = `${videosCount} videos available`;
-  }
-  
-  updateCTAButtons();
-  await checkLanguageAndShowOverlay();
+  try {
+    renderUpdates();
+    renderUpdatesGrid();
+    const videosCount = allUpdates.length;
+    const updatesStats = document.getElementById('updatesStats');
+    if (updatesStats && videosCount > 0) {
+      updatesStats.textContent = `${videosCount} videos available`;
+    }
+    updateCTAButtons();
+  } catch(e) { console.warn('[init] CTA:', e); }
 
-  // Hide splash after everything is ready
+  try {
+    await checkLanguageAndShowOverlay();
+  } catch(e) { console.warn('[init] lang:', e); }
+
+  // ALWAYS hide splash — even if everything above crashed
   setTimeout(hideSplash, 300);
 })();
 </script>
