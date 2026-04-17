@@ -2923,7 +2923,7 @@ body {
   </div>
 
   <div class="video-wrap">
-    <video id="vpVideo" controls playsinline webkit-playsinline preload="auto"></video>
+    <video id="vpVideo" muted controls playsinline webkit-playsinline preload="auto"></video>
   </div>
 
   <div class="video-player-body">
@@ -4677,7 +4677,19 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
     el.innerHTML = '<div style="font-size:32px">⚠️</div><div style="font-size:14px;color:#fff">'+msg+'</div><button onclick="window.open(\''+url.replace(/'/g,"\\'")+'\',\'_blank\')" style="background:var(--pink);color:#000;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer">Open in Browser</button>';
   }
 
-  function tryPlay() { video.play().catch(e => console.log('[player] autoplay blocked:', e?.message)); }
+  function tryPlay() {
+    video.muted = true;  // Start muted to bypass Android autoplay block
+    const p = video.play();
+    if (p && p.then) {
+      p.then(() => {
+        // Playback started! Now try to unmute
+        console.log('[player] playing, attempting unmute...');
+        video.muted = false;
+      }).catch(e => {
+        console.log('[player] autoplay blocked:', e?.message);
+      });
+    }
+  }
 
   if (isM3U8 && nativeHls && !isAndroid) {
     console.log('[player] native HLS (Safari)');
@@ -4711,7 +4723,12 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
       }
     });
     hlsInstance.attachMedia(video);
-    hlsInstance.loadSource(url);
+
+    // Fix Android race condition: wait for media to actually attach before loading source
+    hlsInstance.on(Hls.Events.MEDIA_ATTACHED, function() {
+      console.log('[player] media attached, loading source...');
+      hlsInstance.loadSource(url);
+    });
   } else if (isM3U8 && nativeHls) {
     console.log('[player] native HLS (Android)');
     video.src = url;
