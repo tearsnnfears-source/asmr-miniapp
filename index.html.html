@@ -1064,6 +1064,74 @@ body {
 
 .profile-photo-item:active { opacity: 0.7; }
 
+/* ── PHOTO LIGHTBOX ── */
+.photo-lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.95);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+.photo-lightbox.active { display: flex; }
+
+.photo-lightbox-img {
+  max-width: 100%;
+  max-height: calc(100vh - 80px);
+  object-fit: contain;
+  border-radius: 6px;
+  user-select: none;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.photo-lightbox-img.fading { opacity: 0; }
+
+.photo-lightbox-counter {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 13px;
+  color: rgba(255,255,255,0.6);
+  letter-spacing: 0.5px;
+}
+.photo-lightbox-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.12);
+  border: none;
+  color: #fff;
+  font-size: 20px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.photo-lightbox-close:active { background: rgba(255,255,255,0.25); }
+
+.photo-lightbox-prev,
+.photo-lightbox-next {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.12);
+  border: none;
+  color: #fff;
+  font-size: 22px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.photo-lightbox-prev { left: 12px; }
+.photo-lightbox-next { right: 12px; }
+.photo-lightbox-prev:active,
+.photo-lightbox-next:active { background: rgba(255,255,255,0.25); }
+
 /* ── SEARCH ── */
 .search-bar {
   display: flex;
@@ -1638,6 +1706,14 @@ body {
 .vip-badge-profile {
   margin: 6px auto 12px;
 }
+
+/* ── Badge color variants ── */
+.badge-VIP     { background: linear-gradient(135deg, #CCFF00, #7DFF2E); color: #0E0E0F; }
+.badge-TESTER  { background: linear-gradient(135deg, #00E5FF, #0091EA); color: #0E0E0F; }
+.badge-OLD     { background: linear-gradient(135deg, #FFD740, #FF8F00); color: #0E0E0F; }
+.badge-FOUNDER { background: linear-gradient(135deg, #E040FB, #7B1FA2); color: #fff; }
+.badge-EARLY   { background: linear-gradient(135deg, #FF6D00, #FF3D00); color: #fff; }
+.badge-DONOR   { background: linear-gradient(135deg, #FF4081, #C51162); color: #fff; }
 
 .profile-stats {
   display: flex;
@@ -3103,6 +3179,7 @@ let currentUser = null;
 let serverDaysLeft = null;
 /** null until /miniapp/profile responds; then from show_subscribe_button */
 let serverShowSubscribe = null;
+let serverBadge = null;
 /** Flag to track if artists have been loaded from API */
 let artistsLoadedFromAPI = false;
 const API_BASE = window.__MINIAPP_API_BASE__ || "https://asmr-bot-production.up.railway.app";
@@ -3767,6 +3844,9 @@ async function initTelegramWebAppUser() {
         }
       }
     }
+    if (profile.badge !== undefined) {
+      serverBadge = profile.badge || null;
+    }
     if (profile.full_name) {
       const nameParts = profile.full_name.split(" ");
       currentUser = {
@@ -4313,6 +4393,7 @@ function buildTagBadge(tagName) {
 
 // ── Current artist video data (for filtering) ─────────────────────────────────
 let currentArtistVideos = [];
+let currentArtistPhotos = [];
 let currentArtistName   = '';
 let activeTagFilter     = '';
 
@@ -4349,13 +4430,14 @@ async function loadArtistProfileContent(name) {
     renderProfileVideos(currentArtistVideos, '');
 
     // Render photos
+    currentArtistPhotos = data.photos || [];
     const photoGrid = document.getElementById('profilePhotoGrid');
-    if (!data.photos || data.photos.length === 0) {
+    if (currentArtistPhotos.length === 0) {
       photoGrid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);grid-column:1/-1">No photos yet</div>';
     } else {
-      photoGrid.innerHTML = data.photos.map(p =>
+      photoGrid.innerHTML = currentArtistPhotos.map((p, i) =>
         `<div class="profile-photo-item" style="background-image:url('${p.url}')"
-              onclick="openPhotoUrl('${p.url.replace(/'/g,"\\'")}')" ></div>`
+              onclick="openPhotoLightbox(${i})" ></div>`
       ).join('');
     }
   } catch(e) {
@@ -4404,10 +4486,89 @@ function filterByTag(btn, tag) {
   renderProfileVideos(currentArtistVideos, tag);
 }
 
-function openPhotoUrl(url) {
+let lightboxIndex = 0;
+let lightboxSwipeStartX = 0;
+let lightboxSwipeStartY = 0;
+
+function openPhotoLightbox(index) {
+  if (!currentArtistPhotos.length) return;
+  lightboxIndex = index;
+  const lb = document.getElementById('photoLightbox');
+  lb.classList.add('active');
+  _lightboxRender();
+
   const tg = window.Telegram?.WebApp;
-  if (tg && typeof tg.openLink === 'function') tg.openLink(url);
-  else window.open(url, '_blank', 'noopener');
+  if (tg && typeof tg.BackButton !== 'undefined') {
+    tg.BackButton.show();
+    tg.BackButton.onClick(closeLightbox);
+  }
+
+  lb.addEventListener('touchstart', _lbTouchStart, { passive: true });
+  lb.addEventListener('touchend', _lbTouchEnd, { passive: true });
+  document.addEventListener('keydown', _lbKeyDown);
+}
+
+function closeLightbox() {
+  const lb = document.getElementById('photoLightbox');
+  lb.classList.remove('active');
+  lb.removeEventListener('touchstart', _lbTouchStart);
+  lb.removeEventListener('touchend', _lbTouchEnd);
+  document.removeEventListener('keydown', _lbKeyDown);
+
+  const tg = window.Telegram?.WebApp;
+  if (tg && typeof tg.BackButton !== 'undefined') {
+    tg.BackButton.hide();
+    tg.BackButton.offClick(closeLightbox);
+  }
+}
+
+function _lightboxRender(fade) {
+  const img = document.getElementById('lightboxImg');
+  const counter = document.getElementById('lightboxCounter');
+  const prev = document.getElementById('lightboxPrev');
+  const next = document.getElementById('lightboxNext');
+  const total = currentArtistPhotos.length;
+
+  counter.textContent = `${lightboxIndex + 1} / ${total}`;
+  prev.style.display = total > 1 ? '' : 'none';
+  next.style.display = total > 1 ? '' : 'none';
+
+  if (fade) {
+    img.classList.add('fading');
+    setTimeout(() => {
+      img.src = currentArtistPhotos[lightboxIndex].url;
+      img.classList.remove('fading');
+    }, 150);
+  } else {
+    img.src = currentArtistPhotos[lightboxIndex].url;
+  }
+}
+
+function lightboxNav(dir) {
+  const total = currentArtistPhotos.length;
+  lightboxIndex = (lightboxIndex + dir + total) % total;
+  _lightboxRender(true);
+}
+
+function _lbTouchStart(e) {
+  lightboxSwipeStartX = e.touches[0].clientX;
+  lightboxSwipeStartY = e.touches[0].clientY;
+}
+
+function _lbTouchEnd(e) {
+  const dx = e.changedTouches[0].clientX - lightboxSwipeStartX;
+  const dy = e.changedTouches[0].clientY - lightboxSwipeStartY;
+  if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+    lightboxNav(dx < 0 ? 1 : -1);
+  } else if (dy > 80) {
+    closeLightbox();
+  }
+}
+
+function _lbKeyDown(e) {
+  if (e.key === 'ArrowRight') lightboxNav(1);
+  else if (e.key === 'ArrowLeft') lightboxNav(-1);
+  else if (e.key === 'Escape') closeLightbox();
 }
 
 // ── Video Player ───────────────────────────────────────────────────────────────
@@ -4819,8 +4980,23 @@ function updateCTAButtons() {
     serverShowSubscribe === true ||
     (serverShowSubscribe === null && !hasAccess);
 
-  if (headerVipBadge) headerVipBadge.classList.toggle('show', isInfiniteSub);
-  if (profileVipBadge) profileVipBadge.classList.toggle('show', isInfiniteSub);
+  const BADGE_LABELS = { VIP: 'VIP ∞', TESTER: 'TESTER', OLD: 'OLD', FOUNDER: 'FOUNDER', EARLY: 'EARLY', DONOR: 'DONOR' };
+  const activeBadge = serverBadge || (isInfiniteSub ? 'VIP' : null);
+  const badgeLabel = activeBadge ? (BADGE_LABELS[activeBadge] || activeBadge) : '';
+
+  function _applyBadge(el) {
+    if (!el) return;
+    ['VIP','TESTER','OLD','FOUNDER','EARLY','DONOR'].forEach(b => el.classList.remove('badge-' + b));
+    if (activeBadge) {
+      el.textContent = badgeLabel;
+      el.classList.add('show', 'badge-' + activeBadge);
+    } else {
+      el.classList.remove('show');
+    }
+  }
+  _applyBadge(headerVipBadge);
+  _applyBadge(profileVipBadge);
+
   if (headerDaysLeft) headerDaysLeft.classList.toggle('infinity-value', isInfiniteSub);
   if (profileDaysLeft) profileDaysLeft.classList.toggle('infinity-value', isInfiniteSub);
 
@@ -5418,6 +5594,15 @@ if (tg && tg.isVersionAtLeast('7.0')) {
   setTimeout(hideSplash, 300);
 })();
 </script>
+
+<!-- ── PHOTO LIGHTBOX ── -->
+<div class="photo-lightbox" id="photoLightbox">
+  <span class="photo-lightbox-counter" id="lightboxCounter">1 / 1</span>
+  <button class="photo-lightbox-close" onclick="closeLightbox()">×</button>
+  <button class="photo-lightbox-prev" id="lightboxPrev" onclick="lightboxNav(-1)">‹</button>
+  <img class="photo-lightbox-img" id="lightboxImg" src="" alt="">
+  <button class="photo-lightbox-next" id="lightboxNext" onclick="lightboxNav(1)">›</button>
+</div>
 
 </body>
 </html>
