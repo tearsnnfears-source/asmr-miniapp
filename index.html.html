@@ -54,7 +54,7 @@ body {
 .header {
   background: var(--dark2);
   border-bottom: 1px solid var(--border);
-  padding: calc(20px + var(--tg-safe-area-inset-top, env(safe-area-inset-top, 0px))) 16px 16px;
+  padding: calc(6px + env(safe-area-inset-top, 0px)) 14px 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -557,6 +557,175 @@ body {
 }
 .av-load-more:active { opacity: 0.7; }
 .av-load-more.hidden { display: none; }
+
+/* ── AV header row ── */
+.av-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px 6px;
+  gap: 8px;
+}
+.av-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.av-title-group .av-big-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 1px;
+  color: var(--text);
+  white-space: nowrap;
+}
+.av-title-group .av-count {
+  font-size: 12px;
+  color: var(--lime);
+  font-weight: 600;
+}
+.av-tab-toggle {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.av-tab-btn {
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--dark3);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.av-tab-btn.active {
+  background: var(--lime);
+  border-color: var(--lime);
+  color: #0E0E0F;
+}
+.av-tab-btn.pro-tab { border-color: #00E5FF33; }
+.av-tab-btn.pro-tab.active { background: #00E5FF; border-color: #00E5FF; color: #0E0E0F; }
+
+/* ── Photo blur lock ── */
+.photos-lock-wrapper { position: relative; }
+.photos-lock-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(14,14,15,0.55);
+  backdrop-filter: blur(0px);
+  z-index: 5;
+  gap: 10px;
+  cursor: pointer;
+}
+.photos-lock-icon { font-size: 36px; }
+.photos-lock-text { font-size: 13px; font-weight: 600; color: #fff; }
+.photos-lock-btn {
+  background: linear-gradient(135deg,var(--lime),#B3E600);
+  color: #0E0E0F;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 20px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+.profile-photo-grid.blurred { filter: blur(10px); pointer-events: none; user-select: none; }
+
+/* ── VP toggles ── */
+.vp-toggle-btn {
+  background: var(--dark3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.vp-toggle-btn.on { background: var(--lime); border-color: var(--lime); color: #0E0E0F; }
+
+/* ── VP playlist queue ── */
+.vp-queue {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.vp-queue-title {
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.vp-queue-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.vp-queue-scroll::-webkit-scrollbar { display: none; }
+.vp-queue-item {
+  flex-shrink: 0;
+  width: 90px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+.vp-queue-item.current { opacity: 1; outline: 1.5px solid var(--lime); border-radius: 6px; }
+.vp-queue-item:hover { opacity: 1; }
+.vp-queue-thumb {
+  width: 90px;
+  height: 54px;
+  background: var(--dark3);
+  border-radius: 6px;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+.vp-queue-label {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── PRO gate modal ── */
+.pro-gate-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.pro-gate-modal.active { display: flex; }
+.pro-gate-content {
+  background: var(--dark2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 28px 24px;
+  text-align: center;
+  max-width: 320px;
+  width: 100%;
+}
 
 .update-card-title {
   font-size: 11px;
@@ -2428,13 +2597,13 @@ body {
   right: 0;
   background: var(--dark2);
   border-top: 1px solid var(--border);
-  padding: 10px 8px 18px;
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
   display: flex;
   align-items: center;
   justify-content: space-around;
   gap: 4px;
   z-index: 120;
-  min-height: 78px;
+  min-height: 52px;
 }
 
 .footer-btn {
@@ -2462,7 +2631,7 @@ body {
 }
 
 .footer-btn-icon {
-  font-size: 24px;
+  font-size: 20px;
   line-height: 1;
   display: flex;
   align-items: center;
@@ -2732,23 +2901,22 @@ body {
 
 <div class="page" id="page-updates">
   <div class="search-bar">
-    <input
-      type="text"
-      class="search-input"
-      id="updatesSearch"
-      placeholder="Search videos..."
-      oninput="avSearchInput(this.value)"
-    >
+    <input type="text" class="search-input" id="updatesSearch" placeholder="Search videos..."
+      oninput="avSearchInput(this.value)">
     <button class="search-clear" id="updatesSearchClear" onclick="avClearSearch()">✕</button>
   </div>
   <div class="page-scroll">
-    <div class="page-title-section">
-      <div class="page-title">All <span>Videos</span></div>
-      <div class="page-title-stats" id="updatesStats" style="font-size:16px;color:var(--lime);margin-top:8px;font-weight:600"></div>
+    <div class="av-header-row">
+      <div class="av-title-group">
+        <span class="av-big-title">ALL <span style="color:var(--pink)">VIDEOS</span></span>
+        <span class="av-count" id="updatesStats"></span>
+      </div>
+      <div class="av-tab-toggle">
+        <button class="av-tab-btn active" id="avTabVideos" onclick="avSwitchTab('videos')">Videos</button>
+        <button class="av-tab-btn pro-tab" id="avTabVods" onclick="avSwitchTab('vods')">VODs & Backups ⚡</button>
+      </div>
     </div>
-    <!-- Artist filter chips -->
     <div class="av-filter-bar" id="avArtistFilter"></div>
-    <!-- Tag filter chips -->
     <div class="av-filter-bar" id="avTagFilter" style="display:none;padding-top:0"></div>
     <div class="updates-grid" id="updatesGrid"></div>
     <button class="av-load-more hidden" id="avLoadMore" onclick="avLoadMore()">Load more…</button>
@@ -3024,9 +3192,19 @@ body {
     <video id="vpVideo" muted controls playsinline webkit-playsinline preload="auto"></video>
   </div>
 
+  <!-- Playlist queue (shown when opened from playlist) -->
+  <div class="vp-queue" id="vpQueue" style="display:none">
+    <div class="vp-queue-title">Up next</div>
+    <div class="vp-queue-scroll" id="vpQueueScroll"></div>
+  </div>
+
   <div class="video-player-body">
     <div class="video-player-info">
-      <div class="video-player-info-title" id="vpInfoTitle"></div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+        <div class="video-player-info-title" id="vpInfoTitle" style="flex:1;min-width:0"></div>
+        <button id="vpReplayBtn" class="vp-toggle-btn" onclick="toggleVpReplay()">⟳ Replay</button>
+        <button id="vpAutoplayBtn" class="vp-toggle-btn" onclick="toggleVpAutoplay()" style="display:none">▷▷ Auto</button>
+      </div>
       <div class="video-player-info-tags" id="vpInfoTags"></div>
       <div style="display:flex;gap:10px;margin-top:10px">
         <button id="vpFavBtn" onclick="toggleVideoFavorite()" style="flex:1;background:var(--dark3);border:1px solid var(--border);border-radius:10px;padding:10px;font-size:14px;font-weight:500;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all 0.15s;font-family:'DM Sans',sans-serif">
@@ -3278,6 +3456,18 @@ let serverDaysLeft = null;
 /** null until /miniapp/profile responds; then from show_subscribe_button */
 let serverShowSubscribe = null;
 let serverBadges = [];
+let serverTier = 'plus';  // 'plus' | 'pro' | 'elite'
+
+// ── Video player playlist state ────────────────────────────────────────────
+let currentVpPlaylist = [];     // [{id,url,title,artist,tags,thumbnailUrl}]
+let currentVpPlaylistIdx = -1;
+let vpAutoplay = false;
+let vpLoop = false;
+let _lastPlaylistItems = [];    // raw items from openPlaylistDetail
+
+function hasProAccess() {
+  return serverTier === 'pro' || serverTier === 'elite';
+}
 /** Flag to track if artists have been loaded from API */
 let artistsLoadedFromAPI = false;
 const API_BASE = window.__MINIAPP_API_BASE__ || "https://asmr-bot-production.up.railway.app";
@@ -3380,10 +3570,13 @@ function _avCardHtml(v) {
 function _avFiltered() {
   const q = avSearch.toLowerCase();
   return avAllVideos.filter(v => {
+    const vtags = (v.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+    const isVod = vtags.some(t => AV_VOD_TAGS.has(t));
+    if (avMode === 'vods' && !isVod) return false;
+    if (avMode === 'videos' && isVod) return false;
     if (q && !v.title.toLowerCase().includes(q) && !(v.artistName||'').toLowerCase().includes(q)) return false;
     if (avArtist && v.artistName !== avArtist) return false;
     if (avTag) {
-      const vtags = (v.tags || '').split(',').map(t => t.trim()).filter(Boolean);
       if (!vtags.includes(avTag)) return false;
     }
     return true;
@@ -3410,6 +3603,38 @@ function avSetTag(name) {
   avPage = 0;
   _avBuildTagFilter();
   _avRender(false);
+}
+
+// ── AV mode: 'videos' | 'vods' ──────────────────────────────────────────────
+let avMode = 'videos';
+const AV_VOD_TAGS = new Set(['VOD', 'YTBACKUP']);
+
+function avSwitchTab(mode) {
+  if (mode === 'vods' && !hasProAccess()) {
+    showProGateModal();
+    return;
+  }
+  avMode = mode;
+  avPage = 0; avSearch = ''; avArtist = ''; avTag = '';
+  document.getElementById('updatesSearch').value = '';
+  document.getElementById('updatesSearchClear')?.classList.remove('active');
+  document.getElementById('avTabVideos')?.classList.toggle('active', mode === 'videos');
+  document.getElementById('avTabVods')?.classList.toggle('active', mode === 'vods');
+  _avBuildArtistFilter();
+  _avBuildTagFilter();
+  _avRender(false);
+}
+
+// ── PRO gate ────────────────────────────────────────────────────────────────
+function showProGateModal() {
+  document.getElementById('proGateModal').classList.add('active');
+}
+function closeProGateModal() {
+  document.getElementById('proGateModal').classList.remove('active');
+}
+function proGateUpgrade() {
+  closeProGateModal();
+  openPage('payment');
 }
 
 function _avRender(append) {
@@ -3465,9 +3690,11 @@ function renderUpdatesGrid() {
 
 async function showUpdatesPage() {
   openPage('updates');
-  avPage = 0; avSearch = ''; avArtist = ''; avTag = '';
+  avPage = 0; avSearch = ''; avArtist = ''; avTag = ''; avMode = 'videos';
   document.getElementById('updatesSearch').value = '';
   document.getElementById('updatesSearchClear')?.classList.remove('active');
+  document.getElementById('avTabVideos')?.classList.add('active');
+  document.getElementById('avTabVods')?.classList.remove('active');
   await _avEnsureLoaded();
   _avBuildArtistFilter();
   _avBuildTagFilter();
@@ -3823,17 +4050,22 @@ async function openPlaylistDetail(plId, plName) {
     const data = await res.json();
     if (!data.items || data.items.length === 0) {
       items.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">Empty playlist</div>';
+      _lastPlaylistItems = [];
       return;
     }
-    items.innerHTML = data.items.map(v => {
-      const thumb = v.thumbnail_url || '';
+    _lastPlaylistItems = data.items.map(v => ({
+      id: v.id, url: v.url || '', title: v.title || 'Video',
+      artist: v.artist_name || '', tags: v.tags || '', thumbnailUrl: v.thumbnail_url || ''
+    }));
+    items.innerHTML = _lastPlaylistItems.map((v, idx) => {
+      const thumb = v.thumbnailUrl;
       const cardStyle = thumb ? `style="--thumb:url('${thumb.replace(/'/g, "\\'")}')"` : '';
-      const tags = (v.tags||'').split(',').filter(Boolean).map(t => buildTagBadge(t.trim())).join('');
+      const tags = v.tags.split(',').filter(Boolean).map(t => buildTagBadge(t.trim())).join('');
       return `
-        <div class="profile-video-card" ${cardStyle} onclick="openVideoPlayer(${v.id},'${(v.url||'').replace(/'/g,"\\'")}','${(v.title||'').replace(/'/g,"\\'")}','${(v.artist_name||'').replace(/'/g,"\\'")}','${(v.tags||'').replace(/'/g,"\\'")}','${thumb.replace(/'/g,"\\'")}')">
+        <div class="profile-video-card" ${cardStyle} onclick="openVideoPlayerInPlaylist(_lastPlaylistItems, ${idx})">
           <div class="profile-video-icon">▶</div>
           <div class="profile-video-info">
-            <div class="profile-video-title">${escapeHtml(v.title||'Video')}</div>
+            <div class="profile-video-title">${escapeHtml(v.title)}</div>
             ${tags ? '<div class="profile-video-tags">'+tags+'</div>' : ''}
           </div>
           <button onclick="event.stopPropagation();removeFromPlaylist(${v.id})" style="background:none;border:none;color:var(--muted);font-size:14px;padding:4px;cursor:pointer">✕</button>
@@ -4030,6 +4262,7 @@ async function initTelegramWebAppUser() {
     } else if (profile.badge) {
       serverBadges = profile.badge.split(',').map(s => s.trim()).filter(Boolean);
     }
+    if (profile.tier) serverTier = profile.tier;
     if (profile.full_name) {
       const nameParts = profile.full_name.split(" ");
       currentUser = {
@@ -4615,13 +4848,31 @@ async function loadArtistProfileContent(name) {
     // Render photos
     currentArtistPhotos = data.photos || [];
     const photoGrid = document.getElementById('profilePhotoGrid');
+    const photosWrapper = photoGrid.parentElement;
+    // Remove old lock overlay if present
+    photosWrapper.querySelectorAll('.photos-lock-overlay').forEach(el => el.remove());
+    photosWrapper.classList.remove('photos-lock-wrapper');
+
     if (currentArtistPhotos.length === 0) {
       photoGrid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);grid-column:1/-1">No photos yet</div>';
     } else {
       photoGrid.innerHTML = currentArtistPhotos.map((p, i) =>
         `<div class="profile-photo-item" style="background-image:url('${p.url}')"
-              onclick="openPhotoLightbox(${i})" ></div>`
+              onclick="${hasVideoAccess() ? `openPhotoLightbox(${i})` : 'paywallSubscribe()'}" ></div>`
       ).join('');
+      if (!hasVideoAccess()) {
+        photoGrid.classList.add('blurred');
+        photosWrapper.classList.add('photos-lock-wrapper');
+        const overlay = document.createElement('div');
+        overlay.className = 'photos-lock-overlay';
+        overlay.onclick = paywallSubscribe;
+        overlay.innerHTML = `<div class="photos-lock-icon">🔒</div>
+          <div class="photos-lock-text">Subscribe to unlock photos</div>
+          <button class="photos-lock-btn" onclick="event.stopPropagation();paywallSubscribe()">Subscribe Now</button>`;
+        photosWrapper.appendChild(overlay);
+      } else {
+        photoGrid.classList.remove('blurred');
+      }
     }
   } catch(e) {
     document.getElementById('profileVideosList').innerHTML =
@@ -4927,6 +5178,15 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
     tryPlay();
   }
 
+  // Autoplay-next / replay on video end
+  video.onended = function() {
+    if (vpLoop) return; // video.loop already handles it natively
+    if (vpAutoplay && currentVpPlaylist.length && currentVpPlaylistIdx >= 0) {
+      const next = currentVpPlaylistIdx + 1;
+      if (next < currentVpPlaylist.length) _vpPlayIdx(next);
+    }
+  };
+
   // Load reactions & comments
   document.getElementById('vpReactions').innerHTML = '<div style="color:var(--muted);font-size:13px;padding:4px 0">Loading reactions…</div>';
   document.getElementById('vpCommentsList').innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px 0;text-align:center">Loading…</div>';
@@ -4945,12 +5205,70 @@ function closeVideoPlayer() {
   overlay.classList.remove('active');
   const video = document.getElementById('vpVideo');
   video.pause();
+  video.onended = null;
+  video.loop = false;
   video.removeAttribute('src');
   try { video.load(); } catch(_) {}
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   currentVideoId = null;
   const errEl = document.querySelector('.vp-error');
   if (errEl) errEl.remove();
+  // Reset playlist state
+  currentVpPlaylist = [];
+  currentVpPlaylistIdx = -1;
+  vpLoop = false;
+  vpAutoplay = false;
+  document.getElementById('vpQueue').style.display = 'none';
+  document.getElementById('vpReplayBtn').classList.remove('on');
+  document.getElementById('vpAutoplayBtn').classList.remove('on');
+  document.getElementById('vpAutoplayBtn').style.display = 'none';
+}
+
+function toggleVpReplay() {
+  vpLoop = !vpLoop;
+  const video = document.getElementById('vpVideo');
+  video.loop = vpLoop;
+  document.getElementById('vpReplayBtn').classList.toggle('on', vpLoop);
+}
+
+function toggleVpAutoplay() {
+  vpAutoplay = !vpAutoplay;
+  document.getElementById('vpAutoplayBtn').classList.toggle('on', vpAutoplay);
+}
+
+function openVideoPlayerInPlaylist(items, idx) {
+  currentVpPlaylist = items;
+  currentVpPlaylistIdx = idx;
+  const item = items[idx];
+  openVideoPlayer(item.id, item.url, item.title, item.artist, item.tags, item.thumbnailUrl);
+  _renderVpQueue();
+  document.getElementById('vpAutoplayBtn').style.display = 'inline-flex';
+}
+
+function _vpPlayIdx(idx) {
+  if (idx < 0 || idx >= currentVpPlaylist.length) return;
+  currentVpPlaylistIdx = idx;
+  const item = currentVpPlaylist[idx];
+  openVideoPlayer(item.id, item.url, item.title, item.artist, item.tags, item.thumbnailUrl);
+  _renderVpQueue();
+  document.getElementById('vpAutoplayBtn').style.display = 'inline-flex';
+}
+
+function _renderVpQueue() {
+  const queue = document.getElementById('vpQueue');
+  const scroll = document.getElementById('vpQueueScroll');
+  if (!currentVpPlaylist.length) { queue.style.display = 'none'; return; }
+  queue.style.display = 'block';
+  scroll.innerHTML = currentVpPlaylist.map((item, i) => {
+    const isCurrent = i === currentVpPlaylistIdx;
+    const thumb = item.thumbnailUrl ? `url('${item.thumbnailUrl.replace(/'/g,"\\'")}')` : 'none';
+    return `<div class="vp-queue-item${isCurrent ? ' current' : ''}" onclick="_vpPlayIdx(${i})">
+      <div class="vp-queue-thumb" style="background-image:${thumb}"></div>
+      <div class="vp-queue-label">${escapeHtml(item.title || 'Video')}</div>
+    </div>`;
+  }).join('');
+  const currentEl = scroll.children[currentVpPlaylistIdx];
+  if (currentEl) currentEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 }
 
 // ── Reactions ─────────────────────────────────────────────────────────────────
@@ -5875,6 +6193,31 @@ if (tg) {
   setTimeout(hideSplash, 300);
 })();
 </script>
+
+<!-- ── PRO GATE MODAL ── -->
+<div class="pro-gate-modal" id="proGateModal">
+  <div class="pro-gate-content">
+    <div style="font-size:44px;margin-bottom:10px">⚡</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px;margin-bottom:8px">PRO <span style="color:#00E5FF">Required</span></div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:20px">
+      VODs & YouTube Backups are available for <b style="color:#00E5FF">PRO</b> subscribers.<br>
+      Upgrade for €8/month and get everything.
+    </div>
+    <button onclick="proGateUpgrade()" style="width:100%;background:linear-gradient(135deg,#00E5FF,#0097A7);color:#0E0E0F;border:none;border-radius:14px;padding:14px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px">
+      ⚡ Upgrade to PRO
+    </button>
+    <button onclick="closeProGateModal()" style="background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;padding:6px;font-family:'DM Sans',sans-serif">
+      Maybe later
+    </button>
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase">Also coming soon</div>
+      <div style="background:var(--dark3);border:1px solid var(--border);border-radius:12px;padding:12px;opacity:0.6">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--pink)">ELITE</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Access to privateleaks.tv · Coming soon</div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ── PHOTO LIGHTBOX ── -->
 <div class="photo-lightbox" id="photoLightbox">
