@@ -676,16 +676,23 @@ body {
   text-transform: uppercase;
 }
 .vp-queue-toggle {
-  background: none;
-  border: none;
+  background: var(--dark3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
-  padding: 0 2px;
-  line-height: 1;
-  transition: transform 0.2s;
+  padding: 3px 10px;
+  line-height: 1.4;
+  letter-spacing: 0.3px;
+  transition: background 0.15s, color 0.15s, transform 0.2s;
+  font-family: 'DM Sans', sans-serif;
 }
-.vp-queue-toggle.collapsed { transform: rotate(180deg); }
+.vp-queue-toggle:hover { background: var(--border); color: var(--text); }
+.vp-queue-toggle.collapsed { transform: none; }
+.vp-queue-toggle.collapsed::after { content: ' ↓'; }
+.vp-queue-toggle:not(.collapsed)::after { content: ' ↑'; }
 .vp-queue-scroll {
   display: flex;
   gap: 8px;
@@ -988,7 +995,7 @@ body {
   background-image: var(--thumb);
   background-size: cover;
   background-position: center;
-  filter: blur(8px) saturate(1.3) brightness(0.75);
+  filter: brightness(0.75);
   z-index: 0;
 }
 
@@ -3368,7 +3375,7 @@ body {
   <div class="vp-queue" id="vpQueue" style="display:none">
     <div class="vp-queue-title-row">
       <span class="vp-queue-title">Up next</span>
-      <button class="vp-queue-toggle" id="vpQueueToggle" onclick="toggleVpQueue()" title="Hide queue">︿</button>
+      <button class="vp-queue-toggle" id="vpQueueToggle" onclick="toggleVpQueue()">Queue</button>
     </div>
     <div class="vp-queue-scroll" id="vpQueueScroll"></div>
   </div>
