@@ -988,7 +988,7 @@ body {
   background-image: var(--thumb);
   background-size: cover;
   background-position: center;
-  filter: blur(24px) saturate(1.3) brightness(0.7);
+  filter: blur(8px) saturate(1.3) brightness(0.75);
   z-index: 0;
 }
 
@@ -3219,7 +3219,7 @@ body {
       <div class="tier-card tier-card-plus selected" id="tierPlus" onclick="selectTier('plus')">
         <div class="tier-selected-dot"></div>
         <div class="tier-card-name">PLUS</div>
-        <div class="tier-card-price">€5 <span>/ month</span></div>
+        <div class="tier-card-price">€6 <span>/ month</span></div>
         <div class="tier-card-features">
           <div class="tier-feature">✅ <span><b>All ASMR videos</b></span></div>
           <div class="tier-feature">✅ <span><b>Photo galleries</b></span></div>
@@ -3276,7 +3276,7 @@ body {
     <div style="padding:0 16px 24px" id="stylishSubscribeBtn">
       <button onclick="openPaymentLink()" id="tierSubscribeBtn" style="width:100%;border:none;border-radius:16px;padding:18px 20px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 8px 32px rgba(255,126,200,0.4);background:linear-gradient(135deg, #FF7EC8, #C86BFF);color:#FFFFFF;transition:all 0.2s;">
         <span style="font-size:20px">🚀</span>
-        <span id="tierSubscribeBtnText">Subscribe — PLUS €5/mo</span>
+        <span id="tierSubscribeBtnText">Subscribe — PLUS €6/mo</span>
       </button>
     </div>
   </div>
@@ -5893,14 +5893,17 @@ function selectTier(tier) {
   const btnText = document.getElementById('tierSubscribeBtnText');
   const btn = document.getElementById('tierSubscribeBtn');
   if (tier === 'plus') {
-    if (btnText) btnText.textContent = 'Subscribe — PLUS €5/mo';
-    if (btn) btn.style.background = 'linear-gradient(135deg, #FF7EC8, #C86BFF)';
-    if (btn) btn.style.boxShadow = '0 8px 32px rgba(255,126,200,0.4)';
+    if (btnText) btnText.textContent = 'Subscribe — PLUS €6/mo';
+    if (btn) { btn.style.background = 'linear-gradient(135deg, #FF7EC8, #C86BFF)'; btn.style.boxShadow = '0 8px 32px rgba(255,126,200,0.4)'; }
+    // Update plan card to PLUS price
+    plans[0] = { ...plans[0], price: '€6', per: '€0.20/day' };
   } else if (tier === 'pro') {
     if (btnText) btnText.textContent = 'Subscribe — PRO €8/mo';
-    if (btn) btn.style.background = 'linear-gradient(135deg, #00B8D4, #0097A7)';
-    if (btn) btn.style.boxShadow = '0 8px 32px rgba(0,229,255,0.3)';
+    if (btn) { btn.style.background = 'linear-gradient(135deg, #00B8D4, #0097A7)'; btn.style.boxShadow = '0 8px 32px rgba(0,229,255,0.3)'; }
+    // Update plan card to PRO price
+    plans[0] = { ...plans[0], price: '€8', per: '€0.27/day' };
   }
+  renderPricingCards();
 }
 
 async function openPaymentLink() {
