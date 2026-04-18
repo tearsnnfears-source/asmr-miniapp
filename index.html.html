@@ -3610,7 +3610,7 @@ let vpLoop = false;
 let _lastPlaylistItems = [];    // raw items from openPlaylistDetail
 
 function hasProAccess() {
-  return serverTier === 'pro' || serverTier === 'elite';
+  return hasVideoAccess() && (serverTier === 'pro' || serverTier === 'elite');
 }
 /** Flag to track if artists have been loaded from API */
 let artistsLoadedFromAPI = false;
@@ -4407,6 +4407,8 @@ async function initTelegramWebAppUser() {
       serverBadges = profile.badge.split(',').map(s => s.trim()).filter(Boolean);
     }
     if (profile.tier) serverTier = profile.tier;
+    if (profile.tribute_plus_url) PAYMENT_URLS.tributePlus = profile.tribute_plus_url;
+    if (profile.tribute_pro_url)  PAYMENT_URLS.tributePro  = profile.tribute_pro_url;
     if (profile.full_name) {
       const nameParts = profile.full_name.split(" ");
       currentUser = {
@@ -5810,8 +5812,9 @@ async function confirmTrial() {
 
 // Payment URLs from bot config
 const PAYMENT_URLS = {
-  tribute: 'https://t.me/tribute/app?startapp=sQSn',
-  // For YooMoney/SBP, we'll call the API
+  tribute:     'https://t.me/tribute/app?startapp=sQSn',
+  tributePlus: 'https://t.me/tribute/app?startapp=sQSn',
+  tributePro:  'https://t.me/tribute/app?startapp=sT5D',
 };
 
 let promoApplied = false;
@@ -5927,7 +5930,7 @@ async function openPaymentLink() {
   switch(selectedMethod) {
     case 0: // Card via Tribute
     case 2: // SBP via Tribute
-      paymentUrl = PAYMENT_URLS.tribute;
+      paymentUrl = selectedTier === 'pro' ? PAYMENT_URLS.tributePro : PAYMENT_URLS.tributePlus;
       if (tg && typeof tg.openLink === 'function') tg.openLink(paymentUrl);
       else window.open(paymentUrl, '_blank', 'noopener');
       openPage('home');
