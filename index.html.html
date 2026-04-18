@@ -802,6 +802,19 @@ body {
   box-shadow: 0 0 8px rgba(68, 200, 255, 0.6);
 }
 
+.artist-mini-tag-ready {
+  background: rgba(0, 200, 120, 0.95);
+  color: #ffffff;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 0 8px rgba(0, 230, 130, 0.7);
+  animation: readyPulse 2s ease-in-out infinite;
+}
+
+@keyframes readyPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(0, 230, 130, 0.7); }
+  50% { box-shadow: 0 0 14px rgba(0, 230, 130, 1); }
+}
+
 /* ── ARTIST PROFILE PAGE ── */
 .artist-profile-page {
   position: fixed;
@@ -2803,6 +2816,11 @@ body {
   color: white;
 }
 
+.artist-tag-ready {
+  background: linear-gradient(135deg, #00e887, #00b865);
+  color: white;
+}
+
 .artist-tag-prom {
   background: linear-gradient(135deg, #FFD93D, #F59E0B);
   color: #1E1E20;
@@ -4552,6 +4570,7 @@ async function initArtistsFromAPI() {
         if (artist.tag_hot !== undefined) artistProfiles[targetName].tag_hot = artist.tag_hot;
         if (artist.tag_new !== undefined) artistProfiles[targetName].tag_new = artist.tag_new;
         if (artist.tag_prom !== undefined) artistProfiles[targetName].tag_prom = artist.tag_prom;
+        if (artist.tag_ready !== undefined) artistProfiles[targetName].tag_ready = artist.tag_ready;
         // Update topic_url and has_profile
         if (artist.topic_url !== undefined) artistProfiles[targetName].topic_url = artist.topic_url || null;
         if (artist.has_profile !== undefined) artistProfiles[targetName].has_profile = !!artist.has_profile;
@@ -4569,7 +4588,8 @@ async function initArtistsFromAPI() {
           videos: artist.videos || 0,
           tag_hot: artist.tag_hot || false,
           tag_new: artist.tag_new || false,
-          tag_prom: artist.tag_prom || false
+          tag_prom: artist.tag_prom || false,
+          tag_ready: artist.tag_ready || false
         };
         added++;
       }
@@ -4625,17 +4645,13 @@ function getHomeArtistTagsHtml(name) {
   const profile = artistProfiles[name];
   if (!profile) return '';
   
-  // Force convert to boolean to handle string "true" from API
-  const isHot = !!profile.tag_hot || profile.tag_hot === 'true';
-  const isNew = !!profile.tag_new || profile.tag_new === 'true';
-  
-  if (isHot) {
-    return '<div class="artist-mini-tag artist-mini-tag-hot">HOT</div>';
-  }
-  if (isNew) {
-    return '<div class="artist-mini-tag artist-mini-tag-new">NEW</div>';
-  }
-  
+  const isReady = !!profile.tag_ready || profile.tag_ready === 'true';
+  const isHot   = !!profile.tag_hot   || profile.tag_hot   === 'true';
+  const isNew   = !!profile.tag_new   || profile.tag_new   === 'true';
+
+  if (isReady) return '<div class="artist-mini-tag artist-mini-tag-ready">✅ READY</div>';
+  if (isHot)   return '<div class="artist-mini-tag artist-mini-tag-hot">HOT</div>';
+  if (isNew)   return '<div class="artist-mini-tag artist-mini-tag-new">NEW</div>';
   return '';
 }
 
@@ -4646,17 +4662,13 @@ function getArtistTagsHtml(name) {
   
   let tagsHtml = '';
   
-  // Force convert to boolean to handle string "true" from API
-  const isHot = !!profile.tag_hot || profile.tag_hot === 'true';
-  const isNew = !!profile.tag_new || profile.tag_new === 'true';
-  
-  if (isHot) {
-    tagsHtml += '<div class="artist-tag artist-tag-hot">🔥 HOT</div>';
-  }
-  if (isNew) {
-    tagsHtml += '<div class="artist-tag artist-tag-new">✨ NEW</div>';
-  }
-  
+  const isReady = !!profile.tag_ready || profile.tag_ready === 'true';
+  const isHot   = !!profile.tag_hot   || profile.tag_hot   === 'true';
+  const isNew   = !!profile.tag_new   || profile.tag_new   === 'true';
+
+  if (isReady) tagsHtml += '<div class="artist-tag artist-tag-ready">✅ READY</div>';
+  if (isHot)   tagsHtml += '<div class="artist-tag artist-tag-hot">🔥 HOT</div>';
+  if (isNew)   tagsHtml += '<div class="artist-tag artist-tag-new">✨ NEW</div>';
   return tagsHtml;
 }
 
@@ -4664,12 +4676,15 @@ function getArtistTagsHtml(name) {
 function getArtistPromPriority(name) {
   const profile = artistProfiles[name];
   if (!profile) return 0;
-  const isProm = !!profile.tag_prom || profile.tag_prom === 'true';
-  const isNew = !!profile.tag_new || profile.tag_new === 'true';
-  const isHot = !!profile.tag_hot || profile.tag_hot === 'true';
-  
+  const isReady = !!profile.tag_ready || profile.tag_ready === 'true';
+  const isProm  = !!profile.tag_prom  || profile.tag_prom  === 'true';
+  const isNew   = !!profile.tag_new   || profile.tag_new   === 'true';
+  const isHot   = !!profile.tag_hot   || profile.tag_hot   === 'true';
+
+  if (isReady) return 4; // READY always first on home page
+
   if (!isProm) return 0;
-  
+
   // Priority: NEW+Prom > HOT+Prom > Just Prom
   if (isNew && isProm) return 3;
   if (isHot && isProm) return 2;
@@ -4710,10 +4725,12 @@ function renderArtists() {
 function getArtistTagPriority(name) {
   const profile = artistProfiles[name];
   if (!profile) return 0;
-  const isNew = !!profile.tag_new || profile.tag_new === 'true';
-  const isHot = !!profile.tag_hot || profile.tag_hot === 'true';
-  if (isNew) return 2;  // NEW highest priority
-  if (isHot) return 1;  // HOT second priority
+  const isReady = !!profile.tag_ready || profile.tag_ready === 'true';
+  const isNew   = !!profile.tag_new   || profile.tag_new   === 'true';
+  const isHot   = !!profile.tag_hot   || profile.tag_hot   === 'true';
+  if (isReady) return 3; // READY — absolute top
+  if (isNew)   return 2;
+  if (isHot)   return 1;
   return 0;
 }
 
