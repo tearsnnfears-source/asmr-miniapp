@@ -563,26 +563,28 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px 6px;
-  gap: 8px;
+  padding: 8px 16px 4px;
+  gap: 6px;
 }
 .av-title-group {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
+  flex-shrink: 0;
 }
 .av-title-group .av-big-title {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: 22px;
+  font-size: 20px;
   letter-spacing: 1px;
   color: var(--text);
   white-space: nowrap;
 }
 .av-title-group .av-count {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--lime);
   font-weight: 600;
+  white-space: nowrap;
 }
 .av-tab-toggle {
   display: flex;
@@ -590,9 +592,9 @@ body {
   flex-shrink: 0;
 }
 .av-tab-btn {
-  padding: 5px 10px;
+  padding: 4px 8px;
   border-radius: 20px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   background: var(--dark3);
   border: 1px solid var(--border);
@@ -637,7 +639,7 @@ body {
   cursor: pointer;
   font-family: 'DM Sans', sans-serif;
 }
-.profile-photo-grid.blurred { filter: blur(10px); pointer-events: none; user-select: none; }
+.profile-photo-grid.blurred { filter: blur(3px); pointer-events: none; user-select: none; }
 
 /* ── VP toggles ── */
 .vp-toggle-btn {
@@ -657,8 +659,14 @@ body {
 
 /* ── VP playlist queue ── */
 .vp-queue {
-  padding: 8px 12px;
+  padding: 6px 12px 8px;
   border-bottom: 1px solid var(--border);
+}
+.vp-queue-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
 }
 .vp-queue-title {
   font-size: 10px;
@@ -666,8 +674,18 @@ body {
   font-weight: 600;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  margin-bottom: 8px;
 }
+.vp-queue-toggle {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+.vp-queue-toggle.collapsed { transform: rotate(180deg); }
 .vp-queue-scroll {
   display: flex;
   gap: 8px;
@@ -1649,11 +1667,94 @@ body {
 }
 
 /* ── PAYMENT PAGE STYLES ── */
-.pay-plans { 
-  padding: 16px; 
-  display: flex; 
-  flex-direction: column; 
-  gap: 10px; 
+/* ── Tier cards ── */
+.tier-scroll-wrap {
+  padding: 12px 16px 4px;
+  overflow-x: auto;
+  display: flex;
+  gap: 12px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.tier-scroll-wrap::-webkit-scrollbar { display: none; }
+.tier-card {
+  flex: 0 0 200px;
+  scroll-snap-align: start;
+  border-radius: 20px;
+  padding: 18px 16px 16px;
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  border: 2px solid transparent;
+  background: var(--dark2);
+}
+.tier-card.selected { transform: translateY(-3px); }
+.tier-card-plus { background: linear-gradient(145deg,#1a0d1f,#260d1a); border-color: rgba(255,126,200,0.35); }
+.tier-card-plus.selected { border-color: var(--pink); box-shadow: 0 8px 28px rgba(255,126,200,0.3); }
+.tier-card-pro { background: linear-gradient(145deg,#091820,#0d1f26); border-color: rgba(0,229,255,0.25); }
+.tier-card-pro.selected { border-color: #00E5FF; box-shadow: 0 8px 28px rgba(0,229,255,0.25); }
+.tier-card-elite { background: linear-gradient(145deg,#1a1508,#261d08); border-color: rgba(255,215,0,0.2); opacity: 0.7; cursor: default; }
+.tier-card-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 26px;
+  letter-spacing: 2px;
+  margin-bottom: 2px;
+}
+.tier-card-plus .tier-card-name { color: var(--pink); }
+.tier-card-pro .tier-card-name { color: #00E5FF; }
+.tier-card-elite .tier-card-name { color: #FFD700; }
+.tier-card-price {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 14px;
+}
+.tier-card-price span { font-size: 11px; color: var(--muted); font-weight: 400; }
+.tier-card-features {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tier-feature {
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  line-height: 1.3;
+}
+.tier-feature b { color: var(--text); font-weight: 500; }
+.tier-soon-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(255,215,0,0.15);
+  border: 1px solid rgba(255,215,0,0.35);
+  color: #FFD700;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+.tier-selected-dot {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--pink);
+  display: none;
+}
+.tier-card-plus.selected .tier-selected-dot { display: block; }
+.tier-card-pro.selected .tier-selected-dot { display: block; background: #00E5FF; }
+
+.pay-plans {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .plan-card-m {
@@ -2913,7 +3014,7 @@ body {
       </div>
       <div class="av-tab-toggle">
         <button class="av-tab-btn active" id="avTabVideos" onclick="avSwitchTab('videos')">Videos</button>
-        <button class="av-tab-btn pro-tab" id="avTabVods" onclick="avSwitchTab('vods')">VODs & Backups ⚡</button>
+        <button class="av-tab-btn pro-tab" id="avTabVods" onclick="avSwitchTab('vods')">VODs ⚡</button>
       </div>
     </div>
     <div class="av-filter-bar" id="avArtistFilter"></div>
@@ -3107,12 +3208,52 @@ body {
 
 <div class="page" id="page-payment">
   <div class="page-scroll">
-    <div style="padding:20px 16px 8px;text-align:center">
-      <div id="paymentTitle" style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1.5px;margin-bottom:6px">Choose <span style="color:var(--pink)">Plan</span></div>
-      <div id="paymentSubtitle" style="font-size:13px;color:var(--muted);font-weight:300">Cancel anytime · No auto-renewal</div>
+    <div style="padding:20px 16px 6px;text-align:center">
+      <div id="paymentTitle" style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1.5px;margin-bottom:4px">Choose <span style="color:var(--pink)">Plan</span></div>
+      <div id="paymentSubtitle" style="font-size:12px;color:var(--muted);font-weight:300">Cancel anytime · No auto-renewal</div>
     </div>
-    
-    <div style="background:rgba(200,255,68,0.07);border:1px solid rgba(200,255,68,0.18);border-radius:12px;margin:0 16px 16px;padding:10px 14px;display:flex;align-items:center;gap:10px">
+
+    <!-- Tier cards horizontal scroll -->
+    <div class="tier-scroll-wrap" id="tierScrollWrap">
+      <!-- PLUS -->
+      <div class="tier-card tier-card-plus selected" id="tierPlus" onclick="selectTier('plus')">
+        <div class="tier-selected-dot"></div>
+        <div class="tier-card-name">PLUS</div>
+        <div class="tier-card-price">€5 <span>/ month</span></div>
+        <div class="tier-card-features">
+          <div class="tier-feature">✅ <span><b>All ASMR videos</b></span></div>
+          <div class="tier-feature">✅ <span><b>Photo galleries</b></span></div>
+          <div class="tier-feature">✅ <span><b>Favorites & playlists</b></span></div>
+          <div class="tier-feature">✅ <span><b>Reactions & comments</b></span></div>
+        </div>
+      </div>
+      <!-- PRO -->
+      <div class="tier-card tier-card-pro" id="tierPro" onclick="selectTier('pro')">
+        <div class="tier-selected-dot"></div>
+        <div class="tier-card-name">PRO</div>
+        <div class="tier-card-price">€8 <span>/ month</span></div>
+        <div class="tier-card-features">
+          <div class="tier-feature">✅ <span><b>Everything in PLUS</b></span></div>
+          <div class="tier-feature">✅ <span><b>VODs & stream backups</b></span></div>
+          <div class="tier-feature">✅ <span><b>Early access content</b></span></div>
+          <div class="tier-feature">✅ <span><b>PRO badge</b></span></div>
+        </div>
+      </div>
+      <!-- ELITE -->
+      <div class="tier-card tier-card-elite" id="tierElite">
+        <div class="tier-soon-badge">SOON</div>
+        <div class="tier-card-name">ELITE</div>
+        <div class="tier-card-price" style="color:rgba(255,215,0,0.6)">privateleaks.tv</div>
+        <div class="tier-card-features">
+          <div class="tier-feature">✅ <span><b>Everything in PRO</b></span></div>
+          <div class="tier-feature">✅ <span><b>Exclusive leak content</b></span></div>
+          <div class="tier-feature">✅ <span><b>Private live streams</b></span></div>
+          <div class="tier-feature">✅ <span><b>ELITE badge</b></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:rgba(200,255,68,0.07);border:1px solid rgba(200,255,68,0.18);border-radius:12px;margin:10px 16px 14px;padding:10px 14px;display:flex;align-items:center;gap:10px">
       <span style="font-size:18px">🎁</span>
       <span style="font-size:12px;color:var(--lime)">New? Try <strong>3 days free</strong> — no payment needed</span>
     </div>
@@ -3133,9 +3274,9 @@ body {
     </div>
 
     <div style="padding:0 16px 24px" id="stylishSubscribeBtn">
-      <button onclick="openPaymentLink()" style="width:100%;border:none;border-radius:16px;padding:18px 20px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 8px 32px rgba(255,126,200,0.4);background:linear-gradient(135deg, #FF7EC8, #C86BFF);color:#FFFFFF;transition:all 0.2s;transform:scale(1);">
+      <button onclick="openPaymentLink()" id="tierSubscribeBtn" style="width:100%;border:none;border-radius:16px;padding:18px 20px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 8px 32px rgba(255,126,200,0.4);background:linear-gradient(135deg, #FF7EC8, #C86BFF);color:#FFFFFF;transition:all 0.2s;">
         <span style="font-size:20px">🚀</span>
-        <span>Subscribe Now</span>
+        <span id="tierSubscribeBtnText">Subscribe — PLUS €5/mo</span>
       </button>
     </div>
   </div>
@@ -3194,7 +3335,10 @@ body {
 
   <!-- Playlist queue (shown when opened from playlist) -->
   <div class="vp-queue" id="vpQueue" style="display:none">
-    <div class="vp-queue-title">Up next</div>
+    <div class="vp-queue-title-row">
+      <span class="vp-queue-title">Up next</span>
+      <button class="vp-queue-toggle" id="vpQueueToggle" onclick="toggleVpQueue()" title="Hide queue">︿</button>
+    </div>
     <div class="vp-queue-scroll" id="vpQueueScroll"></div>
   </div>
 
@@ -5254,9 +5398,23 @@ function _vpPlayIdx(idx) {
   document.getElementById('vpAutoplayBtn').style.display = 'inline-flex';
 }
 
+let vpQueueCollapsed = false;
+
+function toggleVpQueue() {
+  vpQueueCollapsed = !vpQueueCollapsed;
+  const scroll = document.getElementById('vpQueueScroll');
+  const btn = document.getElementById('vpQueueToggle');
+  scroll.style.display = vpQueueCollapsed ? 'none' : 'flex';
+  btn.classList.toggle('collapsed', vpQueueCollapsed);
+}
+
 function _renderVpQueue() {
+  vpQueueCollapsed = false;
   const queue = document.getElementById('vpQueue');
   const scroll = document.getElementById('vpQueueScroll');
+  const btn = document.getElementById('vpQueueToggle');
+  if (btn) { btn.classList.remove('collapsed'); }
+  scroll.style.display = 'flex';
   if (!currentVpPlaylist.length) { queue.style.display = 'none'; return; }
   queue.style.display = 'block';
   scroll.innerHTML = currentVpPlaylist.map((item, i) => {
@@ -5722,6 +5880,27 @@ function processPayStarsLocally(days) {
   serverShowSubscribe = false;
   updateCTAButtons();
   openPage('home');
+}
+
+// ── Tier selection ────────────────────────────────────────────────────────
+let selectedTier = 'plus';
+
+function selectTier(tier) {
+  if (tier === 'elite') return; // SOON
+  selectedTier = tier;
+  document.getElementById('tierPlus')?.classList.toggle('selected', tier === 'plus');
+  document.getElementById('tierPro')?.classList.toggle('selected', tier === 'pro');
+  const btnText = document.getElementById('tierSubscribeBtnText');
+  const btn = document.getElementById('tierSubscribeBtn');
+  if (tier === 'plus') {
+    if (btnText) btnText.textContent = 'Subscribe — PLUS €5/mo';
+    if (btn) btn.style.background = 'linear-gradient(135deg, #FF7EC8, #C86BFF)';
+    if (btn) btn.style.boxShadow = '0 8px 32px rgba(255,126,200,0.4)';
+  } else if (tier === 'pro') {
+    if (btnText) btnText.textContent = 'Subscribe — PRO €8/mo';
+    if (btn) btn.style.background = 'linear-gradient(135deg, #00B8D4, #0097A7)';
+    if (btn) btn.style.boxShadow = '0 8px 32px rgba(0,229,255,0.3)';
+  }
 }
 
 async function openPaymentLink() {
