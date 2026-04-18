@@ -5954,14 +5954,15 @@ function selectTierCarousel(idx) {
   selectedTier = _tierOrder[idx];
   const btnText = document.getElementById('tierSubscribeBtnText');
   const btn     = document.getElementById('tierSubscribeBtn');
+  const _starsPrices = { plus: 500, pro: 650, elite: 800 };
   if (selectedTier === 'plus') {
     if (btnText) btnText.textContent = 'Subscribe — PLUS €6/mo';
     if (btn) { btn.style.background = 'linear-gradient(135deg,#FF7EC8,#C86BFF)'; btn.style.boxShadow = '0 8px 32px rgba(255,126,200,0.4)'; }
-    plans[0] = { ...plans[0], price: '€6', per: '€0.20/day' };
+    plans[0] = { ...plans[0], price: '€6', per: `€0.20/day · ⭐ ${_starsPrices.plus} Stars` };
   } else {
     if (btnText) btnText.textContent = 'Subscribe — PRO €8/mo';
     if (btn) { btn.style.background = 'linear-gradient(135deg,#00B8D4,#0097A7)'; btn.style.boxShadow = '0 8px 32px rgba(0,229,255,0.3)'; }
-    plans[0] = { ...plans[0], price: '€8', per: '€0.27/day' };
+    plans[0] = { ...plans[0], price: '€8', per: `€0.27/day · ⭐ ${_starsPrices.pro} Stars` };
   }
   renderPricingCards();
 }
@@ -6005,7 +6006,7 @@ async function openPaymentLink() {
         const res = await fetch(`${API_BASE}/miniapp/create_stars_invoice`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ initData, days: plan.days })
+          body: JSON.stringify({ initData, days: plan.days, tier: selectedTier })
         });
         const data = await res.json().catch(() => ({}));
 
