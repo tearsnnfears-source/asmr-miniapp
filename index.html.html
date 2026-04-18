@@ -1667,33 +1667,57 @@ body {
 }
 
 /* ── PAYMENT PAGE STYLES ── */
-/* ── Tier cards ── */
-.tier-scroll-wrap {
-  padding: 12px 16px 4px;
-  overflow-x: auto;
+/* ── Tier carousel ── */
+.tier-carousel-wrap {
+  overflow: hidden;
+  padding: 16px 0 4px;
+  position: relative;
+}
+.tier-carousel-track {
   display: flex;
   gap: 12px;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
+  transition: transform 0.42s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: transform;
+  padding: 10px 0 14px;
 }
-.tier-scroll-wrap::-webkit-scrollbar { display: none; }
+.tier-carousel-dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 0 0 6px;
+}
+.tier-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+  cursor: pointer;
+  transition: all 0.25s;
+  flex-shrink: 0;
+}
+.tier-dot.active { width: 18px; border-radius: 3px; }
 .tier-card {
-  flex: 0 0 200px;
-  scroll-snap-align: start;
+  flex: 0 0 72%;
+  max-width: 260px;
   border-radius: 20px;
   padding: 18px 16px 16px;
   position: relative;
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
   border: 2px solid transparent;
   background: var(--dark2);
+  transition: transform 0.42s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              opacity 0.42s, box-shadow 0.42s;
+  transform: scale(0.82) translateY(6px);
+  opacity: 0.5;
 }
-.tier-card.selected { transform: translateY(-3px); }
+.tier-card.carousel-active {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
 .tier-card-plus { background: linear-gradient(145deg,#1a0d1f,#260d1a); border-color: rgba(255,126,200,0.35); }
-.tier-card-plus.selected { border-color: var(--pink); box-shadow: 0 8px 28px rgba(255,126,200,0.3); }
+.tier-card-plus.carousel-active { border-color: var(--pink); box-shadow: 0 10px 32px rgba(255,126,200,0.35); }
 .tier-card-pro { background: linear-gradient(145deg,#091820,#0d1f26); border-color: rgba(0,229,255,0.25); }
-.tier-card-pro.selected { border-color: #00E5FF; box-shadow: 0 8px 28px rgba(0,229,255,0.25); }
+.tier-card-pro.carousel-active { border-color: #00E5FF; box-shadow: 0 10px 32px rgba(0,229,255,0.3); }
 .tier-card-elite { background: linear-gradient(145deg,#1a1508,#261d08); border-color: rgba(255,215,0,0.2); opacity: 0.7; cursor: default; }
 .tier-card-name {
   font-family: 'Bebas Neue', sans-serif;
@@ -1740,15 +1764,14 @@ body {
 }
 .tier-selected-dot {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 12px; right: 12px;
   width: 10px; height: 10px;
   border-radius: 50%;
   background: var(--pink);
   display: none;
 }
-.tier-card-plus.selected .tier-selected-dot { display: block; }
-.tier-card-pro.selected .tier-selected-dot { display: block; background: #00E5FF; }
+.tier-card-plus.carousel-active .tier-selected-dot { display: block; }
+.tier-card-pro.carousel-active .tier-selected-dot { display: block; background: #00E5FF; }
 
 .pay-plans {
   padding: 16px;
@@ -3213,43 +3236,50 @@ body {
       <div id="paymentSubtitle" style="font-size:12px;color:var(--muted);font-weight:300">Cancel anytime · No auto-renewal</div>
     </div>
 
-    <!-- Tier cards horizontal scroll -->
-    <div class="tier-scroll-wrap" id="tierScrollWrap">
-      <!-- PLUS -->
-      <div class="tier-card tier-card-plus selected" id="tierPlus" onclick="selectTier('plus')">
-        <div class="tier-selected-dot"></div>
-        <div class="tier-card-name">PLUS</div>
-        <div class="tier-card-price">€6 <span>/ month</span></div>
-        <div class="tier-card-features">
-          <div class="tier-feature">✅ <span><b>All ASMR videos</b></span></div>
-          <div class="tier-feature">✅ <span><b>Photo galleries</b></span></div>
-          <div class="tier-feature">✅ <span><b>Favorites & playlists</b></span></div>
-          <div class="tier-feature">✅ <span><b>Reactions & comments</b></span></div>
+    <!-- Tier carousel -->
+    <div class="tier-carousel-wrap" id="tierCarouselWrap">
+      <div class="tier-carousel-track" id="tierCarouselTrack">
+        <!-- PLUS -->
+        <div class="tier-card tier-card-plus carousel-active" id="tierPlus" onclick="selectTierCarousel(0)">
+          <div class="tier-selected-dot"></div>
+          <div class="tier-card-name">PLUS</div>
+          <div class="tier-card-price">€6 <span>/ month</span></div>
+          <div class="tier-card-features">
+            <div class="tier-feature">✅ <span><b>All ASMR videos</b></span></div>
+            <div class="tier-feature">✅ <span><b>Photo galleries</b></span></div>
+            <div class="tier-feature">✅ <span><b>Favorites & playlists</b></span></div>
+            <div class="tier-feature">✅ <span><b>Reactions & comments</b></span></div>
+          </div>
+        </div>
+        <!-- PRO -->
+        <div class="tier-card tier-card-pro" id="tierPro" onclick="selectTierCarousel(1)">
+          <div class="tier-selected-dot"></div>
+          <div class="tier-card-name">PRO</div>
+          <div class="tier-card-price">€8 <span>/ month</span></div>
+          <div class="tier-card-features">
+            <div class="tier-feature">✅ <span><b>Everything in PLUS</b></span></div>
+            <div class="tier-feature">✅ <span><b>VODs & stream backups</b></span></div>
+            <div class="tier-feature">✅ <span><b>Early access content</b></span></div>
+            <div class="tier-feature">✅ <span><b>PRO badge</b></span></div>
+          </div>
+        </div>
+        <!-- ELITE -->
+        <div class="tier-card tier-card-elite" id="tierElite" onclick="selectTierCarousel(2)">
+          <div class="tier-soon-badge">SOON</div>
+          <div class="tier-card-name">ELITE</div>
+          <div class="tier-card-price" style="color:rgba(255,215,0,0.6)">privateleaks.tv</div>
+          <div class="tier-card-features">
+            <div class="tier-feature">✅ <span><b>Everything in PRO</b></span></div>
+            <div class="tier-feature">✅ <span><b>Exclusive leak content</b></span></div>
+            <div class="tier-feature">✅ <span><b>Private live streams</b></span></div>
+            <div class="tier-feature">✅ <span><b>ELITE badge</b></span></div>
+          </div>
         </div>
       </div>
-      <!-- PRO -->
-      <div class="tier-card tier-card-pro" id="tierPro" onclick="selectTier('pro')">
-        <div class="tier-selected-dot"></div>
-        <div class="tier-card-name">PRO</div>
-        <div class="tier-card-price">€8 <span>/ month</span></div>
-        <div class="tier-card-features">
-          <div class="tier-feature">✅ <span><b>Everything in PLUS</b></span></div>
-          <div class="tier-feature">✅ <span><b>VODs & stream backups</b></span></div>
-          <div class="tier-feature">✅ <span><b>Early access content</b></span></div>
-          <div class="tier-feature">✅ <span><b>PRO badge</b></span></div>
-        </div>
-      </div>
-      <!-- ELITE -->
-      <div class="tier-card tier-card-elite" id="tierElite">
-        <div class="tier-soon-badge">SOON</div>
-        <div class="tier-card-name">ELITE</div>
-        <div class="tier-card-price" style="color:rgba(255,215,0,0.6)">privateleaks.tv</div>
-        <div class="tier-card-features">
-          <div class="tier-feature">✅ <span><b>Everything in PRO</b></span></div>
-          <div class="tier-feature">✅ <span><b>Exclusive leak content</b></span></div>
-          <div class="tier-feature">✅ <span><b>Private live streams</b></span></div>
-          <div class="tier-feature">✅ <span><b>ELITE badge</b></span></div>
-        </div>
+      <div class="tier-carousel-dots">
+        <span class="tier-dot active" id="tierDot0" onclick="selectTierCarousel(0)"></span>
+        <span class="tier-dot" id="tierDot1" onclick="selectTierCarousel(1)"></span>
+        <span class="tier-dot" id="tierDot2" onclick="selectTierCarousel(2)"></span>
       </div>
     </div>
 
@@ -4871,6 +4901,7 @@ function openPage(page) {
   document.querySelectorAll('.footer-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`footer-${page}`)?.classList.add('active');
   if (page === 'favorites') loadFavorites();
+  if (page === 'payment') initTierCarousel();
   if (page === 'artists' && allArtists.length > 0) {
     renderArtistsGrid();
     updateStatsBanner();
@@ -5885,28 +5916,58 @@ function processPayStarsLocally(days) {
   openPage('home');
 }
 
-// ── Tier selection ────────────────────────────────────────────────────────
+// ── Tier carousel ─────────────────────────────────────────────────────────
 let selectedTier = 'plus';
+let tierCarouselIdx = 0;
+const _tierOrder = ['plus', 'pro', 'elite'];
+const _tierDotColors = ['#FF7EC8', '#00E5FF', '#FFD700'];
 
-function selectTier(tier) {
-  if (tier === 'elite') return; // SOON
-  selectedTier = tier;
-  document.getElementById('tierPlus')?.classList.toggle('selected', tier === 'plus');
-  document.getElementById('tierPro')?.classList.toggle('selected', tier === 'pro');
+function selectTierCarousel(idx) {
+  tierCarouselIdx = idx;
+  const track = document.getElementById('tierCarouselTrack');
+  const wrap  = document.getElementById('tierCarouselWrap');
+  const cards = track?.querySelectorAll('.tier-card');
+  if (!track || !wrap || !cards?.length) return;
+
+  // Compute offset to center the selected card
+  const cardW = cards[0].offsetWidth;
+  const gap   = 12;
+  const offset = wrap.offsetWidth / 2 - cardW / 2 - idx * (cardW + gap);
+  track.style.transform = `translateX(${offset}px)`;
+
+  // Active state on cards
+  cards.forEach((c, i) => {
+    c.classList.toggle('carousel-active', i === idx);
+  });
+
+  // Dots
+  for (let i = 0; i < 3; i++) {
+    const dot = document.getElementById(`tierDot${i}`);
+    if (!dot) continue;
+    dot.classList.toggle('active', i === idx);
+    dot.style.background = i === idx ? _tierDotColors[i] : '';
+  }
+
+  // ELITE is SOON — show as viewed but don't update payment
+  if (idx === 2) return;
+
+  selectedTier = _tierOrder[idx];
   const btnText = document.getElementById('tierSubscribeBtnText');
-  const btn = document.getElementById('tierSubscribeBtn');
-  if (tier === 'plus') {
+  const btn     = document.getElementById('tierSubscribeBtn');
+  if (selectedTier === 'plus') {
     if (btnText) btnText.textContent = 'Subscribe — PLUS €6/mo';
-    if (btn) { btn.style.background = 'linear-gradient(135deg, #FF7EC8, #C86BFF)'; btn.style.boxShadow = '0 8px 32px rgba(255,126,200,0.4)'; }
-    // Update plan card to PLUS price
+    if (btn) { btn.style.background = 'linear-gradient(135deg,#FF7EC8,#C86BFF)'; btn.style.boxShadow = '0 8px 32px rgba(255,126,200,0.4)'; }
     plans[0] = { ...plans[0], price: '€6', per: '€0.20/day' };
-  } else if (tier === 'pro') {
+  } else {
     if (btnText) btnText.textContent = 'Subscribe — PRO €8/mo';
-    if (btn) { btn.style.background = 'linear-gradient(135deg, #00B8D4, #0097A7)'; btn.style.boxShadow = '0 8px 32px rgba(0,229,255,0.3)'; }
-    // Update plan card to PRO price
+    if (btn) { btn.style.background = 'linear-gradient(135deg,#00B8D4,#0097A7)'; btn.style.boxShadow = '0 8px 32px rgba(0,229,255,0.3)'; }
     plans[0] = { ...plans[0], price: '€8', per: '€0.27/day' };
   }
   renderPricingCards();
+}
+
+function initTierCarousel() {
+  requestAnimationFrame(() => selectTierCarousel(tierCarouselIdx));
 }
 
 async function openPaymentLink() {
