@@ -752,6 +752,52 @@ body {
   width: 100%;
 }
 
+/* ── Crypto modal ── */
+.crypto-modal {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.75);
+  z-index: 1000; display: none;
+  align-items: flex-end; justify-content: center;
+}
+.crypto-modal.active { display: flex; }
+.crypto-sheet {
+  background: var(--dark2);
+  border: 1px solid var(--border);
+  border-radius: 24px 24px 0 0;
+  padding: 20px 20px 36px;
+  width: 100%; max-width: 480px;
+}
+.crypto-sheet-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px; letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+.crypto-method-btn {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--dark3); border: 1px solid var(--border);
+  border-radius: 14px; padding: 14px 16px;
+  cursor: pointer; width: 100%; margin-bottom: 10px;
+  transition: border-color 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.crypto-method-btn.selected { border-color: var(--lime); }
+.crypto-method-icon { font-size: 22px; }
+.crypto-method-name { font-size: 14px; font-weight: 600; color: var(--text); text-align: left; }
+.crypto-method-desc { font-size: 11px; color: var(--muted); text-align: left; }
+.crypto-address-box {
+  background: var(--dark3); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 14px; margin: 12px 0;
+  font-size: 11px; word-break: break-all; color: var(--text);
+  font-family: monospace;
+}
+.crypto-tx-input {
+  width: 100%; background: var(--dark3); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 14px; color: var(--text);
+  font-size: 13px; font-family: 'DM Sans', sans-serif; box-sizing: border-box;
+  outline: none; margin-bottom: 10px;
+}
+.crypto-tx-input:focus { border-color: rgba(200,255,68,0.4); }
+
 .update-card-title {
   font-size: 11px;
   font-weight: 500;
@@ -3014,7 +3060,7 @@ body {
           💳 Subscribe Now
         </button>
         <button class="btn btn-secondary" id="freeBtnMain" onclick="openTrialModal()">
-          🎁 Try 3 Days Free
+          🎁 Try 5 Days Free
         </button>
         <button class="btn btn-favorites hidden" id="favoritesBtnMain" onclick="openPage('favorites')">
           ⭐ My Favorites
@@ -3035,6 +3081,13 @@ body {
           <button class="see-all-btn" onclick="showUpdatesPage()">See all →</button>
         </div>
         <div class="updates-scroll" id="updatesScroll"></div>
+      </div>
+
+      <div id="shortsSection" style="display:none">
+        <div class="section-header">
+          <div class="section-title">⚡ Shorts</div>
+        </div>
+        <div class="updates-scroll" id="shortsScroll"></div>
       </div>
 
       <!-- Suggest an Artist -->
@@ -3311,7 +3364,7 @@ body {
 
     <div style="background:rgba(200,255,68,0.07);border:1px solid rgba(200,255,68,0.18);border-radius:12px;margin:10px 16px 14px;padding:10px 14px;display:flex;align-items:center;gap:10px">
       <span style="font-size:18px">🎁</span>
-      <span style="font-size:12px;color:var(--lime)">New? Try <strong>3 days free</strong> — no payment needed</span>
+      <span style="font-size:12px;color:var(--lime)">New? Try <strong>5 days free</strong> — no payment needed</span>
     </div>
 
     <div class="pay-plans" id="payPlans"></div>
@@ -3354,6 +3407,7 @@ body {
   <!-- Tabs -->
   <div class="profile-tabs">
     <button class="profile-tab active" id="tab-videos" onclick="switchProfileTab('videos')">📹 Videos</button>
+    <button class="profile-tab" id="tab-shorts" onclick="switchProfileTab('shorts')">⚡ Shorts</button>
     <button class="profile-tab" id="tab-photos" onclick="switchProfileTab('photos')">🖼 Photos</button>
   </div>
 
@@ -3366,6 +3420,11 @@ body {
   <div class="profile-content-area">
     <div id="profileVideosTab">
       <div id="profileVideosList" class="profile-videos-list">
+        <div style="text-align:center;padding:40px;color:var(--muted)">Loading...</div>
+      </div>
+    </div>
+    <div id="profileShortsTab" style="display:none">
+      <div id="profileShortsList" class="profile-videos-list">
         <div style="text-align:center;padding:40px;color:var(--muted)">Loading...</div>
       </div>
     </div>
@@ -3498,7 +3557,7 @@ body {
 
     <button id="paywallTrialBtn" onclick="paywallTrial()"
       style="width:100%;background:transparent;color:var(--lime);border:1px solid rgba(204,255,0,0.4);border-radius:14px;padding:13px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;display:none;align-items:center;justify-content:center;gap:6px">
-      🎁 Try 3 Days Free
+      🎁 Try 5 Days Free
     </button>
   </div>
 </div>
@@ -3521,11 +3580,11 @@ body {
     <button class="modal-close" onclick="closeTrialModal()">×</button>
     <div class="modal-title">Try <span>Free</span></div>
     <div style="background:rgba(200,255,68,0.1);border:1px solid rgba(200,255,68,0.2);border-radius:14px;padding:16px;margin-bottom:16px;text-align:center">
-      <div style="font-size:14px;font-weight:500;margin-bottom:4px">🎁 3 Days Completely Free</div>
+      <div style="font-size:14px;font-weight:500;margin-bottom:4px">🎁 5 Days Completely Free</div>
       <div style="font-size:11px;color:var(--muted)">No payment method required • Cancel anytime</div>
     </div>
     <button class="btn-primary" onclick="confirmTrial()" style="width:100%;background:linear-gradient(135deg, #CCFF00, #B3E600);color:#0E0E0F;border:none;border-radius:14px;padding:15px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(204,255,0,0.3);">
-      🎁 Get 3 Days Free
+      🎁 Get 5 Days Free
     </button>
   </div>
 </div>
@@ -3633,19 +3692,19 @@ const PLACEHOLDER_ARTIST_PHOTO = 'https://placehold.co/500x600/1E1E20/8A8A8A?tex
 const faqs = [
   { q: 'How do I access the group?', a: "After subscribing, you'll receive an invite link automatically. Just click it to join." },
   { q: 'Does it auto-renew?', a: 'Yes! Your subscription will automatically renew on the day it expires. You can cancel anytime.' },
-  { q: 'Can I try for free?', a: 'Yes! New users get 3 free days. Just tap "Try Free" in the main menu.' },
+  { q: 'Can I try for free?', a: 'Yes! New users get 5 free days. Just tap "Try Free" in the main menu.' },
   { q: 'I paid but no access?', a: 'Contact support — we usually fix it within minutes.' },
 ];
 
 const plans = [
-  { name: '1 Month', price: '€6', per: '€0.20/day', days: 30, save: null, featured: true, soon: false },
+  { name: '1 Month', price: '€6', per: '€0.20/day', days: 31, save: null, featured: true, soon: false },
 ];
 
 const methods = [
   { icon:'💳', name:'Card', desc:'via Tribute' },
   { icon:'⭐', name:'TG Stars', desc:'Telegram Stars' },
   { icon:'🏦', name:'СБП', desc:'Russian banks' },
-  { icon:'₿', name:'Crypto', desc:'Coming soon', soon:true },
+  { icon:'₿', name:'Crypto', desc:'USDT · TON · ETH', soon:false, crypto:true },
 ];
 
 let selectedPlan = 0;
@@ -3738,6 +3797,32 @@ function renderUpdates() {
   scroll.innerHTML = allUpdates.slice(0, 5).map(_updateMiniCardHtml).join('');
 }
 
+// ── Home Shorts strip ─────────────────────────────────────────────────────────
+async function loadHomeShorts() {
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/shorts?limit=20`);
+    const data = await res.json();
+    const shorts = data.shorts || [];
+    const section = document.getElementById('shortsSection');
+    const scroll = document.getElementById('shortsScroll');
+    if (!shorts.length || !scroll) { if (section) section.style.display = 'none'; return; }
+    if (section) section.style.display = 'block';
+    scroll.innerHTML = shorts.map(s => {
+      const bg = s.thumbnail_url ? `style="background-image:url('${s.thumbnail_url.replace(/'/g,"\\'")}')"` : '';
+      return `<div class="update-card" onclick="openVideoPlayer(${s.id},'${(s.url||'').replace(/'/g,"\\'")}','${(s.title||'').replace(/'/g,"\\'")}','${(s.artist_name||'').replace(/'/g,"\\'")}','${(s.tags||'').replace(/'/g,"\\'")}','${(s.thumbnail_url||'').replace(/'/g,"\\'")}')">
+        <div class="update-card-thumb" ${bg}>
+          <div class="update-play-btn"></div>
+          <div style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.7);border-radius:4px;padding:2px 6px;font-size:9px;font-weight:700;color:#C8FF44;letter-spacing:0.5px">⚡ SHORT</div>
+        </div>
+        <div class="update-card-info">
+          <div class="update-card-title">${escapeHtml(s.title||'Short')}</div>
+          <div class="update-card-date">${s.artist_name||''}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { console.warn('[shorts]', e); }
+}
+
 // ── All Videos page state ─────────────────────────────────────────────────────
 let avPage = 0;
 const AV_PAGE_SIZE = 20;
@@ -3826,6 +3911,68 @@ function avSwitchTab(mode) {
 }
 
 // ── PRO gate ────────────────────────────────────────────────────────────────
+// ── Crypto payment ────────────────────────────────────────────────────────────
+let _cryptoOrderUuid = null;
+let _cryptoAddress   = null;
+
+function openCryptoModal() {
+  document.getElementById('cryptoStep1').style.display = 'block';
+  document.getElementById('cryptoStep2').style.display = 'none';
+  document.getElementById('cryptoTxInput').value = '';
+  _cryptoOrderUuid = null;
+  _cryptoAddress   = null;
+  document.getElementById('cryptoModal').classList.add('active');
+}
+
+function closeCryptoModal() {
+  document.getElementById('cryptoModal').classList.remove('active');
+}
+
+async function selectCryptoMethod(currency) {
+  const initData = getTelegramInitData();
+  showToast('⏳ Creating order...');
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/crypto/checkout`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ initData, tier: selectedTier, currency })
+    });
+    const data = await res.json();
+    if (data.error) { showToast('❌ ' + data.error); return; }
+    _cryptoOrderUuid = data.order_uuid;
+    _cryptoAddress   = data.wallet_address;
+    document.getElementById('cryptoAmountDisplay').textContent  = `${data.amount} ${data.symbol}`;
+    document.getElementById('cryptoNetworkDisplay').textContent = data.network;
+    document.getElementById('cryptoAddressDisplay').textContent = data.wallet_address;
+    document.getElementById('cryptoStep1').style.display = 'none';
+    document.getElementById('cryptoStep2').style.display = 'block';
+  } catch(e) { showToast('❌ Network error'); }
+}
+
+function copyCryptoAddress() {
+  if (!_cryptoAddress) return;
+  navigator.clipboard?.writeText(_cryptoAddress).catch(() => {});
+  showToast('📋 Address copied!');
+}
+
+async function submitCryptoTx() {
+  const tx = document.getElementById('cryptoTxInput').value.trim();
+  if (!tx) { showToast('⚠️ Paste your TX hash first'); return; }
+  if (!_cryptoOrderUuid) { showToast('❌ No active order'); return; }
+  const initData = getTelegramInitData();
+  try {
+    const res = await fetch(`${API_BASE}/miniapp/crypto/claim`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ initData, order_uuid: _cryptoOrderUuid, tx_hash: tx })
+    });
+    const data = await res.json();
+    if (data.error) { showToast('❌ ' + data.error); return; }
+    closeCryptoModal();
+    showToast('✅ TX submitted! Admin will confirm shortly.');
+  } catch(e) { showToast('❌ Network error'); }
+}
+
 function showProGateModal() {
   document.getElementById('proGateModal').classList.add('active');
 }
@@ -5025,6 +5172,30 @@ async function loadArtistProfileContent(name) {
 
     currentArtistVideos = data.videos || [];
 
+    // Render shorts tab
+    const shortsList = document.getElementById('profileShortsList');
+    const shorts = data.shorts || [];
+    const shortTab = document.getElementById('tab-shorts');
+    if (shorts.length === 0) {
+      if (shortTab) shortTab.style.display = 'none';
+      if (shortsList) shortsList.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">No shorts yet</div>';
+    } else {
+      if (shortTab) shortTab.style.display = '';
+      if (shortsList) {
+        shortsList.innerHTML = shorts.map((s, idx) => {
+          const thumb = s.thumbnail_url;
+          const cardStyle = thumb ? `style="--thumb:url('${thumb.replace(/'/g,"\\'")}')"` : '';
+          return `<div class="profile-video-card" ${cardStyle}
+            onclick="openVideoPlayer(${s.id},'${(s.url||'').replace(/'/g,"\\'")}','${(s.title||'').replace(/'/g,"\\'")}','${name.replace(/'/g,"\\'")}','${(s.tags||'').replace(/'/g,"\\'")}','${thumb.replace(/'/g,"\\'")}')">
+            <div class="profile-video-icon">▶</div>
+            <div class="profile-video-info">
+              <div class="profile-video-title">${escapeHtml(s.title||'Short')}</div>
+            </div>
+          </div>`;
+        }).join('');
+      }
+    }
+
     // Build tag filter bar
     const filterBar = document.getElementById('profileTagFilter');
     const usedTags = new Set();
@@ -5686,11 +5857,12 @@ async function submitComment() {
 }
 
 function switchProfileTab(tab) {
-  document.getElementById('profileVideosTab').style.display = tab === 'videos' ? 'block' : 'none';
-  document.getElementById('profilePhotosTab').style.display = tab === 'photos' ? 'block' : 'none';
+  document.getElementById('profileVideosTab').style.display  = tab === 'videos'  ? 'block' : 'none';
+  document.getElementById('profileShortsTab').style.display  = tab === 'shorts'  ? 'block' : 'none';
+  document.getElementById('profilePhotosTab').style.display  = tab === 'photos'  ? 'block' : 'none';
   document.getElementById('tab-videos').classList.toggle('active', tab === 'videos');
+  document.getElementById('tab-shorts').classList.toggle('active', tab === 'shorts');
   document.getElementById('tab-photos').classList.toggle('active', tab === 'photos');
-  // show/hide tag filter only on videos tab
   const filterBar = document.getElementById('profileTagFilter');
   if (filterBar.children.length > 1) {
     filterBar.style.display = tab === 'videos' ? 'flex' : 'none';
@@ -5788,8 +5960,18 @@ function updateCTAButtons() {
   if (profileDaysLeft) profileDaysLeft.classList.toggle('infinity-value', isInfiniteSub);
 
   const days = typeof serverDaysLeft === "number" ? serverDaysLeft : 0;
-  if (headerDaysLeft) headerDaysLeft.textContent = isInfiniteSub ? "∞" : String(days);
-  if (profileDaysLeft) profileDaysLeft.innerHTML = isInfiniteSub ? '∞' : `${days}<span>d</span>`;
+  const isGrace = days < 0;
+  const graceRemaining = isGrace ? 7 - Math.abs(days) : 0;
+  if (headerDaysLeft) {
+    if (isInfiniteSub) headerDaysLeft.textContent = "∞";
+    else if (isGrace) { headerDaysLeft.textContent = `Grace ${graceRemaining}d`; headerDaysLeft.style.color = '#FF9800'; }
+    else { headerDaysLeft.textContent = String(days); headerDaysLeft.style.color = ''; }
+  }
+  if (profileDaysLeft) {
+    if (isInfiniteSub) profileDaysLeft.innerHTML = '∞';
+    else if (isGrace) profileDaysLeft.innerHTML = `<span style="color:#FF9800;font-size:11px">Grace ${graceRemaining}d</span>`;
+    else profileDaysLeft.innerHTML = `${days}<span>d</span>`;
+  }
 
   if (hasAccess) {
     favoritesBtnMain.classList.remove('hidden');
@@ -5858,7 +6040,7 @@ async function confirmTrial() {
       openPage('home');
       setTimeout(openInviteModal, 400);
     } else {
-      showToast('🎁 3 free days activated!');
+      showToast('🎁 5 free days activated!');
     }
   } catch (_) {
     hidePaymentOverlay();
@@ -6066,6 +6248,10 @@ async function openPaymentLink() {
         showToast('❌ Network error');
       }
       break;
+
+    case 3: // Crypto
+      openCryptoModal();
+      break;
   }
 }
 
@@ -6152,7 +6338,7 @@ const langTexts = {
   en: {
     pagePreview: "Page Preview", watchBest: "Watch the best ASMR content exclusively",
     photos: "Photos", videos: "Videos", artists: "Artists",
-    subscribeNow: "💳 Subscribe Now", tryFree: "🎁 Try 3 Days Free", myFavsBtn: "⭐ My Favorites",
+    subscribeNow: "💳 Subscribe Now", tryFree: "🎁 Try 5 Days Free", myFavsBtn: "⭐ My Favorites",
     lastUpdates: "Last Updates", seeAll: "See all →",
     allUpdatesTitle: "All Updates", newPreviewsDaily: "New previews added daily",
     searchVideos: "Search videos...",
@@ -6171,13 +6357,13 @@ const langTexts = {
     favNothing: "Nothing saved yet. Tap <b>Add</b> below, paste a link from the group, and give it a name.",
     addVideoBtn: "➕ Add video",
     choosePlan: "Choose Plan", cancelAnytime: "Cancel anytime · No auto-renewal",
-    newTryFree: "New? Try <strong>3 days free</strong> — no payment needed",
+    newTryFree: "New? Try <strong>5 days free</strong> — no payment needed",
     payMethod: "Payment Method", promoTitle: "Promo Code", promoPH: "Enter promo code", applyBtn: "Apply",
     subscribeBtnHero: "Subscribe Now",
     modalAddFav: "Add Favorite", modalStep12: "Step 1: paste the video link from the group.<br>Step 2: choose a short title.",
     saveFavBtn: "✨ Save to favorites",
-    modalTryFree: "Try Free", free3DaysTotal: "🎁 3 Days Completely Free",
-    noPayReq: "No payment method required • Cancel anytime", get3DaysBtn: "🎁 Get 3 Days Free",
+    modalTryFree: "Try Free", free3DaysTotal: "🎁 5 Days Completely Free",
+    noPayReq: "No payment method required • Cancel anytime", get3DaysBtn: "🎁 Get 5 Days Free",
     youreIn: "You're In!", subActiveJoin: "Your subscription is active.<br>Join the private group now:",
     joinBtn: "✈️ Join ASMR LEAKS Group", linkPersonal: "Link is personal · don't share it",
     tabHome: "Home", tabProfile: "Profile", tabFavs: "Favorites", tabSupport: "Support",
@@ -6187,7 +6373,7 @@ const langTexts = {
   ru: {
     pagePreview: "Превью страницы", watchBest: "Смотрите лучший ASMR контент эксклюзивно",
     photos: "Фото", videos: "Видео", artists: "Авторы",
-    subscribeNow: "💳 Оформить подписку", tryFree: "🎁 3 дня бесплатно", myFavsBtn: "⭐ Мое избранное",
+    subscribeNow: "💳 Оформить подписку", tryFree: "🎁 5 дней бесплатно", myFavsBtn: "⭐ Мое избранное",
     lastUpdates: "Последние обновления", seeAll: "Смотреть все →",
     allUpdatesTitle: "Все Обновления", newPreviewsDaily: "Новые превью добавляются ежедневно",
     searchVideos: "Поиск видео...",
@@ -6206,13 +6392,13 @@ const langTexts = {
     favNothing: "Пока ничего нет. Нажмите <b>Добавить</b> ниже и вставьте ссылку из группы.",
     addVideoBtn: "➕ Добавить видео",
     choosePlan: "Выберите Тариф", cancelAnytime: "Отмена в любой момент · Без автопродления",
-    newTryFree: "Впервые? Попробуйте <strong>3 дня бесплатно</strong> — карта не нужна",
+    newTryFree: "Впервые? Попробуйте <strong>5 дней бесплатно</strong> — карта не нужна",
     payMethod: "Способ оплаты", promoTitle: "Промокод", promoPH: "Введите промокод", applyBtn: "Применить",
     subscribeBtnHero: "Оформить подписку",
     modalAddFav: "В Избранное", modalStep12: "Шаг 1: вставьте ссылку на видео.<br>Шаг 2: укажите короткое название.",
     saveFavBtn: "✨ Сохранить в избранное",
-    modalTryFree: "Попробуй Бесплатно", free3DaysTotal: "🎁 3 Дня Абсолютно Бесплатно",
-    noPayReq: "Карта не требуется • Отмена в любой момент", get3DaysBtn: "🎁 Получить 3 Дня",
+    modalTryFree: "Попробуй Бесплатно", free3DaysTotal: "🎁 5 Дней Абсолютно Бесплатно",
+    noPayReq: "Карта не требуется • Отмена в любой момент", get3DaysBtn: "🎁 Получить 5 Дней",
     youreIn: "Вы с нами!", subActiveJoin: "Подписка активна.<br>Вступайте в закрытую группу:",
     joinBtn: "✈️ Вступить в ASMR LEAKS", linkPersonal: "Ссылка только для вас · не делитесь ей",
     tabHome: "Главная", tabProfile: "Профиль", tabFavs: "Избранное", tabSupport: "Поддержка",
@@ -6438,6 +6624,7 @@ if (tg) {
 
   try {
     await fetchVideosFromAPI();
+    loadHomeShorts();
   } catch(e) { console.warn('[init] videos:', e); }
   
   try {
@@ -6467,6 +6654,50 @@ if (tg) {
 </script>
 
 <!-- ── PRO GATE MODAL ── -->
+<!-- ── Crypto Payment Modal ── -->
+<div class="crypto-modal" id="cryptoModal">
+  <div class="crypto-sheet">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="crypto-sheet-title">💎 Pay with <span style="color:var(--lime)">Crypto</span></div>
+      <button onclick="closeCryptoModal()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:0">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Select network, send exact amount, paste TX hash to confirm.</div>
+
+    <!-- Step 1: choose network -->
+    <div id="cryptoStep1">
+      <div style="font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:10px">Select Network</div>
+      <button class="crypto-method-btn" onclick="selectCryptoMethod('USDT_TRC20')">
+        <span class="crypto-method-icon">💚</span>
+        <div><div class="crypto-method-name">USDT — TRC20</div><div class="crypto-method-desc">Tron network · Fast &amp; cheap</div></div>
+      </button>
+      <button class="crypto-method-btn" onclick="selectCryptoMethod('USDT_TON')">
+        <span class="crypto-method-icon">💎</span>
+        <div><div class="crypto-method-name">USDT — TON</div><div class="crypto-method-desc">Telegram network</div></div>
+      </button>
+      <button class="crypto-method-btn" onclick="selectCryptoMethod('ETH')">
+        <span class="crypto-method-icon">⬡</span>
+        <div><div class="crypto-method-name">ETH — Ethereum</div><div class="crypto-method-desc">Ethereum mainnet</div></div>
+      </button>
+    </div>
+
+    <!-- Step 2: send + submit TX -->
+    <div id="cryptoStep2" style="display:none">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Send exactly:</div>
+      <div style="font-size:28px;font-weight:700;color:var(--lime);margin-bottom:2px" id="cryptoAmountDisplay"></div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px" id="cryptoNetworkDisplay"></div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600">To address:</div>
+      <div class="crypto-address-box" id="cryptoAddressDisplay" onclick="copyCryptoAddress()"></div>
+      <button onclick="copyCryptoAddress()" style="width:100%;background:var(--dark3);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;margin-bottom:14px">📋 Copy Address</button>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600">Paste TX hash after sending:</div>
+      <input class="crypto-tx-input" id="cryptoTxInput" placeholder="0x... or transaction ID" />
+      <button onclick="submitCryptoTx()" style="width:100%;background:linear-gradient(135deg,var(--lime),#B3E600);color:#0E0E0F;border:none;border-radius:14px;padding:16px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer">
+        ✅ I've sent — Confirm TX
+      </button>
+      <button onclick="document.getElementById('cryptoStep1').style.display='block';document.getElementById('cryptoStep2').style.display='none'" style="width:100%;background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:10px;font-family:'DM Sans',sans-serif">← Change network</button>
+    </div>
+  </div>
+</div>
+
 <div class="pro-gate-modal" id="proGateModal">
   <div class="pro-gate-content">
     <div style="font-size:44px;margin-bottom:10px">⚡</div>
