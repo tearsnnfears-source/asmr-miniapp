@@ -3982,8 +3982,15 @@ async function loadHomeShorts() {
 
     // Show as portrait thumbnail cards — click opens TikTok player (shuffled)
     scroll.innerHTML = _homeShorts.map((s, idx) => {
-      const bg = s.thumbnail_url ? `style="background-image:url('${s.thumbnail_url.replace(/'/g,"\\'")}')"` : '';
+      const thumb = s.thumbnail_url || '';
+      const bg = thumb ? `style="background-image:url('${thumb.replace(/'/g,"\\'")}')"` : '';
+      const videoFallback = !thumb
+        ? `<video src="${(s.url||'').replace(/"/g,'%22')}" muted preload="metadata" playsinline
+            style="width:100%;height:100%;object-fit:cover;pointer-events:none;border-radius:12px"
+            onloadedmetadata="this.currentTime=1"></video>`
+        : '';
       return `<div class="shorts-home-card" ${bg} onclick="openShortsPlayer(_homeShorts,${idx},true)">
+        ${videoFallback}
         <div class="shorts-home-play">▶</div>
         <div class="shorts-home-label">${escapeHtml(s.title||'Short')}</div>
       </div>`;
@@ -5441,8 +5448,14 @@ async function loadArtistProfileContent(name) {
       if (shortsList) {
         shortsList.innerHTML = shorts.map((s, idx) => {
           const thumb = s.thumbnail_url || '';
-          const bg = thumb ? `background-image:url('${thumb.replace(/'/g,"\\'")}')` : '';
-          return `<div class="shorts-grid-item" style="${bg}" onclick="openShortsPlayer(_currentArtistShorts,${idx})">
+          const bg = thumb ? `style="background-image:url('${thumb.replace(/'/g,"\\'")}')"` : '';
+          const videoFallback = !thumb
+            ? `<video src="${(s.url||'').replace(/"/g,'%22')}" muted preload="metadata" playsinline
+                style="width:100%;height:100%;object-fit:cover;pointer-events:none"
+                onloadedmetadata="this.currentTime=1"></video>`
+            : '';
+          return `<div class="shorts-grid-item" ${bg} onclick="openShortsPlayer(_currentArtistShorts,${idx})">
+            ${videoFallback}
             <div class="shorts-grid-play">▶</div>
             <div class="shorts-grid-label">${escapeHtml(s.title||'Short')}</div>
           </div>`;
