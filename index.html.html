@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
+<link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css">
+<script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
 <style>
 :root {
   --pink: #FF7EC8;
@@ -24,9 +26,31 @@
   --success: #4ADE80;
 }
 
-* { 
-  margin: 0; 
-  padding: 0; 
+/* ── Plyr theme ── */
+:root {
+  --plyr-color-main: #CCFF00;
+  --plyr-video-background: #0E0E0F;
+  --plyr-font-family: 'DM Sans', sans-serif;
+  --plyr-font-size-base: 13px;
+  --plyr-control-radius: 6px;
+  --plyr-range-fill-background: linear-gradient(90deg,#FF7EC8,#CCFF00);
+  --plyr-range-thumb-background: #CCFF00;
+  --plyr-menu-background: rgba(14,14,15,0.97);
+  --plyr-menu-color: #fff;
+  --plyr-tooltip-background: #CCFF00;
+  --plyr-tooltip-color: #0E0E0F;
+  --plyr-video-control-background-hover: rgba(204,255,0,0.12);
+  --plyr-badge-background: #CCFF00;
+  --plyr-badge-text-color: #0E0E0F;
+  --plyr-tab-focus-color: #CCFF00;
+}
+.plyr { border-radius: 0; }
+.plyr__control--overlaid { background: rgba(204,255,0,0.18) !important; }
+.plyr--video .plyr__controls { background: linear-gradient(transparent,rgba(0,0,0,0.75)) !important; }
+
+* {
+  margin: 0;
+  padding: 0;
   box-sizing: border-box; 
   -webkit-tap-highlight-color: transparent; 
 }
@@ -3239,6 +3263,13 @@ body {
         </button>
       </div>
 
+      <div id="continueWatchingSection" style="display:none">
+        <div class="section-header">
+          <div class="section-title">▶ Continue Watching</div>
+        </div>
+        <div class="updates-scroll" id="continueWatchingScroll"></div>
+      </div>
+
       <div>
         <div class="section-header">
           <div class="section-title">🎙 Artists</div>
@@ -3338,6 +3369,21 @@ body {
         </div>
       </div>
     </div>
+
+      <!-- Subscription status card -->
+      <div id="profileSubCard" style="margin:0 16px 14px;background:var(--dark2);border:1px solid var(--border);border-radius:16px;padding:14px 16px;display:none">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted);font-weight:600;margin-bottom:8px">Active Subscription</div>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div id="profileSubTier" style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;color:var(--lime)">PLUS</div>
+            <div id="profileSubDays" style="font-size:13px;color:var(--muted);margin-top:1px">— days remaining</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Access expires</div>
+            <div id="profileSubExpiry" style="font-size:13px;font-weight:600;color:var(--text)">—</div>
+          </div>
+        </div>
+      </div>
 
       <div class="row-section">
       <div class="row-section-title">Subscription</div>
@@ -3615,7 +3661,7 @@ body {
   </div>
 
   <div class="video-wrap">
-    <video id="vpVideo" muted controls playsinline webkit-playsinline preload="auto"></video>
+    <video id="vpVideo" muted playsinline webkit-playsinline preload="auto"></video>
   </div>
 
   <!-- Playlist queue (shown when opened from playlist) -->
@@ -4047,13 +4093,17 @@ function _avBuildTagFilter() {
   const bar = document.getElementById('avTagFilter');
   if (!bar) return;
   const filtered = avArtist ? avAllVideos.filter(v => !avArtist || v.artistName === avArtist) : avAllVideos;
-  const tags = [...new Set(filtered.flatMap(v => (v.tags||'').split(',').map(t=>t.trim()).filter(Boolean)))].sort();
+  // Count per tag
+  const tagCounts = {};
+  filtered.forEach(v => (v.tags||'').split(',').map(t=>t.trim()).filter(Boolean).forEach(t => { tagCounts[t] = (tagCounts[t]||0)+1; }));
+  const tags = Object.keys(tagCounts).sort();
   if (!tags.length) { bar.innerHTML = ''; bar.style.display = 'none'; return; }
+  const allCount = filtered.length;
   bar.style.display = 'flex';
   bar.innerHTML = [
-    `<button class="av-filter-chip${avTag===''?' active':''}" onclick="avSetTag('')">All</button>`,
+    `<button class="av-filter-chip${avTag===''?' active':''}" onclick="avSetTag('')">All <span style="opacity:0.6;font-size:9px">${allCount}</span></button>`,
     ...tags.map(t => `<button class="av-filter-chip${avTag===t?' active':''}" onclick="avSetTag('${t.replace(/'/g,"\\'")}')">
-      ${t}
+      ${t} <span style="opacity:0.6;font-size:9px">${tagCounts[t]}</span>
     </button>`)
   ].join('');
 }
@@ -4321,12 +4371,7 @@ function avLoadMore() {
   _avRender(false);
 }
 
-function avSearchInput(q) {
-  avSearch = q;
-  avPage = 0;
-  document.getElementById('updatesSearchClear')?.classList.toggle('active', q.length > 0);
-  _avRender(false);
-}
+// avSearchInput is defined below as async (server-side search)
 
 function avClearSearch() {
   avSearch = '';
@@ -4888,6 +4933,7 @@ async function initTelegramWebAppUser() {
       renderTelegramProfile(currentUser);
     }
     updateCTAButtons();
+    updateProfileSubCard();
     refreshFavoritesBadgesOnly();
   }
 }
@@ -5652,6 +5698,27 @@ function _lbKeyDown(e) {
 
 // ── Video Player ───────────────────────────────────────────────────────────────
 let hlsInstance = null;
+let plyrInstance = null;
+
+// ── Plyr init / destroy ────────────────────────────────────────────────────
+function _initPlyr() {
+  const video = document.getElementById('vpVideo');
+  if (!video || typeof Plyr === 'undefined') return;
+  if (plyrInstance) { try { plyrInstance.destroy(); } catch(_) {} plyrInstance = null; }
+  plyrInstance = new Plyr(video, {
+    controls: ['play-large','rewind','play','fast-forward','progress','current-time','duration','mute','volume','settings','fullscreen'],
+    settings: ['speed'],
+    speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
+    keyboard: { focused: true, global: false },
+    tooltips: { controls: true, seek: true },
+    fullscreen: { enabled: true, iosNative: true },
+    captions: { active: false },
+    resetOnEnd: false,
+    invertTime: false,
+    hideControls: true,
+    clickToPlay: true,
+  });
+}
 let currentVideoId = null;
 
 // ── Paywall modal ─────────────────────────────────────────────────────────────
@@ -5835,6 +5902,21 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
     }
   };
 
+  // Init Plyr UI after source is set up
+  requestAnimationFrame(() => _initPlyr());
+
+  // Progress tracking — save every 15s
+  _startProgressTracking(contentId, video);
+
+  // Restore resume position from localStorage
+  const savedPos = _getWatchProgress(contentId);
+  if (savedPos > 5) {
+    video.addEventListener('loadedmetadata', function _resume() {
+      video.removeEventListener('loadedmetadata', _resume);
+      if (savedPos < video.duration - 5) video.currentTime = savedPos;
+    }, { once: true });
+  }
+
   // Load reactions & comments
   document.getElementById('vpReactions').innerHTML = '<div style="color:var(--muted);font-size:13px;padding:4px 0">Loading reactions…</div>';
   document.getElementById('vpCommentsList').innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px 0;text-align:center">Loading…</div>';
@@ -5852,12 +5934,14 @@ function closeVideoPlayer() {
   const overlay = document.getElementById('videoPlayerOverlay');
   overlay.classList.remove('active');
   const video = document.getElementById('vpVideo');
+  _stopProgressTracking();
   video.pause();
   video.onended = null;
   video.loop = false;
   video.removeAttribute('src');
   try { video.load(); } catch(_) {}
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+  if (plyrInstance) { try { plyrInstance.destroy(); } catch(_) {} plyrInstance = null; }
   currentVideoId = null;
   const errEl = document.querySelector('.vp-error');
   if (errEl) errEl.remove();
@@ -5931,6 +6015,137 @@ function _renderVpQueue() {
   }).join('');
   const currentEl = scroll.children[currentVpPlaylistIdx];
   if (currentEl) currentEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+}
+
+// ── Watch progress ────────────────────────────────────────────────────────────
+let _progressTimer = null;
+let _currentProgressId = null;
+
+function _getWatchProgress(contentId) {
+  try { return parseFloat(localStorage.getItem(`wp_${contentId}`) || '0') || 0; } catch(_) { return 0; }
+}
+
+function _saveWatchProgress(contentId, video) {
+  if (!contentId || !video || !video.duration) return;
+  const prog = Math.floor(video.currentTime);
+  const dur  = Math.floor(video.duration);
+  if (prog < 3) return;
+  try { localStorage.setItem(`wp_${contentId}`, String(prog)); } catch(_) {}
+  // Async API save (fire & forget)
+  const initData = getTelegramInitData();
+  fetch(`${API_BASE}/miniapp/watch_progress`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({initData, content_id: contentId, progress_seconds: prog, duration_seconds: dur})
+  }).catch(() => {});
+}
+
+function _startProgressTracking(contentId, video) {
+  _stopProgressTracking();
+  _currentProgressId = contentId;
+  _progressTimer = setInterval(() => _saveWatchProgress(contentId, video), 15000);
+}
+
+function _stopProgressTracking() {
+  if (_progressTimer) { clearInterval(_progressTimer); _progressTimer = null; }
+  _currentProgressId = null;
+}
+
+// ── Continue Watching ─────────────────────────────────────────────────────────
+async function loadContinueWatching() {
+  try {
+    const initData = getTelegramInitData();
+    if (!initData) return;
+    const res  = await fetch(`${API_BASE}/miniapp/continue_watching`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({initData})
+    });
+    const data = await res.json();
+    const items = data.items || [];
+    const section = document.getElementById('continueWatchingSection');
+    const scroll  = document.getElementById('continueWatchingScroll');
+    if (!items.length || !scroll) { if (section) section.style.display = 'none'; return; }
+    if (section) section.style.display = 'block';
+    scroll.innerHTML = items.map(v => {
+      const pct = v.duration > 0 ? Math.min(100, Math.round(v.progress / v.duration * 100)) : 0;
+      const bg  = v.thumbnail_url ? `style="background-image:url('${v.thumbnail_url.replace(/'/g,"\\'")}')"` : '';
+      return `<div class="update-mini-card" onclick="openVideoPlayer(${v.id},'${(v.url||'').replace(/'/g,"\\'")}','${(v.title||'').replace(/'/g,"\\'")}','${(v.artist_name||'').replace(/'/g,"\\'")}','${(v.tags||'').replace(/'/g,"\\'")}','${(v.thumbnail_url||'').replace(/'/g,"\\'")}')">
+        <div class="update-mini-thumb" ${bg}>
+          <div class="update-play-btn"></div>
+          <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(255,255,255,0.15)">
+            <div style="width:${pct}%;height:100%;background:var(--lime);transition:width 0.3s"></div>
+          </div>
+        </div>
+        <div class="update-mini-title">${escapeHtml(v.title||'Video')}</div>
+        <div class="update-mini-date">${v.artist_name||''} · ${pct}%</div>
+      </div>`;
+    }).join('');
+  } catch(e) { console.warn('[continue]', e); }
+}
+
+// ── Server-side search ────────────────────────────────────────────────────────
+let _searchDebounce = null;
+
+async function avSearchInput(q) {
+  document.getElementById('updatesSearchClear').style.display = q ? 'flex' : 'none';
+  avSearch = q;
+  clearTimeout(_searchDebounce);
+  if (!q.trim()) { avPage = 0; _avRenderPage(); return; }
+  _searchDebounce = setTimeout(async () => {
+    try {
+      const res  = await fetch(`${API_BASE}/miniapp/search?q=${encodeURIComponent(q)}&limit=40`);
+      const data = await res.json();
+      const results = (data.results || []).map(v => ({
+        id: v.id, title: v.title, url: v.url, artistName: v.artist_name,
+        thumbnailUrl: v.thumbnail_url, tags: v.tags,
+        date: v.created_at ? new Date(v.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '',
+        duration: ''
+      }));
+      const grid = document.getElementById('updatesGrid');
+      if (!grid) return;
+      if (!results.length) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)">No results</div>'; return; }
+      grid.innerHTML = results.map(_avCardHtml).join('');
+    } catch(e) { console.warn('[search]', e); }
+  }, 350);
+}
+
+// ── Tag counts in All Videos ──────────────────────────────────────────────────
+function _buildAvTagsWithCounts() {
+  const counts = {};
+  avAllVideos.forEach(v => {
+    (v.tags||'').split(',').filter(Boolean).forEach(t => {
+      const tag = t.trim();
+      counts[tag] = (counts[tag] || 0) + 1;
+    });
+  });
+  return counts;
+}
+
+// ── Profile subscription card ─────────────────────────────────────────────────
+function updateProfileSubCard() {
+  const card   = document.getElementById('profileSubCard');
+  const tier   = document.getElementById('profileSubTier');
+  const daysEl = document.getElementById('profileSubDays');
+  const expiry = document.getElementById('profileSubExpiry');
+  if (!card) return;
+
+  const days = typeof serverDaysLeft === 'number' ? serverDaysLeft : 0;
+  if (days <= 0 && !serverTier) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+
+  const tierColors = { plus: 'var(--pink)', pro: '#00E5FF', elite: '#FFD700' };
+  const t = (serverTier || 'plus').toLowerCase();
+  if (tier) { tier.textContent = t.toUpperCase(); tier.style.color = tierColors[t] || 'var(--lime)'; }
+
+  if (days < 0) {
+    const rem = 7 - Math.abs(days);
+    if (daysEl) daysEl.textContent = `Grace period — ${rem} day(s) left`;
+    if (expiry) expiry.textContent  = 'Renew to keep access';
+  } else {
+    if (daysEl) daysEl.textContent = `${days} day${days !== 1 ? 's' : ''} remaining`;
+    const exp = new Date();
+    exp.setDate(exp.getDate() + days);
+    if (expiry) expiry.textContent = exp.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  }
 }
 
 // ── Reactions ─────────────────────────────────────────────────────────────────
@@ -6900,6 +7115,7 @@ if (tg) {
   try {
     await fetchVideosFromAPI();
     loadHomeShorts();
+    loadContinueWatching();
   } catch(e) { console.warn('[init] videos:', e); }
   
   try {
