@@ -752,6 +752,98 @@ body {
   width: 100%;
 }
 
+/* ── Shorts TikTok player ── */
+.shorts-player {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 2000;
+  display: none;
+  flex-direction: column;
+}
+.shorts-player.active { display: flex; }
+.shorts-player-back {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top,0px));
+  left: 14px;
+  z-index: 10;
+  background: rgba(0,0,0,0.5);
+  border: none;
+  color: #fff;
+  font-size: 22px;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px);
+}
+.shorts-feed {
+  flex: 1;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.shorts-feed::-webkit-scrollbar { display: none; }
+.shorts-item {
+  width: 100%;
+  height: 100dvh;
+  scroll-snap-align: start;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.shorts-item video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.shorts-item-info {
+  position: absolute;
+  bottom: calc(20px + env(safe-area-inset-bottom,0px));
+  left: 16px;
+  right: 70px;
+  pointer-events: none;
+}
+.shorts-item-artist {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  margin-bottom: 4px;
+}
+.shorts-item-title {
+  font-size: 12px;
+  color: rgba(255,255,255,0.85);
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  line-height: 1.4;
+}
+.shorts-item-spinner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.4);
+  font-size: 40px;
+}
+.shorts-counter {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top,0px));
+  right: 14px;
+  z-index: 10;
+  background: rgba(0,0,0,0.45);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+}
+
 /* ── Crypto modal ── */
 .crypto-modal {
   position: fixed; inset: 0;
@@ -1406,6 +1498,86 @@ body {
 }
 
 .profile-photo-item:active { opacity: 0.7; }
+
+/* ── Shorts home strip card ── */
+.shorts-home-card {
+  flex-shrink: 0;
+  width: 100px;
+  height: 160px;
+  border-radius: 12px;
+  background: var(--dark3);
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: opacity 0.15s;
+  border: 1px solid var(--border);
+}
+.shorts-home-card:active { opacity: 0.75; }
+.shorts-home-play {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  background: rgba(0,0,0,0.5);
+  border-radius: 50%;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: #fff;
+  backdrop-filter: blur(2px);
+}
+.shorts-home-label {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,0.75));
+  padding: 14px 6px 6px;
+  font-size: 9px;
+  color: rgba(255,255,255,0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+/* ── Shorts grid (3-col, portrait thumbnails) ── */
+.shorts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 2px;
+}
+.shorts-grid-item {
+  aspect-ratio: 9/16;
+  background: var(--dark2);
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: opacity 0.15s;
+}
+.shorts-grid-item:active { opacity: 0.75; }
+.shorts-grid-play {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  background: rgba(0,0,0,0.55);
+  border-radius: 50%;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px;
+}
+.shorts-grid-label {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,0.7));
+  padding: 12px 5px 4px;
+  font-size: 9px;
+  color: rgba(255,255,255,0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* ── PHOTO LIGHTBOX ── */
 .photo-lightbox {
@@ -3424,9 +3596,7 @@ body {
       </div>
     </div>
     <div id="profileShortsTab" style="display:none">
-      <div id="profileShortsList" class="profile-videos-list">
-        <div style="text-align:center;padding:40px;color:var(--muted)">Loading...</div>
-      </div>
+      <div id="profileShortsList" class="shorts-grid"></div>
     </div>
     <div id="profilePhotosTab" style="display:none">
       <div id="profilePhotoGrid" class="profile-photo-grid"></div>
@@ -3798,26 +3968,24 @@ function renderUpdates() {
 }
 
 // ── Home Shorts strip ─────────────────────────────────────────────────────────
+let _homeShorts = [];
+
 async function loadHomeShorts() {
   try {
-    const res = await fetch(`${API_BASE}/miniapp/shorts?limit=20`);
+    const res = await fetch(`${API_BASE}/miniapp/shorts?limit=30`);
     const data = await res.json();
-    const shorts = data.shorts || [];
+    _homeShorts = (data.shorts || []).map(s => ({...s, artist: s.artist_name || ''}));
     const section = document.getElementById('shortsSection');
-    const scroll = document.getElementById('shortsScroll');
-    if (!shorts.length || !scroll) { if (section) section.style.display = 'none'; return; }
+    const scroll  = document.getElementById('shortsScroll');
+    if (!_homeShorts.length || !scroll) { if (section) section.style.display = 'none'; return; }
     if (section) section.style.display = 'block';
-    scroll.innerHTML = shorts.map(s => {
+
+    // Show as portrait thumbnail cards — click opens TikTok player (shuffled)
+    scroll.innerHTML = _homeShorts.map((s, idx) => {
       const bg = s.thumbnail_url ? `style="background-image:url('${s.thumbnail_url.replace(/'/g,"\\'")}')"` : '';
-      return `<div class="update-card" onclick="openVideoPlayer(${s.id},'${(s.url||'').replace(/'/g,"\\'")}','${(s.title||'').replace(/'/g,"\\'")}','${(s.artist_name||'').replace(/'/g,"\\'")}','${(s.tags||'').replace(/'/g,"\\'")}','${(s.thumbnail_url||'').replace(/'/g,"\\'")}')">
-        <div class="update-card-thumb" ${bg}>
-          <div class="update-play-btn"></div>
-          <div style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.7);border-radius:4px;padding:2px 6px;font-size:9px;font-weight:700;color:#C8FF44;letter-spacing:0.5px">⚡ SHORT</div>
-        </div>
-        <div class="update-card-info">
-          <div class="update-card-title">${escapeHtml(s.title||'Short')}</div>
-          <div class="update-card-date">${s.artist_name||''}</div>
-        </div>
+      return `<div class="shorts-home-card" ${bg} onclick="openShortsPlayer(_homeShorts,${idx},true)">
+        <div class="shorts-home-play">▶</div>
+        <div class="shorts-home-label">${escapeHtml(s.title||'Short')}</div>
       </div>`;
     }).join('');
   } catch(e) { console.warn('[shorts]', e); }
@@ -3911,6 +4079,95 @@ function avSwitchTab(mode) {
 }
 
 // ── PRO gate ────────────────────────────────────────────────────────────────
+// ── Shorts TikTok Player ──────────────────────────────────────────────────────
+let _shortsData = [];
+let _shortsHlsMap = {};  // idx → Hls instance
+
+function _shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function openShortsPlayer(shorts, startIdx = 0, shuffle = false) {
+  if (!hasVideoAccess()) { paywallSubscribe(); return; }
+  _shortsData = shuffle ? _shuffle(shorts) : [...shorts];
+  _shortsHlsMap = {};
+
+  const feed = document.getElementById('shortsFeed');
+  const counter = document.getElementById('shortsCounter');
+
+  feed.innerHTML = _shortsData.map((s, i) => `
+    <div class="shorts-item" id="shortItem${i}" data-idx="${i}">
+      <div class="shorts-item-spinner">⏳</div>
+      <div class="shorts-item-info">
+        <div class="shorts-item-artist">${escapeHtml(s.artist_name || s.artist || '')}</div>
+        <div class="shorts-item-title">${escapeHtml(s.title || '')}</div>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('shortsPlayer').classList.add('active');
+  window.Telegram?.WebApp?.expand();
+
+  // Lazy-load via IntersectionObserver
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const item = entry.target;
+      const idx = parseInt(item.dataset.idx);
+      const s = _shortsData[idx];
+      if (!item.querySelector('video')) _loadShortsVideo(item, idx, s);
+      // Pause all others, play current
+      feed.querySelectorAll('video').forEach(v => { if (v !== item.querySelector('video')) { v.pause(); if (v._hls) { /* keep */ } } });
+      const vid = item.querySelector('video');
+      if (vid) vid.play().catch(() => {});
+      counter.textContent = `${idx + 1} / ${_shortsData.length}`;
+    });
+  }, { threshold: 0.6 });
+
+  feed.querySelectorAll('.shorts-item').forEach(el => observer.observe(el));
+  feed._observer = observer;
+
+  // scroll to start
+  feed.scrollTop = 0;
+  counter.textContent = `1 / ${_shortsData.length}`;
+}
+
+function _loadShortsVideo(item, idx, s) {
+  item.querySelector('.shorts-item-spinner')?.remove();
+  const video = document.createElement('video');
+  video.style.cssText = 'width:100%;height:100%;object-fit:contain;';
+  video.setAttribute('playsinline', '');
+  video.setAttribute('webkit-playsinline', '');
+  video.loop = true;
+  video.muted = false;
+  item.insertBefore(video, item.querySelector('.shorts-item-info'));
+
+  const url = s.url || '';
+  const isM3U8 = url.includes('.m3u8') || url.includes('/hls/');
+  if (isM3U8 && typeof Hls !== 'undefined' && Hls.isSupported()) {
+    const hls = new Hls({ enableWorker: false, maxBufferLength: 10 });
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MEDIA_ATTACHED, () => hls.loadSource(url));
+    _shortsHlsMap[idx] = hls;
+  } else {
+    video.src = url;
+  }
+}
+
+function closeShortsPlayer() {
+  document.getElementById('shortsPlayer').classList.remove('active');
+  const feed = document.getElementById('shortsFeed');
+  feed.querySelectorAll('video').forEach(v => { v.pause(); v.src = ''; });
+  Object.values(_shortsHlsMap).forEach(h => h.destroy());
+  _shortsHlsMap = {};
+  if (feed._observer) { feed._observer.disconnect(); feed._observer = null; }
+  feed.innerHTML = '';
+}
+
 // ── Crypto payment ────────────────────────────────────────────────────────────
 let _cryptoOrderUuid = null;
 let _cryptoAddress   = null;
@@ -5172,27 +5429,25 @@ async function loadArtistProfileContent(name) {
 
     currentArtistVideos = data.videos || [];
 
-    // Render shorts tab
+    // Render shorts tab — portrait grid, opens TikTok player
     const shortsList = document.getElementById('profileShortsList');
-    const shorts = data.shorts || [];
+    const shorts = (data.shorts || []).map(s => ({...s, artist: name}));
     const shortTab = document.getElementById('tab-shorts');
     if (shorts.length === 0) {
       if (shortTab) shortTab.style.display = 'none';
-      if (shortsList) shortsList.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">No shorts yet</div>';
+      if (shortsList) shortsList.innerHTML = '';
     } else {
       if (shortTab) shortTab.style.display = '';
       if (shortsList) {
         shortsList.innerHTML = shorts.map((s, idx) => {
-          const thumb = s.thumbnail_url;
-          const cardStyle = thumb ? `style="--thumb:url('${thumb.replace(/'/g,"\\'")}')"` : '';
-          return `<div class="profile-video-card" ${cardStyle}
-            onclick="openVideoPlayer(${s.id},'${(s.url||'').replace(/'/g,"\\'")}','${(s.title||'').replace(/'/g,"\\'")}','${name.replace(/'/g,"\\'")}','${(s.tags||'').replace(/'/g,"\\'")}','${thumb.replace(/'/g,"\\'")}')">
-            <div class="profile-video-icon">▶</div>
-            <div class="profile-video-info">
-              <div class="profile-video-title">${escapeHtml(s.title||'Short')}</div>
-            </div>
+          const thumb = s.thumbnail_url || '';
+          const bg = thumb ? `background-image:url('${thumb.replace(/'/g,"\\'")}')` : '';
+          return `<div class="shorts-grid-item" style="${bg}" onclick="openShortsPlayer(_currentArtistShorts,${idx})">
+            <div class="shorts-grid-play">▶</div>
+            <div class="shorts-grid-label">${escapeHtml(s.title||'Short')}</div>
           </div>`;
         }).join('');
+        window._currentArtistShorts = shorts;
       }
     }
 
@@ -5255,9 +5510,16 @@ async function loadArtistProfileContent(name) {
 
 function renderProfileVideos(videos, tagFilter) {
   const videosList = document.getElementById('profileVideosList');
+  // Filter out VOD-tagged videos for non-PRO users
+  const visibleVideos = hasProAccess()
+    ? videos
+    : videos.filter(v => {
+        const vtags = (v.tags||'').split(',').map(t => t.trim().toUpperCase());
+        return !vtags.some(t => AV_VOD_TAGS.has(t));
+      });
   const filtered = tagFilter
-    ? videos.filter(v => (v.tags||'').split(',').map(t=>t.trim()).includes(tagFilter))
-    : videos;
+    ? visibleVideos.filter(v => (v.tags||'').split(',').map(t=>t.trim()).includes(tagFilter))
+    : visibleVideos;
 
   if (filtered.length === 0) {
     videosList.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted)">${tagFilter ? 'No videos with this tag' : 'No videos yet'}</div>`;
@@ -6654,6 +6916,13 @@ if (tg) {
 </script>
 
 <!-- ── PRO GATE MODAL ── -->
+<!-- ── Shorts TikTok Player ── -->
+<div class="shorts-player" id="shortsPlayer">
+  <button class="shorts-player-back" onclick="closeShortsPlayer()">‹</button>
+  <div class="shorts-counter" id="shortsCounter"></div>
+  <div class="shorts-feed" id="shortsFeed"></div>
+</div>
+
 <!-- ── Crypto Payment Modal ── -->
 <div class="crypto-modal" id="cryptoModal">
   <div class="crypto-sheet">
