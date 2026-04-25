@@ -4289,6 +4289,7 @@ function openShortsPlayer(shorts, startIdx = 0, shuffle = false) {
 
   document.getElementById('shortsPlayer').classList.add('active');
   window.Telegram?.WebApp?.expand();
+  _pushBack(closeShortsPlayer);
 
   // Touch handling — one swipe = one video, no native scroll interference
   let _ty0 = 0;
@@ -4415,6 +4416,7 @@ function closeShortsPlayer() {
   if (feed._onClick) { feed.removeEventListener('click',      feed._onClick); feed._onClick = null; }
   document.getElementById('shortsPlayer').classList.remove('active');
   document.getElementById('shortsTrack').innerHTML = '';
+  _popBack();
 }
 
 // ── Crypto payment ────────────────────────────────────────────────────────────
@@ -5588,19 +5590,56 @@ function updatePaymentUI() {
   }
 }
 
+// ── Navigation stack + Telegram Back Button ────────────────────────────────
+const _NAV_ROOT = new Set(['home', 'artists', 'profile', 'favorites', 'support']);
+let _navStack = []; // stack of closers for back button
+
+function _tgBack() { return window.Telegram?.WebApp?.BackButton; }
+
+function _pushBack(closeFn) {
+  _navStack.push(closeFn);
+  const bb = _tgBack();
+  if (bb) { bb.show(); bb.offClick(_onTgBack); bb.onClick(_onTgBack); }
+}
+
+function _popBack() {
+  _navStack.pop();
+  const bb = _tgBack();
+  if (!bb) return;
+  if (_navStack.length === 0) {
+    bb.hide(); bb.offClick(_onTgBack);
+  } else {
+    bb.show(); bb.offClick(_onTgBack); bb.onClick(_onTgBack);
+  }
+}
+
+function _onTgBack() {
+  const fn = _navStack[_navStack.length - 1];
+  if (fn) fn();
+}
+
 function openPage(page) {
+  // Clear non-root overlays when navigating to a root page
+  if (_NAV_ROOT.has(page)) {
+    _navStack = [];
+    const bb = _tgBack();
+    if (bb) { bb.hide(); bb.offClick(_onTgBack); }
+  }
+
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const pageEl = document.getElementById(`page-${page}`);
   if (pageEl) pageEl.classList.add('active');
   document.querySelectorAll('.footer-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`footer-${page}`)?.classList.add('active');
   if (page === 'favorites') loadFavorites();
-  if (page === 'payment') initTierCarousel();
+  if (page === 'payment') {
+    initTierCarousel();
+    _pushBack(() => { openPage('home'); });
+  }
   if (page === 'artists' && allArtists.length > 0) {
     renderArtistsGrid();
     updateStatsBanner();
   }
-  // Scroll page to top
   const scroll = pageEl?.querySelector('.page-scroll');
   if (scroll) scroll.scrollTop = 0;
   const mc = pageEl?.querySelector('.main-container');
@@ -5646,6 +5685,7 @@ function openArtistProfile(name) {
   document.getElementById('profilePhotoGrid').innerHTML = '';
 
   document.getElementById('artist-profile-page').classList.add('active');
+  _pushBack(closeArtistProfile);
   checkArtistFollowStatus(name);
 
   // Load content from API
@@ -5941,12 +5981,7 @@ function openPhotoLightbox(index) {
   lb.classList.add('active');
   _lightboxRender();
 
-  const tg = window.Telegram?.WebApp;
-  if (tg && typeof tg.BackButton !== 'undefined') {
-    tg.BackButton.show();
-    tg.BackButton.onClick(closeLightbox);
-  }
-
+  _pushBack(closeLightbox);
   lb.addEventListener('touchstart', _lbTouchStart, { passive: true });
   lb.addEventListener('touchend', _lbTouchEnd, { passive: true });
   document.addEventListener('keydown', _lbKeyDown);
@@ -5958,12 +5993,7 @@ function closeLightbox() {
   lb.removeEventListener('touchstart', _lbTouchStart);
   lb.removeEventListener('touchend', _lbTouchEnd);
   document.removeEventListener('keydown', _lbKeyDown);
-
-  const tg = window.Telegram?.WebApp;
-  if (tg && typeof tg.BackButton !== 'undefined') {
-    tg.BackButton.hide();
-    tg.BackButton.offClick(closeLightbox);
-  }
+  _popBack();
 }
 
 function _lightboxRender(fade) {
@@ -6085,6 +6115,7 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
 
   const overlay = document.getElementById('videoPlayerOverlay');
   overlay.classList.add('active');
+  _pushBack(closeVideoPlayer);
 
   // Blurred background: prefer artist profile photo, fallback to thumbnail
   if (thumbUrl) {
@@ -6242,6 +6273,7 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
 function closeVideoPlayer() {
   const overlay = document.getElementById('videoPlayerOverlay');
   overlay.classList.remove('active');
+  _popBack();
   const video = document.getElementById('vpVideo');
   if (video._previewCheck) { video.removeEventListener('timeupdate', video._previewCheck); video._previewCheck = null; }
   document.getElementById('vpWrap')?.querySelectorAll('.vp-preview-end').forEach(el => el.remove());
@@ -6765,6 +6797,7 @@ function switchProfileTab(tab) {
 
 function closeArtistProfile() {
   document.getElementById('artist-profile-page').classList.remove('active');
+  _popBack();
 }
 
 function searchArtists(query) {
