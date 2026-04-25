@@ -5262,7 +5262,7 @@ function getHomeArtistTagsHtml(name) {
   const isHot   = !!profile.tag_hot   || profile.tag_hot   === 'true';
   const isNew   = !!profile.tag_new   || profile.tag_new   === 'true';
 
-  if (isReady) return '<div class="artist-mini-tag artist-mini-tag-ready">✅ READY</div>';
+  if (isReady) return '<div class="artist-mini-tag artist-mini-tag-ready">▶ IN APP</div>';
   if (isHot)   return '<div class="artist-mini-tag artist-mini-tag-hot">HOT</div>';
   if (isNew)   return '<div class="artist-mini-tag artist-mini-tag-new">NEW</div>';
   return '';
@@ -5279,7 +5279,7 @@ function getArtistTagsHtml(name) {
   const isHot   = !!profile.tag_hot   || profile.tag_hot   === 'true';
   const isNew   = !!profile.tag_new   || profile.tag_new   === 'true';
 
-  if (isReady) tagsHtml += '<div class="artist-tag artist-tag-ready">✅ READY</div>';
+  if (isReady) tagsHtml += '<div class="artist-tag artist-tag-ready">▶ IN APP</div>';
   if (isHot)   tagsHtml += '<div class="artist-tag artist-tag-hot">🔥 HOT</div>';
   if (isNew)   tagsHtml += '<div class="artist-tag artist-tag-new">✨ NEW</div>';
   return tagsHtml;
