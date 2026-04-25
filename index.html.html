@@ -26,6 +26,22 @@
   --success: #4ADE80;
 }
 
+/* ── VP landscape fullscreen ── */
+.video-player-overlay.vp-landscape {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 100vh;
+  height: 100vw;
+  transform: translate(-50%, -50%) rotate(90deg);
+  transform-origin: center;
+  z-index: 3000;
+}
+.video-player-overlay.vp-landscape .video-player-topbar { display: none; }
+.video-player-overlay.vp-landscape .video-player-body  { display: none; }
+.video-player-overlay.vp-landscape .vp-queue           { display: none !important; }
+.video-player-overlay.vp-landscape .video-wrap         { height: 100%; }
+
 /* ── Plyr theme ── */
 :root {
   --plyr-color-main: #CCFF00;
@@ -854,6 +870,34 @@ body {
   color: rgba(255,255,255,0.4);
   font-size: 40px;
 }
+.shorts-progress-bar {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.2);
+  z-index: 10;
+}
+.shorts-progress-fill {
+  height: 100%;
+  background: var(--lime);
+  width: 0%;
+  transition: width 0.25s linear;
+}
+.shorts-mute-btn {
+  position: absolute;
+  bottom: calc(16px + env(safe-area-inset-bottom,0px));
+  right: 14px;
+  z-index: 10;
+  background: rgba(0,0,0,0.45);
+  border: none;
+  border-radius: 50%;
+  width: 38px; height: 38px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
 .shorts-counter {
   position: absolute;
   top: calc(14px + env(safe-area-inset-top,0px));
@@ -4149,10 +4193,16 @@ function _shuffle(arr) {
   return a;
 }
 
+let _shortsIdx = 0;
+let _shortsMuted = false;
+let _shortsProgTimer = null;
+
 function openShortsPlayer(shorts, startIdx = 0, shuffle = false) {
   if (!hasVideoAccess()) { paywallSubscribe(); return; }
   _shortsData = shuffle ? _shuffle(shorts) : [...shorts];
   _shortsHlsMap = {};
+  _shortsIdx = Math.min(startIdx, _shortsData.length - 1);
+  _shortsMuted = false;
 
   const feed = document.getElementById('shortsFeed');
   const counter = document.getElementById('shortsCounter');
@@ -4164,44 +4214,82 @@ function openShortsPlayer(shorts, startIdx = 0, shuffle = false) {
         <div class="shorts-item-artist">${escapeHtml(s.artist_name || s.artist || '')}</div>
         <div class="shorts-item-title">${escapeHtml(s.title || '')}</div>
       </div>
+      <div class="shorts-progress-bar"><div class="shorts-progress-fill" id="shortsProg${i}"></div></div>
+      <button class="shorts-mute-btn" id="shortsMute${i}" onclick="event.stopPropagation();toggleShortsSound()">🔊</button>
     </div>`).join('');
 
   document.getElementById('shortsPlayer').classList.add('active');
   window.Telegram?.WebApp?.expand();
 
-  // Lazy-load via IntersectionObserver
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (!entry.isIntersecting) return;
-      const item = entry.target;
-      const idx = parseInt(item.dataset.idx);
-      const s = _shortsData[idx];
-      if (!item.querySelector('video')) _loadShortsVideo(item, idx, s);
-      // Pause all others, play current
-      feed.querySelectorAll('video').forEach(v => { if (v !== item.querySelector('video')) { v.pause(); if (v._hls) { /* keep */ } } });
-      const vid = item.querySelector('video');
-      if (vid) vid.play().catch(() => {});
-      counter.textContent = `${idx + 1} / ${_shortsData.length}`;
-    });
-  }, { threshold: 0.6 });
+  // Touch: one swipe = one item
+  let _ty0 = 0, _swiping = false;
+  feed.addEventListener('touchstart', e => { _ty0 = e.touches[0].clientY; _swiping = false; }, { passive: true });
+  feed.addEventListener('touchmove', e => { if (Math.abs(e.touches[0].clientY - _ty0) > 8) _swiping = true; }, { passive: true });
+  feed.addEventListener('touchend', e => {
+    const dy = _ty0 - e.changedTouches[0].clientY;
+    if (!_swiping || Math.abs(dy) < 40) return;
+    _goToShort(_shortsIdx + (dy > 0 ? 1 : -1));
+  });
 
-  feed.querySelectorAll('.shorts-item').forEach(el => observer.observe(el));
-  feed._observer = observer;
+  // Tap on video area = pause/play
+  feed.addEventListener('click', e => {
+    if (e.target.closest('.shorts-mute-btn') || e.target.closest('.shorts-player-back')) return;
+    const item = document.getElementById(`shortItem${_shortsIdx}`);
+    const vid = item?.querySelector('video');
+    if (!vid) return;
+    vid.paused ? vid.play().catch(()=>{}) : vid.pause();
+  });
 
-  // scroll to start
-  feed.scrollTop = 0;
-  counter.textContent = `1 / ${_shortsData.length}`;
+  _goToShort(_shortsIdx, true);
+}
+
+function _goToShort(idx, instant = false) {
+  idx = Math.max(0, Math.min(_shortsData.length - 1, idx));
+  _shortsIdx = idx;
+  const item = document.getElementById(`shortItem${idx}`);
+  if (!item) return;
+  item.scrollIntoView({ behavior: instant ? 'instant' : 'smooth', block: 'start' });
+
+  // Load video for current + preload next
+  [idx, idx + 1].forEach(i => {
+    if (i >= _shortsData.length) return;
+    const el = document.getElementById(`shortItem${i}`);
+    if (el && !el.querySelector('video')) _loadShortsVideo(el, i, _shortsData[i]);
+  });
+
+  // Pause all, play current
+  document.querySelectorAll('.shorts-item video').forEach(v => v !== document.getElementById(`shortItem${idx}`)?.querySelector('video') && v.pause());
+  const vid = item.querySelector('video');
+  if (vid) { vid.muted = _shortsMuted; vid.play().catch(() => {}); _startShortsProgress(idx, vid); }
+
+  document.getElementById('shortsCounter').textContent = `${idx + 1} / ${_shortsData.length}`;
+}
+
+function _startShortsProgress(idx, video) {
+  clearInterval(_shortsProgTimer);
+  const bar = document.getElementById(`shortsProg${idx}`);
+  if (!bar) return;
+  _shortsProgTimer = setInterval(() => {
+    if (!video.duration) return;
+    bar.style.width = `${Math.min(100, video.currentTime / video.duration * 100)}%`;
+  }, 250);
+}
+
+function toggleShortsSound() {
+  _shortsMuted = !_shortsMuted;
+  document.querySelectorAll('.shorts-item video').forEach(v => { v.muted = _shortsMuted; });
+  document.querySelectorAll('.shorts-mute-btn').forEach(b => { b.textContent = _shortsMuted ? '🔇' : '🔊'; });
 }
 
 function _loadShortsVideo(item, idx, s) {
   item.querySelector('.shorts-item-spinner')?.remove();
   const video = document.createElement('video');
-  video.style.cssText = 'width:100%;height:100%;object-fit:contain;';
+  video.style.cssText = 'width:100%;height:100%;object-fit:contain;position:absolute;inset:0;';
   video.setAttribute('playsinline', '');
   video.setAttribute('webkit-playsinline', '');
   video.loop = true;
-  video.muted = false;
-  item.insertBefore(video, item.querySelector('.shorts-item-info'));
+  video.muted = _shortsMuted;
+  item.insertBefore(video, item.firstChild);
 
   const url = s.url || '';
   const isM3U8 = url.includes('.m3u8') || url.includes('/hls/');
@@ -4216,12 +4304,12 @@ function _loadShortsVideo(item, idx, s) {
 }
 
 function closeShortsPlayer() {
+  clearInterval(_shortsProgTimer);
   document.getElementById('shortsPlayer').classList.remove('active');
   const feed = document.getElementById('shortsFeed');
-  feed.querySelectorAll('video').forEach(v => { v.pause(); v.src = ''; });
-  Object.values(_shortsHlsMap).forEach(h => h.destroy());
+  feed.querySelectorAll('video').forEach(v => { v.pause(); v.src = ''; try { v.load(); } catch(_) {} });
+  Object.values(_shortsHlsMap).forEach(h => { try { h.destroy(); } catch(_) {} });
   _shortsHlsMap = {};
-  if (feed._observer) { feed._observer.disconnect(); feed._observer = null; }
   feed.innerHTML = '';
 }
 
@@ -4935,6 +5023,7 @@ async function initTelegramWebAppUser() {
     updateCTAButtons();
     updateProfileSubCard();
     refreshFavoritesBadgesOnly();
+    loadContinueWatching();
   }
 }
 
@@ -5492,6 +5581,7 @@ async function loadArtistProfileContent(name) {
     } else {
       if (shortTab) shortTab.style.display = '';
       if (shortsList) {
+        const canViewShorts = hasVideoAccess();
         shortsList.innerHTML = shorts.map((s, idx) => {
           const thumb = s.thumbnail_url || '';
           const bg = thumb ? `style="background-image:url('${thumb.replace(/'/g,"\\'")}')"` : '';
@@ -5500,6 +5590,12 @@ async function loadArtistProfileContent(name) {
                 style="width:100%;height:100%;object-fit:cover;pointer-events:none"
                 onloadedmetadata="this.currentTime=1"></video>`
             : '';
+          if (!canViewShorts) {
+            return `<div class="shorts-grid-item" ${bg} style="filter:blur(3px);pointer-events:none">
+              ${videoFallback}
+              <div class="shorts-grid-play">🔒</div>
+            </div>`;
+          }
           return `<div class="shorts-grid-item" ${bg} onclick="openShortsPlayer(_currentArtistShorts,${idx})">
             ${videoFallback}
             <div class="shorts-grid-play">▶</div>
@@ -5507,6 +5603,19 @@ async function loadArtistProfileContent(name) {
           </div>`;
         }).join('');
         window._currentArtistShorts = shorts;
+        if (!canViewShorts) {
+          const wrapper = shortsList.parentElement;
+          if (!wrapper.querySelector('.photos-lock-overlay')) {
+            const ov = document.createElement('div');
+            ov.className = 'photos-lock-overlay';
+            ov.onclick = paywallSubscribe;
+            ov.innerHTML = `<div class="photos-lock-icon">🔒</div>
+              <div class="photos-lock-text">Subscribe to unlock Shorts</div>
+              <button class="photos-lock-btn" onclick="event.stopPropagation();paywallSubscribe()">Subscribe Now</button>`;
+            wrapper.style.position = 'relative';
+            wrapper.appendChild(ov);
+          }
+        }
       }
     }
 
@@ -5700,6 +5809,35 @@ function _lbKeyDown(e) {
 let hlsInstance = null;
 let plyrInstance = null;
 
+// ── Fullscreen with landscape rotation ────────────────────────────────────────
+let _isFakeFullscreen = false;
+
+function _enterFullscreen() {
+  const overlay = document.getElementById('videoPlayerOverlay');
+  const video   = document.getElementById('vpVideo');
+  // Try screen orientation lock first (Android)
+  const lockPromise = screen.orientation?.lock?.('landscape');
+  // Try native fullscreen on video element (iOS Safari)
+  const nativeFsPromise = video.webkitEnterFullscreen
+    ? Promise.resolve(video.webkitEnterFullscreen())
+    : (overlay.requestFullscreen?.() || overlay.webkitRequestFullscreen?.() || Promise.reject());
+
+  Promise.race([lockPromise, nativeFsPromise])
+    .catch(() => {
+      // Fallback: CSS landscape rotation
+      overlay.classList.add('vp-landscape');
+      _isFakeFullscreen = true;
+    });
+}
+
+function _exitFullscreen() {
+  const overlay = document.getElementById('videoPlayerOverlay');
+  overlay.classList.remove('vp-landscape');
+  _isFakeFullscreen = false;
+  try { screen.orientation?.unlock?.(); } catch(_) {}
+  try { document.exitFullscreen?.() || document.webkitExitFullscreen?.(); } catch(_) {}
+}
+
 // ── Plyr init / destroy ────────────────────────────────────────────────────
 function _initPlyr() {
   const video = document.getElementById('vpVideo');
@@ -5711,12 +5849,20 @@ function _initPlyr() {
     speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
     keyboard: { focused: true, global: false },
     tooltips: { controls: true, seek: true },
-    fullscreen: { enabled: true, iosNative: true },
+    fullscreen: { enabled: true, iosNative: false, fallback: false },
     captions: { active: false },
     resetOnEnd: false,
     invertTime: false,
     hideControls: true,
     clickToPlay: true,
+  });
+  // Override fullscreen with our landscape handler
+  plyrInstance.on('enterfullscreen', (e) => {
+    e.preventDefault?.();
+    _enterFullscreen();
+  });
+  plyrInstance.on('exitfullscreen', () => {
+    _exitFullscreen();
   });
 }
 let currentVideoId = null;
@@ -5934,6 +6080,8 @@ function closeVideoPlayer() {
   const overlay = document.getElementById('videoPlayerOverlay');
   overlay.classList.remove('active');
   const video = document.getElementById('vpVideo');
+  // Save final progress before stopping
+  if (_currentProgressId) _saveWatchProgress(_currentProgressId, video);
   _stopProgressTracking();
   video.pause();
   video.onended = null;
@@ -5941,6 +6089,7 @@ function closeVideoPlayer() {
   video.removeAttribute('src');
   try { video.load(); } catch(_) {}
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+  if (_isFakeFullscreen) _exitFullscreen();
   if (plyrInstance) { try { plyrInstance.destroy(); } catch(_) {} plyrInstance = null; }
   currentVideoId = null;
   const errEl = document.querySelector('.vp-error');
@@ -7115,7 +7264,6 @@ if (tg) {
   try {
     await fetchVideosFromAPI();
     loadHomeShorts();
-    loadContinueWatching();
   } catch(e) { console.warn('[init] videos:', e); }
   
   try {
