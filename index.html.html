@@ -7,8 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
-<link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css">
-<script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
 <style>
 :root {
   --pink: #FF7EC8;
@@ -42,27 +40,88 @@
 .video-player-overlay.vp-landscape .vp-queue           { display: none !important; }
 .video-player-overlay.vp-landscape .video-wrap         { height: 100%; }
 
-/* ── Plyr theme ── */
-:root {
-  --plyr-color-main: #CCFF00;
-  --plyr-video-background: #0E0E0F;
-  --plyr-font-family: 'DM Sans', sans-serif;
-  --plyr-font-size-base: 13px;
-  --plyr-control-radius: 6px;
-  --plyr-range-fill-background: linear-gradient(90deg,#FF7EC8,#CCFF00);
-  --plyr-range-thumb-background: #CCFF00;
-  --plyr-menu-background: rgba(14,14,15,0.97);
-  --plyr-menu-color: #fff;
-  --plyr-tooltip-background: #CCFF00;
-  --plyr-tooltip-color: #0E0E0F;
-  --plyr-video-control-background-hover: rgba(204,255,0,0.12);
-  --plyr-badge-background: #CCFF00;
-  --plyr-badge-text-color: #0E0E0F;
-  --plyr-tab-focus-color: #CCFF00;
+/* ── Custom video controls ── */
+.vp-controls {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  z-index: 5;
+  transition: opacity 0.25s;
 }
-.plyr { border-radius: 0; }
-.plyr__control--overlaid { background: rgba(204,255,0,0.18) !important; }
-.plyr--video .plyr__controls { background: linear-gradient(transparent,rgba(0,0,0,0.75)) !important; }
+.vp-controls.hidden { opacity: 0; pointer-events: none; }
+.vp-tap-area { flex: 1; cursor: pointer; }
+.vp-bottom {
+  background: linear-gradient(transparent, rgba(0,0,0,0.8));
+  padding: 20px 12px 10px;
+}
+.vp-seek-wrap { padding: 0 2px 10px; }
+.vp-seek {
+  width: 100%;
+  height: 3px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255,255,255,0.25);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.vp-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--lime);
+  cursor: pointer;
+  box-shadow: 0 0 4px rgba(0,0,0,0.5);
+}
+.vp-ctrl-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.vp-ctrl-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.vp-time {
+  font-size: 11px;
+  color: rgba(255,255,255,0.75);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  padding: 0 4px;
+}
+.vp-speed-btn {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: rgba(255,255,255,0.85);
+  padding: 4px 6px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 6px;
+}
+.vp-play-indicator {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  font-size: 52px;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.7));
+}
+.vp-play-indicator.flash { opacity: 1; }
 
 * {
   margin: 0;
@@ -3704,8 +3763,26 @@ body {
     </div>
   </div>
 
-  <div class="video-wrap">
+  <div class="video-wrap" id="vpWrap">
     <video id="vpVideo" muted playsinline webkit-playsinline preload="auto"></video>
+    <div class="vp-controls hidden" id="vpControls">
+      <div class="vp-tap-area" onclick="vpTogglePlay()"></div>
+      <div class="vp-play-indicator" id="vpPlayIndicator"></div>
+      <div class="vp-bottom">
+        <div class="vp-seek-wrap">
+          <input type="range" class="vp-seek" id="vpSeek" value="0" min="0" max="100" step="0.1"
+            oninput="vpOnSeekInput()" ontouchstart="vpOnSeekStart()" ontouchend="vpOnSeekEnd()">
+        </div>
+        <div class="vp-ctrl-row">
+          <button class="vp-ctrl-btn" id="vpPlayBtn" onclick="vpTogglePlay()">▶</button>
+          <span class="vp-time" id="vpTimeDisplay">0:00 / 0:00</span>
+          <div style="flex:1"></div>
+          <button class="vp-ctrl-btn vp-speed-btn" id="vpSpeedBtn" onclick="vpCycleSpeed()">1×</button>
+          <button class="vp-ctrl-btn" id="vpMuteBtn" onclick="vpToggleMute()">🔊</button>
+          <button class="vp-ctrl-btn" onclick="_enterFullscreen()" style="font-size:22px">⛶</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Playlist queue (shown when opened from playlist) -->
@@ -5807,7 +5884,108 @@ function _lbKeyDown(e) {
 
 // ── Video Player ───────────────────────────────────────────────────────────────
 let hlsInstance = null;
-let plyrInstance = null;
+
+// ── Custom video controls ──────────────────────────────────────────────────
+let _vpSeeking   = false;
+let _vpHideTimer = null;
+let _vpSpeedIdx  = 2;
+const _vpSpeeds  = [0.5, 0.75, 1, 1.25, 1.5, 2];
+
+function _initCustomControls() {
+  const video = document.getElementById('vpVideo');
+  if (!video) return;
+
+  video.addEventListener('play',  () => {
+    const btn = document.getElementById('vpPlayBtn');
+    if (btn) btn.textContent = '⏸';
+    _showVpControls();
+  });
+  video.addEventListener('pause', () => {
+    const btn = document.getElementById('vpPlayBtn');
+    if (btn) btn.textContent = '▶';
+  });
+  video.addEventListener('timeupdate', _vpUpdateTime);
+  video.addEventListener('loadedmetadata', _vpUpdateTime);
+
+  _vpSpeedIdx = 2;
+  const speedBtn = document.getElementById('vpSpeedBtn');
+  if (speedBtn) speedBtn.textContent = '1×';
+  const muteBtn = document.getElementById('vpMuteBtn');
+  if (muteBtn) muteBtn.textContent = video.muted ? '🔇' : '🔊';
+
+  _showVpControls();
+}
+
+function _vpUpdateTime() {
+  const video = document.getElementById('vpVideo');
+  const seek  = document.getElementById('vpSeek');
+  const time  = document.getElementById('vpTimeDisplay');
+  if (!video || _vpSeeking) return;
+  if (video.duration) {
+    if (seek) seek.value = (video.currentTime / video.duration * 100).toFixed(1);
+  }
+  if (time) time.textContent = `${_fmtTime(video.currentTime)} / ${_fmtTime(video.duration || 0)}`;
+}
+
+function _fmtTime(s) {
+  if (!s || isNaN(s)) return '0:00';
+  const m = Math.floor(s / 60);
+  return `${m}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
+}
+
+function _showVpControls() {
+  const ctrl = document.getElementById('vpControls');
+  if (!ctrl) return;
+  ctrl.classList.remove('hidden');
+  clearTimeout(_vpHideTimer);
+  _vpHideTimer = setTimeout(() => ctrl.classList.add('hidden'), 3500);
+}
+
+function _flashVpIndicator(icon) {
+  const ind = document.getElementById('vpPlayIndicator');
+  if (!ind) return;
+  ind.textContent = icon;
+  ind.classList.add('flash');
+  setTimeout(() => ind.classList.remove('flash'), 500);
+}
+
+function vpTogglePlay() {
+  const video = document.getElementById('vpVideo');
+  if (!video) return;
+  if (video.paused) { video.play().catch(() => {}); _flashVpIndicator('▶'); }
+  else              { video.pause();                 _flashVpIndicator('⏸'); }
+  _showVpControls();
+}
+
+function vpToggleMute() {
+  const video = document.getElementById('vpVideo');
+  if (!video) return;
+  video.muted = !video.muted;
+  const btn = document.getElementById('vpMuteBtn');
+  if (btn) btn.textContent = video.muted ? '🔇' : '🔊';
+  _showVpControls();
+}
+
+function vpCycleSpeed() {
+  const video = document.getElementById('vpVideo');
+  if (!video) return;
+  _vpSpeedIdx = (_vpSpeedIdx + 1) % _vpSpeeds.length;
+  video.playbackRate = _vpSpeeds[_vpSpeedIdx];
+  const btn = document.getElementById('vpSpeedBtn');
+  if (btn) btn.textContent = `${_vpSpeeds[_vpSpeedIdx]}×`;
+  _showVpControls();
+}
+
+function vpOnSeekStart()  { _vpSeeking = true; _showVpControls(); }
+function vpOnSeekEnd()    { _vpSeeking = false; }
+function vpOnSeekInput()  {
+  const video = document.getElementById('vpVideo');
+  const seek  = document.getElementById('vpSeek');
+  if (!video || !video.duration || !seek) return;
+  video.currentTime = seek.value / 100 * video.duration;
+  _vpUpdateTime();
+  _showVpControls();
+}
 
 // ── Fullscreen with landscape rotation ────────────────────────────────────────
 let _isFakeFullscreen = false;
@@ -5838,33 +6016,6 @@ function _exitFullscreen() {
   try { document.exitFullscreen?.() || document.webkitExitFullscreen?.(); } catch(_) {}
 }
 
-// ── Plyr init / destroy ────────────────────────────────────────────────────
-function _initPlyr() {
-  const video = document.getElementById('vpVideo');
-  if (!video || typeof Plyr === 'undefined') return;
-  if (plyrInstance) { try { plyrInstance.destroy(); } catch(_) {} plyrInstance = null; }
-  plyrInstance = new Plyr(video, {
-    controls: ['play-large','rewind','play','fast-forward','progress','current-time','duration','mute','volume','settings','fullscreen'],
-    settings: ['speed'],
-    speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
-    keyboard: { focused: true, global: false },
-    tooltips: { controls: true, seek: true },
-    fullscreen: { enabled: true, iosNative: false, fallback: false },
-    captions: { active: false },
-    resetOnEnd: false,
-    invertTime: false,
-    hideControls: true,
-    clickToPlay: true,
-  });
-  // Override fullscreen with our landscape handler
-  plyrInstance.on('enterfullscreen', (e) => {
-    e.preventDefault?.();
-    _enterFullscreen();
-  });
-  plyrInstance.on('exitfullscreen', () => {
-    _exitFullscreen();
-  });
-}
 let currentVideoId = null;
 
 // ── Paywall modal ─────────────────────────────────────────────────────────────
@@ -6048,8 +6199,8 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
     }
   };
 
-  // Init Plyr UI after source is set up
-  requestAnimationFrame(() => _initPlyr());
+  // Init custom controls after source is set up
+  _initCustomControls();
 
   // Progress tracking — save every 15s
   _startProgressTracking(contentId, video);
@@ -6090,7 +6241,7 @@ function closeVideoPlayer() {
   try { video.load(); } catch(_) {}
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   if (_isFakeFullscreen) _exitFullscreen();
-  if (plyrInstance) { try { plyrInstance.destroy(); } catch(_) {} plyrInstance = null; }
+  clearTimeout(_vpHideTimer);
   currentVideoId = null;
   const errEl = document.querySelector('.vp-error');
   if (errEl) errEl.remove();
