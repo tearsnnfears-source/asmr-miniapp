@@ -24,34 +24,19 @@
   --success: #4ADE80;
 }
 
-/* ── VP landscape fullscreen ── */
-.video-player-overlay.vp-landscape {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  width: 100vh;
-  height: 100vw;
-  transform: translate(-50%, -50%) rotate(90deg);
-  transform-origin: center;
-  z-index: 3000;
-}
-.video-player-overlay.vp-landscape .video-player-topbar { display: none; }
-.video-player-overlay.vp-landscape .video-player-body  { display: none; }
-.video-player-overlay.vp-landscape .vp-queue           { display: none !important; }
-.video-player-overlay.vp-landscape .video-wrap         { height: 100%; }
+/* video-wrap fills available space */
+.video-wrap { position: relative; }
 
 /* ── Custom video controls ── */
 .vp-controls {
   position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  z-index: 5;
+  left: 0; right: 0; bottom: 0;
+  z-index: 6;
   transition: opacity 0.25s;
+  pointer-events: none;
 }
-.vp-controls.hidden { opacity: 0; pointer-events: none; }
-.vp-tap-area { flex: 1; cursor: pointer; }
+.vp-controls.hidden { opacity: 0; }
+.vp-controls:not(.hidden) { pointer-events: auto; }
 .vp-bottom {
   background: linear-gradient(transparent, rgba(0,0,0,0.8));
   padding: 20px 12px 10px;
@@ -3757,24 +3742,27 @@ body {
     </div>
   </div>
 
+  <!-- Touch target OUTSIDE controls — always visible, brings controls back -->
+  <div id="vpTouchZone" style="position:absolute;inset:0;z-index:4;"></div>
+
   <div class="video-wrap" id="vpWrap">
     <video id="vpVideo" muted playsinline webkit-playsinline preload="auto"></video>
-    <div class="vp-controls hidden" id="vpControls">
-      <div class="vp-tap-area" onclick="vpTogglePlay()"></div>
-      <div class="vp-play-indicator" id="vpPlayIndicator"></div>
-      <div class="vp-bottom">
-        <div class="vp-seek-wrap">
-          <input type="range" class="vp-seek" id="vpSeek" value="0" min="0" max="100" step="0.1"
-            oninput="vpOnSeekInput()" ontouchstart="vpOnSeekStart()" ontouchend="vpOnSeekEnd()">
-        </div>
-        <div class="vp-ctrl-row">
-          <button class="vp-ctrl-btn" id="vpPlayBtn" onclick="vpTogglePlay()">▶</button>
-          <span class="vp-time" id="vpTimeDisplay">0:00 / 0:00</span>
-          <div style="flex:1"></div>
-          <button class="vp-ctrl-btn vp-speed-btn" id="vpSpeedBtn" onclick="vpCycleSpeed()">1×</button>
-          <button class="vp-ctrl-btn" id="vpMuteBtn" onclick="vpToggleMute()">🔊</button>
-          <button class="vp-ctrl-btn" onclick="_enterFullscreen()" style="font-size:22px">⛶</button>
-        </div>
+  </div>
+
+  <!-- Controls sit OUTSIDE video-wrap so they survive video-wrap changes -->
+  <div class="vp-controls hidden" id="vpControls">
+    <div class="vp-play-indicator" id="vpPlayIndicator"></div>
+    <div class="vp-bottom">
+      <div class="vp-seek-wrap">
+        <input type="range" class="vp-seek" id="vpSeek" value="0" min="0" max="100" step="0.1">
+      </div>
+      <div class="vp-ctrl-row">
+        <button class="vp-ctrl-btn" id="vpPlayBtn" onclick="vpTogglePlay()">▶</button>
+        <span class="vp-time" id="vpTimeDisplay">0:00 / 0:00</span>
+        <div style="flex:1"></div>
+        <button class="vp-ctrl-btn vp-speed-btn" id="vpSpeedBtn" onclick="vpCycleSpeed()">1×</button>
+        <button class="vp-ctrl-btn" id="vpMuteBtn" onclick="vpToggleMute()">🔊</button>
+        <button class="vp-ctrl-btn" onclick="vpFullscreen()" style="font-size:22px">⛶</button>
       </div>
     </div>
   </div>
@@ -5936,25 +5924,74 @@ function _initCustomControls() {
   const video = document.getElementById('vpVideo');
   if (!video) return;
 
-  video.addEventListener('play',  () => {
-    const btn = document.getElementById('vpPlayBtn');
-    if (btn) btn.textContent = '⏸';
-    _showVpControls();
-  });
-  video.addEventListener('pause', () => {
-    const btn = document.getElementById('vpPlayBtn');
-    if (btn) btn.textContent = '▶';
-  });
-  video.addEventListener('timeupdate', _vpUpdateTime);
-  video.addEventListener('loadedmetadata', _vpUpdateTime);
+  // Clean up previous listeners
+  _destroyCustomControls();
 
+  // Named handlers so we can remove them later
+  video._onPlay  = () => { const b = document.getElementById('vpPlayBtn'); if (b) b.textContent = '⏸'; };
+  video._onPause = () => { const b = document.getElementById('vpPlayBtn'); if (b) b.textContent = '▶'; };
+  video._onTime  = _vpUpdateTime;
+  video._onMeta  = _vpUpdateTime;
+
+  video.addEventListener('play',          video._onPlay);
+  video.addEventListener('pause',         video._onPause);
+  video.addEventListener('timeupdate',    video._onTime);
+  video.addEventListener('loadedmetadata',video._onMeta);
+
+  // Seek bar
+  const seek = document.getElementById('vpSeek');
+  if (seek) {
+    seek._onInput = () => { vpOnSeekInput(); };
+    seek._onTS    = () => { _vpSeeking = true; };
+    seek._onTE    = () => { _vpSeeking = false; };
+    seek.addEventListener('input',      seek._onInput);
+    seek.addEventListener('touchstart', seek._onTS, { passive: true });
+    seek.addEventListener('touchend',   seek._onTE, { passive: true });
+    // Also handle mouse for desktop testing
+    seek.addEventListener('mousedown',  seek._onTS);
+    seek.addEventListener('mouseup',    seek._onTE);
+  }
+
+  // Touch zone — always on top, tap = toggle controls, double-tap = play/pause
+  const tz = document.getElementById('vpTouchZone');
+  if (tz) {
+    let _lastTap = 0;
+    tz._onTouch = () => {
+      const now = Date.now();
+      if (now - _lastTap < 300) { vpTogglePlay(); }  // double-tap = play/pause
+      else { _showVpControls(); }                      // single tap = show controls
+      _lastTap = now;
+    };
+    tz.addEventListener('click', tz._onTouch);
+  }
+
+  // Initial state
   _vpSpeedIdx = 2;
   const speedBtn = document.getElementById('vpSpeedBtn');
   if (speedBtn) speedBtn.textContent = '1×';
   const muteBtn = document.getElementById('vpMuteBtn');
-  if (muteBtn) muteBtn.textContent = video.muted ? '🔇' : '🔊';
+  if (muteBtn) muteBtn.textContent = '🔊';
 
   _showVpControls();
+}
+
+function _destroyCustomControls() {
+  const video = document.getElementById('vpVideo');
+  if (video) {
+    if (video._onPlay)  { video.removeEventListener('play',           video._onPlay);  video._onPlay  = null; }
+    if (video._onPause) { video.removeEventListener('pause',          video._onPause); video._onPause = null; }
+    if (video._onTime)  { video.removeEventListener('timeupdate',     video._onTime);  video._onTime  = null; }
+    if (video._onMeta)  { video.removeEventListener('loadedmetadata', video._onMeta);  video._onMeta  = null; }
+  }
+  const seek = document.getElementById('vpSeek');
+  if (seek) {
+    if (seek._onInput) { seek.removeEventListener('input',      seek._onInput); seek._onInput = null; }
+    if (seek._onTS)    { seek.removeEventListener('touchstart', seek._onTS);    seek._onTS    = null; }
+    if (seek._onTE)    { seek.removeEventListener('touchend',   seek._onTE);    seek._onTE    = null; }
+  }
+  const tz = document.getElementById('vpTouchZone');
+  if (tz?._onTouch) { tz.removeEventListener('click', tz._onTouch); tz._onTouch = null; }
+  clearTimeout(_vpHideTimer);
 }
 
 function _vpUpdateTime() {
@@ -6028,33 +6065,23 @@ function vpOnSeekInput()  {
   _showVpControls();
 }
 
-// ── Fullscreen with landscape rotation ────────────────────────────────────────
-let _isFakeFullscreen = false;
-
-function _enterFullscreen() {
-  const overlay = document.getElementById('videoPlayerOverlay');
-  const video   = document.getElementById('vpVideo');
-  // Try screen orientation lock first (Android)
-  const lockPromise = screen.orientation?.lock?.('landscape');
-  // Try native fullscreen on video element (iOS Safari)
-  const nativeFsPromise = video.webkitEnterFullscreen
-    ? Promise.resolve(video.webkitEnterFullscreen())
-    : (overlay.requestFullscreen?.() || overlay.webkitRequestFullscreen?.() || Promise.reject());
-
-  Promise.race([lockPromise, nativeFsPromise])
-    .catch(() => {
-      // Fallback: CSS landscape rotation
-      overlay.classList.add('vp-landscape');
-      _isFakeFullscreen = true;
-    });
-}
-
-function _exitFullscreen() {
-  const overlay = document.getElementById('videoPlayerOverlay');
-  overlay.classList.remove('vp-landscape');
-  _isFakeFullscreen = false;
-  try { screen.orientation?.unlock?.(); } catch(_) {}
-  try { document.exitFullscreen?.() || document.webkitExitFullscreen?.(); } catch(_) {}
+// ── Fullscreen (native video FS — simplest, most reliable on mobile) ──────────
+function vpFullscreen() {
+  const video = document.getElementById('vpVideo');
+  if (!video) return;
+  // iOS Safari: native video fullscreen
+  if (typeof video.webkitEnterFullscreen === 'function') {
+    video.webkitEnterFullscreen();
+    return;
+  }
+  // Android / Chrome: element fullscreen
+  const target = document.getElementById('vpWrap');
+  const req = target.requestFullscreen || target.webkitRequestFullscreen || target.mozRequestFullScreen;
+  if (req) {
+    req.call(target).then(() => {
+      screen.orientation?.lock?.('landscape').catch(() => {});
+    }).catch(() => {});
+  }
 }
 
 let currentVideoId = null;
@@ -6172,9 +6199,11 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
     const p = video.play();
     if (p && p.then) {
       p.then(() => {
-        // Playback started! Now try to unmute
-        console.log('[player] playing, attempting unmute...');
         video.muted = false;
+        // Update mute button
+        const mb = document.getElementById('vpMuteBtn');
+        if (mb) mb.textContent = '🔊';
+        _showVpControls();
       }).catch(e => {
         console.log('[player] autoplay blocked:', e?.message);
       });
@@ -6281,7 +6310,7 @@ function closeVideoPlayer() {
   video.removeAttribute('src');
   try { video.load(); } catch(_) {}
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-  if (_isFakeFullscreen) _exitFullscreen();
+  _destroyCustomControls();
   clearTimeout(_vpHideTimer);
   currentVideoId = null;
   const errEl = document.querySelector('.vp-error');
