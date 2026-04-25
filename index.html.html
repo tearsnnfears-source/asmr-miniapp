@@ -1684,8 +1684,10 @@ body {
   object-fit: contain;
   border-radius: 6px;
   user-select: none;
-  pointer-events: none;
+  touch-action: none;
+  transform-origin: center center;
   transition: opacity 0.2s;
+  will-change: transform;
 }
 .photo-lightbox-img.fading { opacity: 0; }
 
@@ -4565,8 +4567,11 @@ async function showUpdatesPage() {
   document.getElementById('avTabVods')?.classList.remove('active');
   document.getElementById('avTabYT')?.classList.remove('active');
 
-  // Show skeleton while loading
-  if (!avAllVideos.length) _avShowSkeleton();
+  // Show skeleton while loading, hide stats counter
+  if (!avAllVideos.length) {
+    _avShowSkeleton();
+    document.getElementById('updatesStats').textContent = '';
+  }
 
   await _avEnsureLoaded();
   _avBuildArtistFilter();
@@ -5981,9 +5986,11 @@ function openPhotoLightbox(index) {
   lb.classList.add('active');
   _lightboxRender();
 
+  _lbResetZoom();
   _pushBack(closeLightbox);
-  lb.addEventListener('touchstart', _lbTouchStart, { passive: true });
-  lb.addEventListener('touchend', _lbTouchEnd, { passive: true });
+  lb.addEventListener('touchstart', _lbTouchStart, { passive: false });
+  lb.addEventListener('touchmove',  _lbTouchMove,  { passive: false });
+  lb.addEventListener('touchend',   _lbTouchEnd,   { passive: true });
   document.addEventListener('keydown', _lbKeyDown);
 }
 
@@ -5991,8 +5998,10 @@ function closeLightbox() {
   const lb = document.getElementById('photoLightbox');
   lb.classList.remove('active');
   lb.removeEventListener('touchstart', _lbTouchStart);
-  lb.removeEventListener('touchend', _lbTouchEnd);
+  lb.removeEventListener('touchmove',  _lbTouchMove);
+  lb.removeEventListener('touchend',   _lbTouchEnd);
   document.removeEventListener('keydown', _lbKeyDown);
+  _lbResetZoom();
   _popBack();
 }
 
@@ -6021,15 +6030,72 @@ function _lightboxRender(fade) {
 function lightboxNav(dir) {
   const total = currentArtistPhotos.length;
   lightboxIndex = (lightboxIndex + dir + total) % total;
+  _lbResetZoom();
   _lightboxRender(true);
 }
 
+// ── Lightbox pinch-zoom state ─────────────────────────────────────────────────
+let _lbScale    = 1;
+let _lbPinchDist0 = 0;
+let _lbPinchScale0 = 1;
+let _lbPanX = 0, _lbPanY = 0;
+let _lbPanX0 = 0, _lbPanY0 = 0;
+let _lbDragStartX = 0, _lbDragStartY = 0;
+let _lbPinching  = false;
+
+function _lbPinchDist(e) {
+  const dx = e.touches[0].clientX - e.touches[1].clientX;
+  const dy = e.touches[0].clientY - e.touches[1].clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function _lbApplyTransform() {
+  const img = document.getElementById('lightboxImg');
+  if (img) img.style.transform = `translate(${_lbPanX}px,${_lbPanY}px) scale(${_lbScale})`;
+}
+
+function _lbResetZoom() {
+  _lbScale = 1; _lbPanX = 0; _lbPanY = 0;
+  _lbApplyTransform();
+}
+
 function _lbTouchStart(e) {
-  lightboxSwipeStartX = e.touches[0].clientX;
-  lightboxSwipeStartY = e.touches[0].clientY;
+  if (e.touches.length === 2) {
+    _lbPinching = true;
+    _lbPinchDist0  = _lbPinchDist(e);
+    _lbPinchScale0 = _lbScale;
+  } else {
+    _lbPinching = false;
+    lightboxSwipeStartX = e.touches[0].clientX;
+    lightboxSwipeStartY = e.touches[0].clientY;
+    _lbDragStartX = e.touches[0].clientX;
+    _lbDragStartY = e.touches[0].clientY;
+    _lbPanX0 = _lbPanX;
+    _lbPanY0 = _lbPanY;
+  }
+}
+
+function _lbTouchMove(e) {
+  e.preventDefault();
+  if (e.touches.length === 2 && _lbPinching) {
+    const dist = _lbPinchDist(e);
+    _lbScale = Math.min(5, Math.max(1, _lbPinchScale0 * dist / _lbPinchDist0));
+    _lbApplyTransform();
+  } else if (e.touches.length === 1 && _lbScale > 1) {
+    // Pan when zoomed in
+    _lbPanX = _lbPanX0 + (e.touches[0].clientX - _lbDragStartX);
+    _lbPanY = _lbPanY0 + (e.touches[0].clientY - _lbDragStartY);
+    _lbApplyTransform();
+  }
 }
 
 function _lbTouchEnd(e) {
+  if (_lbPinching && e.touches.length < 2) {
+    _lbPinching = false;
+    if (_lbScale < 1.05) _lbResetZoom();
+    return;
+  }
+  if (_lbScale > 1.1) return; // don't swipe while zoomed
   const dx = e.changedTouches[0].clientX - lightboxSwipeStartX;
   const dy = e.changedTouches[0].clientY - lightboxSwipeStartY;
   if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
