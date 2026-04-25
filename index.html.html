@@ -26,19 +26,6 @@
 
 /* video-wrap fills available space */
 .video-wrap { position: relative; }
-.vp-fs-btn {
-  position: absolute;
-  bottom: 10px; right: 10px;
-  z-index: 10;
-  background: rgba(0,0,0,0.5);
-  border: none; border-radius: 8px;
-  color: #fff; font-size: 20px;
-  width: 38px; height: 38px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
-  backdrop-filter: blur(4px);
-  -webkit-tap-highlight-color: transparent;
-}
 
 * {
   margin: 0;
@@ -3277,13 +3264,6 @@ body {
         </button>
       </div>
 
-      <div id="continueWatchingSection" style="display:none">
-        <div class="section-header">
-          <div class="section-title">▶ Continue Watching</div>
-        </div>
-        <div class="updates-scroll" id="continueWatchingScroll"></div>
-      </div>
-
       <div>
         <div class="section-header">
           <div class="section-title">🎙 Artists</div>
@@ -3676,7 +3656,6 @@ body {
 
   <div class="video-wrap" id="vpWrap">
     <video id="vpVideo" muted controls playsinline webkit-playsinline preload="auto"></video>
-    <button class="vp-fs-btn" onclick="vpFullscreen()" title="Fullscreen">⛶</button>
   </div>
 
   <!-- Playlist queue (shown when opened from playlist) -->
@@ -5041,7 +5020,6 @@ async function initTelegramWebAppUser() {
     updateCTAButtons();
     updateProfileSubCard();
     refreshFavoritesBadgesOnly();
-    loadContinueWatching();
   }
 }
 
@@ -5826,28 +5804,6 @@ function _lbKeyDown(e) {
 // ── Video Player ───────────────────────────────────────────────────────────────
 let hlsInstance = null;
 
-// ── Fullscreen button ──────────────────────────────────────────────────────
-
-
-
-// ── Fullscreen (native video FS — simplest, most reliable on mobile) ──────────
-function vpFullscreen() {
-  const video = document.getElementById('vpVideo');
-  if (!video) return;
-  // iOS Safari: native video fullscreen
-  if (typeof video.webkitEnterFullscreen === 'function') {
-    video.webkitEnterFullscreen();
-    return;
-  }
-  // Android / Chrome: element fullscreen
-  const target = document.getElementById('vpWrap');
-  const req = target.requestFullscreen || target.webkitRequestFullscreen || target.mozRequestFullScreen;
-  if (req) {
-    req.call(target).then(() => {
-      screen.orientation?.lock?.('landscape').catch(() => {});
-    }).catch(() => {});
-  }
-}
 
 let currentVideoId = null;
 
@@ -6032,18 +5988,6 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
   };
 
 
-  // Progress tracking — save every 15s
-  _startProgressTracking(contentId, video);
-
-  // Restore resume position from localStorage
-  const savedPos = _getWatchProgress(contentId);
-  if (savedPos > 5) {
-    video.addEventListener('loadedmetadata', function _resume() {
-      video.removeEventListener('loadedmetadata', _resume);
-      if (savedPos < video.duration - 5) video.currentTime = savedPos;
-    }, { once: true });
-  }
-
   // Load reactions & comments
   document.getElementById('vpReactions').innerHTML = '<div style="color:var(--muted);font-size:13px;padding:4px 0">Loading reactions…</div>';
   document.getElementById('vpCommentsList').innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px 0;text-align:center">Loading…</div>';
@@ -6061,9 +6005,6 @@ function closeVideoPlayer() {
   const overlay = document.getElementById('videoPlayerOverlay');
   overlay.classList.remove('active');
   const video = document.getElementById('vpVideo');
-  // Save final progress before stopping
-  if (_currentProgressId) _saveWatchProgress(_currentProgressId, video);
-  _stopProgressTracking();
   video.pause();
   video.onended = null;
   video.loop = false;
@@ -6145,70 +6086,6 @@ function _renderVpQueue() {
   if (currentEl) currentEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 }
 
-// ── Watch progress ────────────────────────────────────────────────────────────
-let _progressTimer = null;
-let _currentProgressId = null;
-
-function _getWatchProgress(contentId) {
-  try { return parseFloat(localStorage.getItem(`wp_${contentId}`) || '0') || 0; } catch(_) { return 0; }
-}
-
-function _saveWatchProgress(contentId, video) {
-  if (!contentId || !video || !video.duration) return;
-  const prog = Math.floor(video.currentTime);
-  const dur  = Math.floor(video.duration);
-  if (prog < 3) return;
-  try { localStorage.setItem(`wp_${contentId}`, String(prog)); } catch(_) {}
-  // Async API save (fire & forget)
-  const initData = getTelegramInitData();
-  fetch(`${API_BASE}/miniapp/watch_progress`, {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({initData, content_id: contentId, progress_seconds: prog, duration_seconds: dur})
-  }).catch(() => {});
-}
-
-function _startProgressTracking(contentId, video) {
-  _stopProgressTracking();
-  _currentProgressId = contentId;
-  _progressTimer = setInterval(() => _saveWatchProgress(contentId, video), 15000);
-}
-
-function _stopProgressTracking() {
-  if (_progressTimer) { clearInterval(_progressTimer); _progressTimer = null; }
-  _currentProgressId = null;
-}
-
-// ── Continue Watching ─────────────────────────────────────────────────────────
-async function loadContinueWatching() {
-  try {
-    const initData = getTelegramInitData();
-    if (!initData) return;
-    const res  = await fetch(`${API_BASE}/miniapp/continue_watching`, {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({initData})
-    });
-    const data = await res.json();
-    const items = data.items || [];
-    const section = document.getElementById('continueWatchingSection');
-    const scroll  = document.getElementById('continueWatchingScroll');
-    if (!items.length || !scroll) { if (section) section.style.display = 'none'; return; }
-    if (section) section.style.display = 'block';
-    scroll.innerHTML = items.map(v => {
-      const pct = v.duration > 0 ? Math.min(100, Math.round(v.progress / v.duration * 100)) : 0;
-      const bg  = v.thumbnail_url ? `style="background-image:url('${v.thumbnail_url.replace(/'/g,"\\'")}')"` : '';
-      return `<div class="update-mini-card" onclick="openVideoPlayer(${v.id},'${(v.url||'').replace(/'/g,"\\'")}','${(v.title||'').replace(/'/g,"\\'")}','${(v.artist_name||'').replace(/'/g,"\\'")}','${(v.tags||'').replace(/'/g,"\\'")}','${(v.thumbnail_url||'').replace(/'/g,"\\'")}')">
-        <div class="update-mini-thumb" ${bg}>
-          <div class="update-play-btn"></div>
-          <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(255,255,255,0.15)">
-            <div style="width:${pct}%;height:100%;background:var(--lime);transition:width 0.3s"></div>
-          </div>
-        </div>
-        <div class="update-mini-title">${escapeHtml(v.title||'Video')}</div>
-        <div class="update-mini-date">${v.artist_name||''} · ${pct}%</div>
-      </div>`;
-    }).join('');
-  } catch(e) { console.warn('[continue]', e); }
-}
 
 // ── Server-side search ────────────────────────────────────────────────────────
 let _searchDebounce = null;
