@@ -644,6 +644,33 @@ body {
 }
 .profile-photo-grid.blurred { filter: blur(3px); pointer-events: none; user-select: none; }
 
+/* ── VP 30s preview end overlay ── */
+.vp-preview-end {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(14,14,15,0.88);
+  backdrop-filter: blur(8px);
+  padding: 24px;
+  text-align: center;
+  animation: fadeIn 0.35s ease;
+}
+@keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+.vp-preview-end-icon  { font-size: 40px; }
+.vp-preview-end-title { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 1px; color: #fff; }
+.vp-preview-end-sub   { font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.5; }
+.vp-preview-end-btn   { background: linear-gradient(135deg,#FF7EC8,#C86BFF); border: none; border-radius: 14px;
+  padding: 13px 28px; font-size: 15px; font-weight: 700; color: #fff; cursor: pointer;
+  font-family: 'DM Sans',sans-serif; box-shadow: 0 6px 20px rgba(255,126,200,0.4); width: 100%; max-width: 260px; }
+.vp-preview-end-trial { background: none; border: 1px solid rgba(255,255,255,0.2); border-radius: 14px;
+  padding: 10px 20px; font-size: 13px; color: rgba(255,255,255,0.65); cursor: pointer;
+  font-family: 'DM Sans',sans-serif; }
+
 /* ── VP toggles ── */
 .vp-toggle-btn {
   background: var(--dark3);
@@ -5981,14 +6008,23 @@ async function paywallTrial() {
   }
 }
 
-function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
-  // ── PAYWALL GATE ─────────────────────────────────────────────────────────────
-  if (!hasVideoAccess()) {
-    _paywallPending = { contentId, url, title, artist, tagsRaw, thumbUrl };
-    showPaywall(title, artist);
-    return;
-  }
+function _showVpPreviewEnd() {
+  const wrap = document.getElementById('vpWrap');
+  if (!wrap || wrap.querySelector('.vp-preview-end')) return;
+  const video = document.getElementById('vpVideo');
+  video.pause();
+  const div = document.createElement('div');
+  div.className = 'vp-preview-end';
+  div.innerHTML = `
+    <div class="vp-preview-end-icon">🔒</div>
+    <div class="vp-preview-end-title">Preview ended</div>
+    <div class="vp-preview-end-sub">Subscribe to watch the full video and access all content</div>
+    <button class="vp-preview-end-btn" onclick="paywallSubscribe()">🚀 Subscribe Now</button>
+    <button class="vp-preview-end-trial" onclick="paywallTrial()">🎁 Try 5 days free</button>`;
+  wrap.appendChild(div);
+}
 
+function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
   currentVideoId = contentId;
 
   const overlay = document.getElementById('videoPlayerOverlay');
@@ -6109,6 +6145,21 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
     tryPlay();
   }
 
+  // 30-second preview for non-subscribers
+  const vpWrap = document.getElementById('vpWrap');
+  vpWrap?.querySelectorAll('.vp-preview-end').forEach(el => el.remove());
+  if (!hasVideoAccess()) {
+    video._previewCheck = () => {
+      if (video.currentTime >= 30) {
+        video.removeEventListener('timeupdate', video._previewCheck);
+        _showVpPreviewEnd();
+      }
+    };
+    video.addEventListener('timeupdate', video._previewCheck);
+  } else {
+    video._previewCheck = null;
+  }
+
   // Autoplay-next / replay on video end
   video.onended = function() {
     if (vpLoop) return; // video.loop already handles it natively
@@ -6136,6 +6187,8 @@ function closeVideoPlayer() {
   const overlay = document.getElementById('videoPlayerOverlay');
   overlay.classList.remove('active');
   const video = document.getElementById('vpVideo');
+  if (video._previewCheck) { video.removeEventListener('timeupdate', video._previewCheck); video._previewCheck = null; }
+  document.getElementById('vpWrap')?.querySelectorAll('.vp-preview-end').forEach(el => el.remove());
   video.pause();
   video.onended = null;
   video.loop = false;
@@ -6826,6 +6879,13 @@ async function confirmTrial() {
       setTimeout(openInviteModal, 400);
     } else {
       showToast('🎁 5 free days activated!');
+    }
+    // Remove preview overlay if watching a video — let them continue
+    const previewEl = document.querySelector('.vp-preview-end');
+    if (previewEl) {
+      previewEl.remove();
+      const vid = document.getElementById('vpVideo');
+      vid?.play().catch(() => {});
     }
   } catch (_) {
     hidePaymentOverlay();
