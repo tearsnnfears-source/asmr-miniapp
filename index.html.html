@@ -3274,7 +3274,7 @@ body {
 
       <div>
         <div class="section-header">
-          <div class="section-title">🎬 Last Updates</div>
+          <div class="section-title" id="lastUpdatesTitle">🎬 Last Updates</div>
           <button class="see-all-btn" onclick="showUpdatesPage()">See all →</button>
         </div>
         <div class="updates-scroll" id="updatesScroll"></div>
@@ -3334,8 +3334,20 @@ body {
     <button class="search-clear" id="searchClear" onclick="clearSearch()">✕</button>
   </div>
   <div class="page-scroll">
-    <div class="page-title-section">
-      <div class="page-title">All <span>Artists</span></div>
+    <div class="page-title-section" style="padding-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div class="page-title" id="artistsPageTitle">All <span>Artists</span></div>
+        <div style="display:flex;gap:4px;background:var(--dark3);border-radius:20px;padding:3px">
+          <button id="artistTabAll" onclick="switchArtistTab('all')"
+            style="border:none;border-radius:18px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;background:var(--lime);color:#0E0E0F;transition:all 0.15s">
+            Artists
+          </button>
+          <button id="artistTabFollowing" onclick="switchArtistTab('following')"
+            style="border:none;border-radius:18px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;background:none;color:var(--muted);transition:all 0.15s">
+            Following
+          </button>
+        </div>
+      </div>
       <div class="page-title-stats" id="artistsStats" style="font-size:16px;color:var(--lime);margin-top:8px;font-weight:600">51.534 Photos · 10.423 Videos</div>
     </div>
     <div class="artists-grid" id="artistsGrid"></div>
@@ -3363,6 +3375,30 @@ body {
         </div>
       </div>
     </div>
+
+      <!-- User stats card -->
+      <div id="profileStatsCard" style="margin:0 16px 14px;background:var(--dark2);border:1px solid var(--border);border-radius:16px;padding:14px 16px;display:none">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted);font-weight:600;margin-bottom:12px">Your Activity</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div style="text-align:center">
+            <div id="statFollows" style="font-size:22px;font-weight:700;color:var(--lime)">0</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">Artists followed</div>
+          </div>
+          <div style="text-align:center">
+            <div id="statFavorites" style="font-size:22px;font-weight:700;color:var(--pink)">0</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">Favorites</div>
+          </div>
+          <div style="text-align:center">
+            <div id="statReactions" style="font-size:22px;font-weight:700;color:var(--orange)">0</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">Reactions</div>
+          </div>
+          <div style="text-align:center">
+            <div id="statSince" style="font-size:13px;font-weight:700;color:var(--text)">—</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">Member since</div>
+          </div>
+        </div>
+        <div id="statTopArtist" style="display:none;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);text-align:center"></div>
+      </div>
 
       <!-- Subscription status card -->
       <div id="profileSubCard" style="margin:0 16px 14px;background:var(--dark2);border:1px solid var(--border);border-radius:16px;padding:14px 16px;display:none">
@@ -3609,7 +3645,13 @@ body {
 
   <!-- Header -->
   <div class="artist-profile-header">
-    <div class="artist-profile-stat-val" id="artistProfileName" style="font-size:24px;color:var(--lime);font-family:'Bebas Neue',sans-serif;letter-spacing:1px">Artist</div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+      <div class="artist-profile-stat-val" id="artistProfileName" style="font-size:24px;color:var(--lime);font-family:'Bebas Neue',sans-serif;letter-spacing:1px">Artist</div>
+      <button id="artistFollowBtn" onclick="toggleFollowArtist()"
+        style="flex-shrink:0;background:var(--dark3);border:1.5px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s">
+        ➕ Follow
+      </button>
+    </div>
     <div style="display:flex;gap:16px;margin-top:6px">
       <div style="font-size:12px;color:var(--muted)">📸 <span id="profilePhotoCount">0</span></div>
       <div style="font-size:12px;color:var(--muted)">📹 <span id="profileVideoCount">0</span></div>
@@ -5020,6 +5062,8 @@ async function initTelegramWebAppUser() {
     updateCTAButtons();
     updateProfileSubCard();
     refreshFavoritesBadgesOnly();
+    loadMyArtists();
+    loadUserStats();
   }
 }
 
@@ -5519,6 +5563,7 @@ function openArtistProfile(name) {
   document.getElementById('profilePhotoGrid').innerHTML = '';
 
   document.getElementById('artist-profile-page').classList.add('active');
+  checkArtistFollowStatus(name);
 
   // Load content from API
   loadArtistProfileContent(name);
@@ -6126,6 +6171,165 @@ function _buildAvTagsWithCounts() {
 }
 
 // ── Profile subscription card ─────────────────────────────────────────────────
+// ── Follow system ─────────────────────────────────────────────────────────────
+let _currentArtistFollowed = false;
+
+async function toggleFollowArtist() {
+  const name = document.getElementById('artistProfileName')?.textContent;
+  if (!name) return;
+  const initData = getTelegramInitData();
+  try {
+    const res  = await fetch(`${API_BASE}/miniapp/follow`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({initData, artist_name: name})
+    });
+    const data = await res.json();
+    _currentArtistFollowed = data.following;
+    _updateFollowBtn(_currentArtistFollowed);
+    showToast(_currentArtistFollowed ? `💜 Following ${name}` : `Unfollowed ${name}`);
+    loadMyArtists();
+    if (_artistTab === 'following') _renderFollowingGrid();
+  } catch(e) { showToast('Error'); }
+}
+
+function _updateFollowBtn(following) {
+  const btn = document.getElementById('artistFollowBtn');
+  if (!btn) return;
+  if (following) {
+    btn.textContent = '✓ Following';
+    btn.style.background    = 'rgba(255,126,200,0.15)';
+    btn.style.borderColor   = 'rgba(255,126,200,0.5)';
+    btn.style.color         = 'var(--pink)';
+  } else {
+    btn.textContent = '➕ Follow';
+    btn.style.background  = 'var(--dark3)';
+    btn.style.borderColor = 'var(--border)';
+    btn.style.color       = 'var(--text)';
+  }
+}
+
+async function checkArtistFollowStatus(name) {
+  const initData = getTelegramInitData();
+  if (!initData) { _updateFollowBtn(false); return; }
+  try {
+    const res  = await fetch(`${API_BASE}/miniapp/follows`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({initData})
+    });
+    const data = await res.json();
+    _currentArtistFollowed = (data.artists || []).some(a => a.name === name);
+    _updateFollowBtn(_currentArtistFollowed);
+  } catch(e) { _updateFollowBtn(false); }
+}
+
+let _artistTab = 'all';
+let _followedArtists = [];
+
+async function loadMyArtists() {
+  const initData = getTelegramInitData();
+  if (!initData) return;
+  try {
+    const res  = await fetch(`${API_BASE}/miniapp/follows`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({initData})
+    });
+    const data = await res.json();
+    _followedArtists = data.artists || [];
+    // Update Following tab count
+    const tabBtn = document.getElementById('artistTabFollowing');
+    if (tabBtn && _followedArtists.length) {
+      tabBtn.textContent = `Following ${_followedArtists.length}`;
+    }
+    loadFollowedFeed();
+  } catch(e) { console.warn('[follows]', e); }
+}
+
+function switchArtistTab(tab) {
+  _artistTab = tab;
+  const allBtn  = document.getElementById('artistTabAll');
+  const folBtn  = document.getElementById('artistTabFollowing');
+  const title   = document.getElementById('artistsPageTitle');
+
+  if (tab === 'all') {
+    if (allBtn) { allBtn.style.background = 'var(--lime)'; allBtn.style.color = '#0E0E0F'; }
+    if (folBtn) { folBtn.style.background = 'none';        folBtn.style.color = 'var(--muted)'; }
+    if (title)    title.innerHTML = 'All <span>Artists</span>';
+    renderArtistsGrid();
+  } else {
+    if (allBtn) { allBtn.style.background = 'none';        allBtn.style.color = 'var(--muted)'; }
+    if (folBtn) { folBtn.style.background = 'var(--lime)'; folBtn.style.color = '#0E0E0F'; }
+    if (title)    title.innerHTML = '💜 <span>Following</span>';
+    _renderFollowingGrid();
+  }
+}
+
+function _renderFollowingGrid() {
+  const grid = document.getElementById('artistsGrid');
+  if (!grid) return;
+  if (!_followedArtists.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--muted)">
+      <div style="font-size:36px;margin-bottom:12px">💜</div>
+      <div style="font-size:14px;font-weight:500">No artists followed yet</div>
+      <div style="font-size:12px;margin-top:6px;opacity:0.7">Open an artist's profile and tap Follow</div>
+    </div>`;
+    return;
+  }
+  grid.innerHTML = _followedArtists.map(a => buildArtistCard(a.name)).join('');
+}
+
+async function loadFollowedFeed() {
+  const initData = getTelegramInitData();
+  if (!initData) return;
+  try {
+    const res  = await fetch(`${API_BASE}/miniapp/followed_feed`, {
+      method: 'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({initData})
+    });
+    const data = await res.json();
+    const videos = data.videos || [];
+    if (!videos.length) return;
+    // Inject followed videos at top of allUpdates
+    const titleEl = document.getElementById('lastUpdatesTitle');
+    if (titleEl) titleEl.textContent = '🎬 For You';
+    const followed = videos.map(v => ({
+      id: v.id, title: v.title, url: v.url, artistName: v.artist_name,
+      thumbnailUrl: v.thumbnail_url, tags: v.tags,
+      date: v.created_at ? new Date(v.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '',
+      duration: ''
+    }));
+    // Merge: followed first, then rest (deduplicate)
+    const followedIds = new Set(followed.map(v => v.id));
+    const merged = [...followed, ...allUpdates.filter(v => !followedIds.has(v.id))];
+    const scroll = document.getElementById('updatesScroll');
+    if (scroll) scroll.innerHTML = merged.slice(0, 6).map(_updateMiniCardHtml).join('');
+  } catch(e) { console.warn('[followed feed]', e); }
+}
+
+// ── User stats ─────────────────────────────────────────────────────────────────
+async function loadUserStats() {
+  const initData = getTelegramInitData();
+  if (!initData) return;
+  try {
+    const res  = await fetch(`${API_BASE}/miniapp/user_stats`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({initData})
+    });
+    const data = await res.json();
+    const s    = data.stats || {};
+    const card = document.getElementById('profileStatsCard');
+    if (!card) return;
+    card.style.display = 'block';
+    document.getElementById('statFollows').textContent   = s.follows   || 0;
+    document.getElementById('statFavorites').textContent = s.favorites || 0;
+    document.getElementById('statReactions').textContent = s.reactions || 0;
+    document.getElementById('statSince').textContent     = s.member_since || '—';
+    if (s.top_artist) {
+      const ta = document.getElementById('statTopArtist');
+      if (ta) { ta.style.display = 'block'; ta.innerHTML = `🎙 Top artist: <b style="color:var(--text)">${escapeHtml(s.top_artist)}</b>`; }
+    }
+  } catch(e) { console.warn('[stats]', e); }
+}
+
 function updateProfileSubCard() {
   const card   = document.getElementById('profileSubCard');
   const tier   = document.getElementById('profileSubTier');
