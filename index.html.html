@@ -5602,164 +5602,250 @@ let currentArtistPhotos = [];
 let currentArtistName   = '';
 let activeTagFilter     = '';
 
+// ── Artist profile pagination state ───────────────────────────────────────────
+let _profVOff  = 0, _profSOff  = 0, _profPOff  = 0;
+let _profVMore = false, _profSMore = false, _profPMore = false;
+let _profVTag  = '';
+let _profKnownTags = new Set();
+
 async function loadArtistProfileContent(name) {
   currentArtistName = name;
-  activeTagFilter   = '';
+  activeTagFilter = '';
+  _profName = name;
+  _profVTag = '';
+  _profVOff = _profSOff = _profPOff = 0;
+  _profVMore = _profSMore = _profPMore = false;
+  _profKnownTags = new Set();
+  currentArtistVideos = [];
+  currentArtistPhotos = [];
 
   try {
     const res = await fetch(`${API_BASE}/miniapp/artist_content?name=${encodeURIComponent(name)}`);
     const data = await res.json();
 
+    // ── Videos
     currentArtistVideos = data.videos || [];
+    _profVMore = data.videos_more || false;
+    _profVOff  = currentArtistVideos.length;
+    currentArtistVideos.forEach(v =>
+      (v.tags||'').split(',').filter(Boolean).forEach(t => _profKnownTags.add(t.trim()))
+    );
+    _renderProfileVideos();
+    _buildProfileTagFilter();
 
-    // Render shorts tab — portrait grid, opens TikTok player
-    const shortsList = document.getElementById('profileShortsList');
+    // ── Shorts
     const shorts = (data.shorts || []).map(s => ({...s, artist: name}));
-    const shortTab = document.getElementById('tab-shorts');
-    if (shorts.length === 0) {
-      if (shortTab) shortTab.style.display = 'none';
-      if (shortsList) shortsList.innerHTML = '';
-    } else {
-      if (shortTab) shortTab.style.display = '';
-      if (shortsList) {
-        const canViewShorts = hasVideoAccess();
-        shortsList.innerHTML = shorts.map((s, idx) => {
-          const thumb = s.thumbnail_url || '';
-          const bg = thumb ? `style="background-image:url('${thumb.replace(/'/g,"\\'")}')"` : '';
-          const videoFallback = !thumb
-            ? `<video src="${(s.url||'').replace(/"/g,'%22')}" muted preload="metadata" playsinline
-                style="width:100%;height:100%;object-fit:cover;pointer-events:none"
-                onloadedmetadata="this.currentTime=1"></video>`
-            : '';
-          if (!canViewShorts) {
-            return `<div class="shorts-grid-item" ${bg} style="filter:blur(3px);pointer-events:none">
-              ${videoFallback}
-              <div class="shorts-grid-play">🔒</div>
-            </div>`;
-          }
-          return `<div class="shorts-grid-item" ${bg} onclick="openShortsPlayer(_currentArtistShorts,${idx})">
-            ${videoFallback}
-            <div class="shorts-grid-play">▶</div>
-            <div class="shorts-grid-label">${escapeHtml(s.title||'Short')}</div>
-          </div>`;
-        }).join('');
-        window._currentArtistShorts = shorts;
-        if (!canViewShorts) {
-          const wrapper = shortsList.parentElement;
-          if (!wrapper.querySelector('.photos-lock-overlay')) {
-            const ov = document.createElement('div');
-            ov.className = 'photos-lock-overlay';
-            ov.onclick = paywallSubscribe;
-            ov.innerHTML = `<div class="photos-lock-icon">🔒</div>
-              <div class="photos-lock-text">Subscribe to unlock Shorts</div>
-              <button class="photos-lock-btn" onclick="event.stopPropagation();paywallSubscribe()">Subscribe Now</button>`;
-            wrapper.style.position = 'relative';
-            wrapper.appendChild(ov);
-          }
-        }
-      }
-    }
+    _profSMore = data.shorts_more || false;
+    _profSOff  = shorts.length;
+    window._currentArtistShorts = shorts;
+    _renderProfileShorts(shorts);
 
-    // Build tag filter bar
-    const filterBar = document.getElementById('profileTagFilter');
-    const usedTags = new Set();
-    currentArtistVideos.forEach(v => {
-      (v.tags || '').split(',').filter(Boolean).forEach(t => usedTags.add(t.trim()));
-    });
-
-    if (usedTags.size > 0) {
-      filterBar.style.display = 'flex';
-      filterBar.innerHTML = `<button class="filter-tag-btn active" data-tag="" onclick="filterByTag(this,'')">All</button>`;
-      usedTags.forEach(tag => {
-        const color = tagColorMap[tag] || '#888888';
-        filterBar.innerHTML += `<button class="filter-tag-btn" data-tag="${tag}"
-          style="border-color:${color}40;color:${color}"
-          onclick="filterByTag(this,'${tag.replace(/'/g,"\\'")}')"> ${tag}</button>`;
-      });
-    } else {
-      filterBar.style.display = 'none';
-    }
-
-    renderProfileVideos(currentArtistVideos, '');
-
-    // Render photos
+    // ── Photos
     currentArtistPhotos = data.photos || [];
-    const photoGrid = document.getElementById('profilePhotoGrid');
-    const photosWrapper = photoGrid.parentElement;
-    // Remove old lock overlay if present
-    photosWrapper.querySelectorAll('.photos-lock-overlay').forEach(el => el.remove());
-    photosWrapper.classList.remove('photos-lock-wrapper');
+    _profPMore = data.photos_more || false;
+    _profPOff  = currentArtistPhotos.length;
+    _renderProfilePhotos();
 
-    if (currentArtistPhotos.length === 0) {
-      photoGrid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);grid-column:1/-1">No photos yet</div>';
-    } else {
-      photoGrid.innerHTML = currentArtistPhotos.map((p, i) =>
-        `<div class="profile-photo-item" style="background-image:url('${p.url}')"
-              onclick="${hasVideoAccess() ? `openPhotoLightbox(${i})` : 'paywallSubscribe()'}" ></div>`
-      ).join('');
-      if (!hasVideoAccess()) {
-        photoGrid.classList.add('blurred');
-        photosWrapper.classList.add('photos-lock-wrapper');
-        const overlay = document.createElement('div');
-        overlay.className = 'photos-lock-overlay';
-        overlay.onclick = paywallSubscribe;
-        overlay.innerHTML = `<div class="photos-lock-icon">🔒</div>
-          <div class="photos-lock-text">Subscribe to unlock photos</div>
-          <button class="photos-lock-btn" onclick="event.stopPropagation();paywallSubscribe()">Subscribe Now</button>`;
-        photosWrapper.appendChild(overlay);
-      } else {
-        photoGrid.classList.remove('blurred');
-      }
-    }
   } catch(e) {
     document.getElementById('profileVideosList').innerHTML =
       '<div style="text-align:center;padding:40px;color:var(--muted)">Failed to load</div>';
   }
 }
 
-function renderProfileVideos(videos, tagFilter) {
-  const videosList = document.getElementById('profileVideosList');
-  // Filter out VOD-tagged videos for non-PRO users
-  const visibleVideos = hasProAccess()
-    ? videos
-    : videos.filter(v => {
-        const vtags = (v.tags||'').split(',').map(t => t.trim().toUpperCase());
-        return !vtags.some(t => AV_VOD_TAGS.has(t));
-      });
-  const filtered = tagFilter
-    ? visibleVideos.filter(v => (v.tags||'').split(',').map(t=>t.trim()).includes(tagFilter))
-    : visibleVideos;
+// ── Render helpers ─────────────────────────────────────────────────────────────
+function _videoCard(v) {
+  const tags    = (v.tags||'').split(',').filter(Boolean);
+  const tagsHtml= tags.map(t => buildTagBadge(t.trim())).join('');
+  const safeT   = (v.title||'Video').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+  const safeU   = (v.url||'').replace(/'/g,"\\'");
+  const safeThumb = (v.thumbnail_url||'').replace(/'/g,"\\'");
+  const cardStyle = v.thumbnail_url ? `style="--thumb:url('${v.thumbnail_url.replace(/"/g,'%22').replace(/'/g,"\\'")}')"` : '';
+  return `<div class="profile-video-card" ${cardStyle}
+    onclick="openVideoPlayer(${v.id},'${safeU}','${safeT}','${currentArtistName.replace(/'/g,"\\'")}','${(v.tags||'').replace(/'/g,"\\'")}','${safeThumb}')">
+    <div class="profile-video-icon">▶</div>
+    <div class="profile-video-info">
+      <div class="profile-video-title">${v.title||'Video'}</div>
+      ${tagsHtml ? `<div class="profile-video-tags">${tagsHtml}</div>` : ''}
+    </div>
+    <div style="color:var(--muted);font-size:18px">›</div>
+  </div>`;
+}
 
-  if (filtered.length === 0) {
-    videosList.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted)">${tagFilter ? 'No videos with this tag' : 'No videos yet'}</div>`;
+function _loadMoreBtn(onclick, label = 'Load more') {
+  return `<button onclick="${onclick}" style="width:100%;margin:10px 0;padding:12px;background:var(--dark3);border:1px solid var(--border);border-radius:12px;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">
+    ${label} ↓
+  </button>`;
+}
+
+function _renderProfileVideos() {
+  const list = document.getElementById('profileVideosList');
+  const visible = hasProAccess()
+    ? currentArtistVideos
+    : currentArtistVideos.filter(v => {
+        const vt = (v.tags||'').split(',').map(t => t.trim().toUpperCase());
+        return !vt.some(t => AV_VOD_TAGS.has(t));
+      });
+  if (!visible.length) {
+    list.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted)">${_profVTag ? 'No videos with this tag' : 'No videos yet'}</div>`;
     return;
   }
-
-  videosList.innerHTML = filtered.map(v => {
-    const tags = (v.tags || '').split(',').filter(Boolean);
-    const tagsHtml = tags.map(t => buildTagBadge(t.trim())).join('');
-    const safeTitle = (v.title || 'Video').replace(/'/g,"\\'").replace(/"/g,'&quot;');
-    const safeUrl   = (v.url||'').replace(/'/g,"\\'");
-    const safeThumb = (v.thumbnail_url||'').replace(/'/g,"\\'");
-    const cardStyle = v.thumbnail_url ? `style="--thumb:url('${v.thumbnail_url.replace(/"/g,'%22').replace(/'/g,"\\'")}')"` : '';
-    return `
-      <div class="profile-video-card" ${cardStyle} onclick="openVideoPlayer(${v.id},'${safeUrl}','${safeTitle}','${currentArtistName.replace(/'/g,"\\'")}','${(v.tags||'').replace(/'/g,"\\'")}','${safeThumb}')">
-        <div class="profile-video-icon">▶</div>
-        <div class="profile-video-info">
-          <div class="profile-video-title">${v.title || 'Video'}</div>
-          ${tagsHtml ? `<div class="profile-video-tags">${tagsHtml}</div>` : ''}
-        </div>
-        <div style="color:var(--muted);font-size:18px">›</div>
-      </div>`;
-  }).join('');
+  list.innerHTML = visible.map(_videoCard).join('') +
+    (_profVMore ? _loadMoreBtn('loadMoreProfileVideos()', 'Load more videos') : '');
 }
 
-function filterByTag(btn, tag) {
-  activeTagFilter = tag;
+function _buildProfileTagFilter() {
+  const filterBar = document.getElementById('profileTagFilter');
+  if (!_profKnownTags.size) { filterBar.style.display = 'none'; return; }
+  filterBar.style.display = 'flex';
+  filterBar.innerHTML = `<button class="filter-tag-btn${_profVTag===''?' active':''}" data-tag="" onclick="filterByTag(this,'')">All</button>`;
+  _profKnownTags.forEach(tag => {
+    const color = tagColorMap[tag] || '#888888';
+    filterBar.innerHTML += `<button class="filter-tag-btn${_profVTag===tag?' active':''}" data-tag="${tag}"
+      style="border-color:${color}40;color:${color}"
+      onclick="filterByTag(this,'${tag.replace(/'/g,"\\'")}')"> ${tag}</button>`;
+  });
+}
+
+async function filterByTag(btn, tag) {
+  _profVTag = tag;
+  _profVOff = 0;
+  currentArtistVideos = [];
   document.querySelectorAll('.filter-tag-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  renderProfileVideos(currentArtistVideos, tag);
+  document.getElementById('profileVideosList').innerHTML =
+    '<div style="text-align:center;padding:20px;color:var(--muted)">Loading…</div>';
+  try {
+    const url = `${API_BASE}/miniapp/artist_content?name=${encodeURIComponent(_profName)}&type=video&offset=0&tag=${encodeURIComponent(tag)}`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    currentArtistVideos = data.items || [];
+    _profVMore = data.has_more;
+    _profVOff  = currentArtistVideos.length;
+    currentArtistVideos.forEach(v =>
+      (v.tags||'').split(',').filter(Boolean).forEach(t => _profKnownTags.add(t.trim()))
+    );
+    _renderProfileVideos();
+  } catch(e) {
+    document.getElementById('profileVideosList').innerHTML =
+      '<div style="text-align:center;padding:20px;color:var(--muted)">Error</div>';
+  }
 }
+
+async function loadMoreProfileVideos() {
+  const url = `${API_BASE}/miniapp/artist_content?name=${encodeURIComponent(_profName)}&type=video&offset=${_profVOff}&tag=${encodeURIComponent(_profVTag)}`;
+  try {
+    const res  = await fetch(url);
+    const data = await res.json();
+    const more = data.items || [];
+    _profVMore = data.has_more;
+    _profVOff += more.length;
+    more.forEach(v => (v.tags||'').split(',').filter(Boolean).forEach(t => _profKnownTags.add(t.trim())));
+    currentArtistVideos = [...currentArtistVideos, ...more];
+    _renderProfileVideos();
+  } catch(e) { showToast('Error loading more'); }
+}
+
+function _renderProfileShorts(shorts) {
+  const shortsList = document.getElementById('profileShortsList');
+  const shortTab   = document.getElementById('tab-shorts');
+  if (!shorts.length && !_profSMore) {
+    if (shortTab) shortTab.style.display = 'none';
+    if (shortsList) shortsList.innerHTML = '';
+    return;
+  }
+  if (shortTab) shortTab.style.display = '';
+  if (!shortsList) return;
+
+  const canView = hasVideoAccess();
+  let html = shorts.map((s, idx) => {
+    const thumb = s.thumbnail_url || '';
+    const bg    = thumb ? `style="background-image:url('${thumb.replace(/'/g,"\\'")}')"` : '';
+    const vfb   = !thumb
+      ? `<video src="${(s.url||'').replace(/"/g,'%22')}" muted preload="metadata" playsinline
+           style="width:100%;height:100%;object-fit:cover;pointer-events:none"
+           onloadedmetadata="this.currentTime=1"></video>`
+      : '';
+    if (!canView) return `<div class="shorts-grid-item" ${bg} style="filter:blur(3px);pointer-events:none">${vfb}<div class="shorts-grid-play">🔒</div></div>`;
+    return `<div class="shorts-grid-item" ${bg} onclick="openShortsPlayer(_currentArtistShorts,${idx})">${vfb}<div class="shorts-grid-play">▶</div></div>`;
+  }).join('');
+
+  // Load more button for shorts (full width below grid)
+  if (_profSMore) {
+    html += `<div style="grid-column:1/-1">${_loadMoreBtn('loadMoreProfileShorts()', 'Load more shorts')}</div>`;
+  }
+  shortsList.innerHTML = html;
+
+  if (!canView) {
+    const wrapper = shortsList.parentElement;
+    wrapper.querySelectorAll('.photos-lock-overlay').forEach(el => el.remove());
+    const ov = document.createElement('div');
+    ov.className = 'photos-lock-overlay'; ov.onclick = paywallSubscribe;
+    ov.innerHTML = `<div class="photos-lock-icon">🔒</div>
+      <div class="photos-lock-text">Subscribe to unlock Shorts</div>
+      <button class="photos-lock-btn" onclick="event.stopPropagation();paywallSubscribe()">Subscribe Now</button>`;
+    wrapper.style.position = 'relative'; wrapper.appendChild(ov);
+  }
+}
+
+async function loadMoreProfileShorts() {
+  const url = `${API_BASE}/miniapp/artist_content?name=${encodeURIComponent(_profName)}&type=short&offset=${_profSOff}`;
+  try {
+    const res  = await fetch(url);
+    const data = await res.json();
+    const more = (data.items || []).map(s => ({...s, artist: _profName}));
+    _profSMore = data.has_more;
+    _profSOff += more.length;
+    window._currentArtistShorts = [...(window._currentArtistShorts || []), ...more];
+    _renderProfileShorts(window._currentArtistShorts);
+  } catch(e) { showToast('Error loading more'); }
+}
+
+function _renderProfilePhotos() {
+  const photoGrid    = document.getElementById('profilePhotoGrid');
+  const photosWrapper = photoGrid.parentElement;
+  photosWrapper.querySelectorAll('.photos-lock-overlay').forEach(el => el.remove());
+  photosWrapper.classList.remove('photos-lock-wrapper');
+
+  if (!currentArtistPhotos.length) {
+    photoGrid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);grid-column:1/-1">No photos yet</div>';
+    return;
+  }
+  photoGrid.innerHTML = currentArtistPhotos.map((p, i) =>
+    `<div class="profile-photo-item" style="background-image:url('${p.url}')"
+      onclick="${hasVideoAccess() ? `openPhotoLightbox(${i})` : 'paywallSubscribe()'}"></div>`
+  ).join('') + (_profPMore
+    ? `<div style="grid-column:1/-1">${_loadMoreBtn('loadMoreProfilePhotos()', 'Load more photos')}</div>`
+    : '');
+
+  if (!hasVideoAccess()) {
+    photoGrid.classList.add('blurred');
+    photosWrapper.classList.add('photos-lock-wrapper');
+    const overlay = document.createElement('div');
+    overlay.className = 'photos-lock-overlay'; overlay.onclick = paywallSubscribe;
+    overlay.innerHTML = `<div class="photos-lock-icon">🔒</div>
+      <div class="photos-lock-text">Subscribe to unlock photos</div>
+      <button class="photos-lock-btn" onclick="event.stopPropagation();paywallSubscribe()">Subscribe Now</button>`;
+    photosWrapper.appendChild(overlay);
+  } else {
+    photoGrid.classList.remove('blurred');
+  }
+}
+
+async function loadMoreProfilePhotos() {
+  const url = `${API_BASE}/miniapp/artist_content?name=${encodeURIComponent(_profName)}&type=photo&offset=${_profPOff}`;
+  try {
+    const res  = await fetch(url);
+    const data = await res.json();
+    const more = data.items || [];
+    _profPMore = data.has_more;
+    _profPOff += more.length;
+    currentArtistPhotos = [...currentArtistPhotos, ...more];
+    _renderProfilePhotos();
+  } catch(e) { showToast('Error loading more'); }
+}
+
+// renderProfileVideos kept as alias for backward compatibility
+function renderProfileVideos(videos, tag) { _renderProfileVideos(); }
 
 let lightboxIndex = 0;
 let lightboxSwipeStartX = 0;
