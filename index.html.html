@@ -6146,8 +6146,8 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
   }
 
   // 30-second preview for non-subscribers
-  const vpWrap = document.getElementById('vpWrap');
-  vpWrap?.querySelectorAll('.vp-preview-end').forEach(el => el.remove());
+  const vpWrap2 = document.getElementById('vpWrap');
+  vpWrap2?.querySelectorAll('.vp-preview-end').forEach(el => el.remove());
   if (!hasVideoAccess()) {
     video._previewCheck = () => {
       if (video.currentTime >= 30) {
