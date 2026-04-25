@@ -26,87 +26,19 @@
 
 /* video-wrap fills available space */
 .video-wrap { position: relative; }
-
-/* ── Custom video controls ── */
-.vp-controls {
+.vp-fs-btn {
   position: absolute;
-  left: 0; right: 0; bottom: 0;
-  z-index: 6;
-  transition: opacity 0.25s;
-  pointer-events: none;
-}
-.vp-controls.hidden { opacity: 0; }
-.vp-controls:not(.hidden) { pointer-events: auto; }
-.vp-bottom {
-  background: linear-gradient(transparent, rgba(0,0,0,0.8));
-  padding: 20px 12px 10px;
-}
-.vp-seek-wrap { padding: 0 2px 10px; }
-.vp-seek {
-  width: 100%;
-  height: 3px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: rgba(255,255,255,0.25);
-  border-radius: 2px;
-  outline: none;
+  bottom: 10px; right: 10px;
+  z-index: 10;
+  background: rgba(0,0,0,0.5);
+  border: none; border-radius: 8px;
+  color: #fff; font-size: 20px;
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
   cursor: pointer;
-}
-.vp-seek::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 14px; height: 14px;
-  border-radius: 50%;
-  background: var(--lime);
-  cursor: pointer;
-  box-shadow: 0 0 4px rgba(0,0,0,0.5);
-}
-.vp-ctrl-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.vp-ctrl-btn {
-  background: none;
-  border: none;
-  color: #fff;
-  font-size: 20px;
-  cursor: pointer;
-  padding: 6px 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  backdrop-filter: blur(4px);
   -webkit-tap-highlight-color: transparent;
 }
-.vp-time {
-  font-size: 11px;
-  color: rgba(255,255,255,0.75);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  padding: 0 4px;
-}
-.vp-speed-btn {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  color: rgba(255,255,255,0.85);
-  padding: 4px 6px;
-  background: rgba(255,255,255,0.1);
-  border-radius: 6px;
-}
-.vp-play-indicator {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s;
-  font-size: 52px;
-  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.7));
-}
-.vp-play-indicator.flash { opacity: 1; }
 
 * {
   margin: 0;
@@ -3742,29 +3674,9 @@ body {
     </div>
   </div>
 
-  <!-- Touch target OUTSIDE controls — always visible, brings controls back -->
-  <div id="vpTouchZone" style="position:absolute;inset:0;z-index:4;"></div>
-
   <div class="video-wrap" id="vpWrap">
-    <video id="vpVideo" muted playsinline webkit-playsinline preload="auto"></video>
-  </div>
-
-  <!-- Controls sit OUTSIDE video-wrap so they survive video-wrap changes -->
-  <div class="vp-controls hidden" id="vpControls">
-    <div class="vp-play-indicator" id="vpPlayIndicator"></div>
-    <div class="vp-bottom">
-      <div class="vp-seek-wrap">
-        <input type="range" class="vp-seek" id="vpSeek" value="0" min="0" max="100" step="0.1">
-      </div>
-      <div class="vp-ctrl-row">
-        <button class="vp-ctrl-btn" id="vpPlayBtn" onclick="vpTogglePlay()">▶</button>
-        <span class="vp-time" id="vpTimeDisplay">0:00 / 0:00</span>
-        <div style="flex:1"></div>
-        <button class="vp-ctrl-btn vp-speed-btn" id="vpSpeedBtn" onclick="vpCycleSpeed()">1×</button>
-        <button class="vp-ctrl-btn" id="vpMuteBtn" onclick="vpToggleMute()">🔊</button>
-        <button class="vp-ctrl-btn" onclick="vpFullscreen()" style="font-size:22px">⛶</button>
-      </div>
-    </div>
+    <video id="vpVideo" muted controls playsinline webkit-playsinline preload="auto"></video>
+    <button class="vp-fs-btn" onclick="vpFullscreen()" title="Fullscreen">⛶</button>
   </div>
 
   <!-- Playlist queue (shown when opened from playlist) -->
@@ -5914,156 +5826,9 @@ function _lbKeyDown(e) {
 // ── Video Player ───────────────────────────────────────────────────────────────
 let hlsInstance = null;
 
-// ── Custom video controls ──────────────────────────────────────────────────
-let _vpSeeking   = false;
-let _vpHideTimer = null;
-let _vpSpeedIdx  = 2;
-const _vpSpeeds  = [0.5, 0.75, 1, 1.25, 1.5, 2];
+// ── Fullscreen button ──────────────────────────────────────────────────────
 
-function _initCustomControls() {
-  const video = document.getElementById('vpVideo');
-  if (!video) return;
 
-  // Clean up previous listeners
-  _destroyCustomControls();
-
-  // Named handlers so we can remove them later
-  video._onPlay  = () => { const b = document.getElementById('vpPlayBtn'); if (b) b.textContent = '⏸'; };
-  video._onPause = () => { const b = document.getElementById('vpPlayBtn'); if (b) b.textContent = '▶'; };
-  video._onTime  = _vpUpdateTime;
-  video._onMeta  = _vpUpdateTime;
-
-  video.addEventListener('play',          video._onPlay);
-  video.addEventListener('pause',         video._onPause);
-  video.addEventListener('timeupdate',    video._onTime);
-  video.addEventListener('loadedmetadata',video._onMeta);
-
-  // Seek bar
-  const seek = document.getElementById('vpSeek');
-  if (seek) {
-    seek._onInput = () => { vpOnSeekInput(); };
-    seek._onTS    = () => { _vpSeeking = true; };
-    seek._onTE    = () => { _vpSeeking = false; };
-    seek.addEventListener('input',      seek._onInput);
-    seek.addEventListener('touchstart', seek._onTS, { passive: true });
-    seek.addEventListener('touchend',   seek._onTE, { passive: true });
-    // Also handle mouse for desktop testing
-    seek.addEventListener('mousedown',  seek._onTS);
-    seek.addEventListener('mouseup',    seek._onTE);
-  }
-
-  // Touch zone — always on top, tap = toggle controls, double-tap = play/pause
-  const tz = document.getElementById('vpTouchZone');
-  if (tz) {
-    let _lastTap = 0;
-    tz._onTouch = () => {
-      const now = Date.now();
-      if (now - _lastTap < 300) { vpTogglePlay(); }  // double-tap = play/pause
-      else { _showVpControls(); }                      // single tap = show controls
-      _lastTap = now;
-    };
-    tz.addEventListener('click', tz._onTouch);
-  }
-
-  // Initial state
-  _vpSpeedIdx = 2;
-  const speedBtn = document.getElementById('vpSpeedBtn');
-  if (speedBtn) speedBtn.textContent = '1×';
-  const muteBtn = document.getElementById('vpMuteBtn');
-  if (muteBtn) muteBtn.textContent = '🔊';
-
-  _showVpControls();
-}
-
-function _destroyCustomControls() {
-  const video = document.getElementById('vpVideo');
-  if (video) {
-    if (video._onPlay)  { video.removeEventListener('play',           video._onPlay);  video._onPlay  = null; }
-    if (video._onPause) { video.removeEventListener('pause',          video._onPause); video._onPause = null; }
-    if (video._onTime)  { video.removeEventListener('timeupdate',     video._onTime);  video._onTime  = null; }
-    if (video._onMeta)  { video.removeEventListener('loadedmetadata', video._onMeta);  video._onMeta  = null; }
-  }
-  const seek = document.getElementById('vpSeek');
-  if (seek) {
-    if (seek._onInput) { seek.removeEventListener('input',      seek._onInput); seek._onInput = null; }
-    if (seek._onTS)    { seek.removeEventListener('touchstart', seek._onTS);    seek._onTS    = null; }
-    if (seek._onTE)    { seek.removeEventListener('touchend',   seek._onTE);    seek._onTE    = null; }
-  }
-  const tz = document.getElementById('vpTouchZone');
-  if (tz?._onTouch) { tz.removeEventListener('click', tz._onTouch); tz._onTouch = null; }
-  clearTimeout(_vpHideTimer);
-}
-
-function _vpUpdateTime() {
-  const video = document.getElementById('vpVideo');
-  const seek  = document.getElementById('vpSeek');
-  const time  = document.getElementById('vpTimeDisplay');
-  if (!video || _vpSeeking) return;
-  if (video.duration) {
-    if (seek) seek.value = (video.currentTime / video.duration * 100).toFixed(1);
-  }
-  if (time) time.textContent = `${_fmtTime(video.currentTime)} / ${_fmtTime(video.duration || 0)}`;
-}
-
-function _fmtTime(s) {
-  if (!s || isNaN(s)) return '0:00';
-  const m = Math.floor(s / 60);
-  return `${m}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
-}
-
-function _showVpControls() {
-  const ctrl = document.getElementById('vpControls');
-  if (!ctrl) return;
-  ctrl.classList.remove('hidden');
-  clearTimeout(_vpHideTimer);
-  _vpHideTimer = setTimeout(() => ctrl.classList.add('hidden'), 3500);
-}
-
-function _flashVpIndicator(icon) {
-  const ind = document.getElementById('vpPlayIndicator');
-  if (!ind) return;
-  ind.textContent = icon;
-  ind.classList.add('flash');
-  setTimeout(() => ind.classList.remove('flash'), 500);
-}
-
-function vpTogglePlay() {
-  const video = document.getElementById('vpVideo');
-  if (!video) return;
-  if (video.paused) { video.play().catch(() => {}); _flashVpIndicator('▶'); }
-  else              { video.pause();                 _flashVpIndicator('⏸'); }
-  _showVpControls();
-}
-
-function vpToggleMute() {
-  const video = document.getElementById('vpVideo');
-  if (!video) return;
-  video.muted = !video.muted;
-  const btn = document.getElementById('vpMuteBtn');
-  if (btn) btn.textContent = video.muted ? '🔇' : '🔊';
-  _showVpControls();
-}
-
-function vpCycleSpeed() {
-  const video = document.getElementById('vpVideo');
-  if (!video) return;
-  _vpSpeedIdx = (_vpSpeedIdx + 1) % _vpSpeeds.length;
-  video.playbackRate = _vpSpeeds[_vpSpeedIdx];
-  const btn = document.getElementById('vpSpeedBtn');
-  if (btn) btn.textContent = `${_vpSpeeds[_vpSpeedIdx]}×`;
-  _showVpControls();
-}
-
-function vpOnSeekStart()  { _vpSeeking = true; _showVpControls(); }
-function vpOnSeekEnd()    { _vpSeeking = false; }
-function vpOnSeekInput()  {
-  const video = document.getElementById('vpVideo');
-  const seek  = document.getElementById('vpSeek');
-  if (!video || !video.duration || !seek) return;
-  video.currentTime = seek.value / 100 * video.duration;
-  _vpUpdateTime();
-  _showVpControls();
-}
 
 // ── Fullscreen (native video FS — simplest, most reliable on mobile) ──────────
 function vpFullscreen() {
@@ -6201,9 +5966,6 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
       p.then(() => {
         video.muted = false;
         // Update mute button
-        const mb = document.getElementById('vpMuteBtn');
-        if (mb) mb.textContent = '🔊';
-        _showVpControls();
       }).catch(e => {
         console.log('[player] autoplay blocked:', e?.message);
       });
@@ -6269,8 +6031,6 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
     }
   };
 
-  // Init custom controls after source is set up
-  _initCustomControls();
 
   // Progress tracking — save every 15s
   _startProgressTracking(contentId, video);
@@ -6310,8 +6070,6 @@ function closeVideoPlayer() {
   video.removeAttribute('src');
   try { video.load(); } catch(_) {}
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-  _destroyCustomControls();
-  clearTimeout(_vpHideTimer);
   currentVideoId = null;
   const errEl = document.querySelector('.vp-error');
   if (errEl) errEl.remove();
