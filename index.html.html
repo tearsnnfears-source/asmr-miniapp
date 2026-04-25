@@ -878,27 +878,29 @@ body {
 }
 .shorts-feed {
   flex: 1;
-  overflow-y: scroll;
-  scroll-snap-type: y mandatory;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
+  position: relative;
 }
-.shorts-feed::-webkit-scrollbar { display: none; }
+.shorts-track {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+  transition: transform 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
 .shorts-item {
   width: 100%;
-  height: 100dvh;
-  scroll-snap-align: start;
-  position: relative;
+  height: 100%;
+  position: absolute;
+  left: 0;
   overflow: hidden;
   background: #000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 .shorts-item video {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  position: absolute;
+  inset: 0;
 }
 .shorts-item-info {
   position: absolute;
@@ -1686,24 +1688,16 @@ body {
 .shorts-grid-item:active { opacity: 0.75; }
 .shorts-grid-play {
   position: absolute;
-  bottom: 6px;
-  left: 6px;
-  background: rgba(0,0,0,0.55);
-  border-radius: 50%;
-  width: 26px; height: 26px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.15);
+  font-size: 22px;
+  opacity: 0.85;
 }
 .shorts-grid-label {
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  background: linear-gradient(transparent, rgba(0,0,0,0.7));
-  padding: 12px 5px 4px;
-  font-size: 9px;
-  color: rgba(255,255,255,0.85);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  display: none;
 }
 
 /* ── PHOTO LIGHTBOX ── */
@@ -4156,7 +4150,7 @@ async function loadHomeShorts() {
             style="width:100%;height:100%;object-fit:cover;pointer-events:none;border-radius:12px"
             onloadedmetadata="this.currentTime=1"></video>`
         : '';
-      return `<div class="shorts-home-card" ${bg} onclick="openShortsPlayer(_homeShorts,${idx},true)">
+      return `<div class="shorts-home-card" ${bg} onclick="openShortsPlayer(_homeShorts,${idx},false)">
         ${videoFallback}
         <div class="shorts-home-play">▶</div>
         <div class="shorts-home-label">${escapeHtml(s.title||'Short')}</div>
@@ -4258,8 +4252,12 @@ function avSwitchTab(mode) {
 
 // ── PRO gate ────────────────────────────────────────────────────────────────
 // ── Shorts TikTok Player ──────────────────────────────────────────────────────
-let _shortsData = [];
-let _shortsHlsMap = {};  // idx → Hls instance
+// ── Shorts player (transform-based, one HLS at a time) ────────────────────────
+let _shortsData  = [];
+let _shortsIdx   = 0;
+let _shortsMuted = false;
+let _shortsHls   = null;  // only ONE active HLS instance
+let _shortsProgTimer = null;
 
 function _shuffle(arr) {
   const a = [...arr];
@@ -4270,124 +4268,167 @@ function _shuffle(arr) {
   return a;
 }
 
-let _shortsIdx = 0;
-let _shortsMuted = false;
-let _shortsProgTimer = null;
-
 function openShortsPlayer(shorts, startIdx = 0, shuffle = false) {
   if (!hasVideoAccess()) { paywallSubscribe(); return; }
-  _shortsData = shuffle ? _shuffle(shorts) : [...shorts];
-  _shortsHlsMap = {};
-  _shortsIdx = Math.min(startIdx, _shortsData.length - 1);
+
+  // For home page: put clicked item first, keep rest in order (server already randomises)
+  if (shuffle && startIdx > 0) {
+    const arr = [...shorts];
+    const clicked = arr.splice(startIdx, 1);
+    _shortsData = [...clicked, ...arr];
+    _shortsIdx = 0;
+  } else {
+    _shortsData = [...shorts];
+    _shortsIdx  = Math.max(0, Math.min(startIdx, shorts.length - 1));
+  }
+
   _shortsMuted = false;
+  _killShortsHls();
 
-  const feed = document.getElementById('shortsFeed');
-  const counter = document.getElementById('shortsCounter');
+  const track = document.getElementById('shortsTrack');
+  const feed  = document.getElementById('shortsFeed');
 
-  feed.innerHTML = _shortsData.map((s, i) => `
-    <div class="shorts-item" id="shortItem${i}" data-idx="${i}">
-      <div class="shorts-item-spinner">⏳</div>
+  // Render all slide placeholders positioned by top offset
+  track.innerHTML = _shortsData.map((s, i) => {
+    const bg = s.thumbnail_url ? `background-image:url('${s.thumbnail_url.replace(/'/g,"\\'")}');background-size:cover;background-position:center` : '';
+    return `<div class="shorts-item" id="si${i}" style="top:${i * 100}%;${bg}">
       <div class="shorts-item-info">
         <div class="shorts-item-artist">${escapeHtml(s.artist_name || s.artist || '')}</div>
         <div class="shorts-item-title">${escapeHtml(s.title || '')}</div>
       </div>
-      <div class="shorts-progress-bar"><div class="shorts-progress-fill" id="shortsProg${i}"></div></div>
-      <button class="shorts-mute-btn" id="shortsMute${i}" onclick="event.stopPropagation();toggleShortsSound()">🔊</button>
-    </div>`).join('');
+      <div class="shorts-progress-bar"><div class="shorts-progress-fill" id="spb${i}"></div></div>
+      <button class="shorts-mute-btn" onclick="event.stopPropagation();toggleShortsSound()">🔊</button>
+    </div>`;
+  }).join('');
 
   document.getElementById('shortsPlayer').classList.add('active');
   window.Telegram?.WebApp?.expand();
 
-  // Touch: one swipe = one item
-  let _ty0 = 0, _swiping = false;
-  feed.addEventListener('touchstart', e => { _ty0 = e.touches[0].clientY; _swiping = false; }, { passive: true });
-  feed.addEventListener('touchmove', e => { if (Math.abs(e.touches[0].clientY - _ty0) > 8) _swiping = true; }, { passive: true });
-  feed.addEventListener('touchend', e => {
+  // Touch handling — one swipe = one video, no native scroll interference
+  let _ty0 = 0;
+  feed._onTS = e => { _ty0 = e.touches[0].clientY; };
+  feed._onTE = e => {
     const dy = _ty0 - e.changedTouches[0].clientY;
-    if (!_swiping || Math.abs(dy) < 40) return;
+    if (Math.abs(dy) < 50) return; // tap, not swipe
     _goToShort(_shortsIdx + (dy > 0 ? 1 : -1));
-  });
+  };
+  feed.addEventListener('touchstart', feed._onTS, { passive: true });
+  feed.addEventListener('touchend',   feed._onTE, { passive: true });
 
-  // Tap on video area = pause/play
-  feed.addEventListener('click', e => {
+  // Tap = pause/play
+  feed._onClick = e => {
     if (e.target.closest('.shorts-mute-btn') || e.target.closest('.shorts-player-back')) return;
-    const item = document.getElementById(`shortItem${_shortsIdx}`);
-    const vid = item?.querySelector('video');
+    const vid = document.getElementById(`si${_shortsIdx}`)?.querySelector('video');
     if (!vid) return;
-    vid.paused ? vid.play().catch(()=>{}) : vid.pause();
-  });
+    vid.paused ? vid.play().catch(() => {}) : vid.pause();
+  };
+  feed.addEventListener('click', feed._onClick);
 
   _goToShort(_shortsIdx, true);
 }
 
 function _goToShort(idx, instant = false) {
-  idx = Math.max(0, Math.min(_shortsData.length - 1, idx));
+  if (!_shortsData.length) return;
+  idx = Math.max(0, Math.min(idx, _shortsData.length - 1));
   _shortsIdx = idx;
-  const item = document.getElementById(`shortItem${idx}`);
-  if (!item) return;
-  item.scrollIntoView({ behavior: instant ? 'instant' : 'smooth', block: 'start' });
 
-  // Load video for current + preload next
-  [idx, idx + 1].forEach(i => {
-    if (i >= _shortsData.length) return;
-    const el = document.getElementById(`shortItem${i}`);
-    if (el && !el.querySelector('video')) _loadShortsVideo(el, i, _shortsData[i]);
-  });
+  // Move track via transform (no scrolling)
+  const track = document.getElementById('shortsTrack');
+  if (!track) return;
+  if (instant) track.style.transition = 'none';
+  track.style.transform = `translateY(-${idx * 100}%)`;
+  if (instant) requestAnimationFrame(() => { track.style.transition = ''; });
 
-  // Pause all, play current
-  document.querySelectorAll('.shorts-item video').forEach(v => v !== document.getElementById(`shortItem${idx}`)?.querySelector('video') && v.pause());
-  const vid = item.querySelector('video');
-  if (vid) { vid.muted = _shortsMuted; vid.play().catch(() => {}); _startShortsProgress(idx, vid); }
+  // Kill old HLS + stop any playing video immediately
+  _killShortsHls();
+
+  // Load current video
+  const item = document.getElementById(`si${idx}`);
+  if (item) _loadShortsVideo(item, idx);
 
   document.getElementById('shortsCounter').textContent = `${idx + 1} / ${_shortsData.length}`;
 }
 
+function _killShortsHls() {
+  clearInterval(_shortsProgTimer);
+  if (_shortsHls) { try { _shortsHls.destroy(); } catch(_) {} _shortsHls = null; }
+  // Stop all videos immediately to kill audio
+  document.querySelectorAll('#shortsTrack video').forEach(v => {
+    v.pause();
+    try { v.currentTime = 0; } catch(_) {}
+  });
+}
+
+function _loadShortsVideo(item, idx) {
+  // Remove any existing video
+  item.querySelectorAll('video').forEach(v => { v.pause(); v.remove(); });
+
+  const s = _shortsData[idx];
+  if (!s) return;
+
+  const video = document.createElement('video');
+  video.setAttribute('playsinline', '');
+  video.setAttribute('webkit-playsinline', '');
+  video.loop   = true;
+  video.muted  = _shortsMuted;
+
+  const url    = s.url || '';
+  const isM3U8 = url.includes('.m3u8') || url.includes('/hls/');
+
+  item.insertBefore(video, item.firstChild);
+
+  const onReady = () => {
+    video.play().catch(() => {});
+    _startShortsProgress(idx, video);
+    // Preload next after current starts
+    setTimeout(() => {
+      const ni = document.getElementById(`si${idx + 1}`);
+      if (ni && !ni.querySelector('video') && idx + 1 < _shortsData.length) {
+        const nv = document.createElement('video');
+        nv.setAttribute('playsinline', ''); nv.setAttribute('webkit-playsinline', '');
+        nv.muted = true; nv.preload = 'metadata';
+        const ns = _shortsData[idx + 1];
+        nv.src = ns.url || '';
+        ni.insertBefore(nv, ni.firstChild);
+      }
+    }, 1000);
+  };
+
+  if (isM3U8 && typeof Hls !== 'undefined' && Hls.isSupported()) {
+    _shortsHls = new Hls({ enableWorker: false, maxBufferLength: 15, startLevel: -1 });
+    _shortsHls.attachMedia(video);
+    _shortsHls.on(Hls.Events.MEDIA_ATTACHED, () => _shortsHls.loadSource(url));
+    _shortsHls.on(Hls.Events.MANIFEST_PARSED, onReady);
+  } else {
+    video.src = url;
+    video.addEventListener('canplay', onReady, { once: true });
+  }
+}
+
 function _startShortsProgress(idx, video) {
   clearInterval(_shortsProgTimer);
-  const bar = document.getElementById(`shortsProg${idx}`);
+  const bar = document.getElementById(`spb${idx}`);
   if (!bar) return;
   _shortsProgTimer = setInterval(() => {
     if (!video.duration) return;
     bar.style.width = `${Math.min(100, video.currentTime / video.duration * 100)}%`;
-  }, 250);
+  }, 200);
 }
 
 function toggleShortsSound() {
   _shortsMuted = !_shortsMuted;
-  document.querySelectorAll('.shorts-item video').forEach(v => { v.muted = _shortsMuted; });
+  document.querySelectorAll('#shortsTrack video').forEach(v => { v.muted = _shortsMuted; });
   document.querySelectorAll('.shorts-mute-btn').forEach(b => { b.textContent = _shortsMuted ? '🔇' : '🔊'; });
 }
 
-function _loadShortsVideo(item, idx, s) {
-  item.querySelector('.shorts-item-spinner')?.remove();
-  const video = document.createElement('video');
-  video.style.cssText = 'width:100%;height:100%;object-fit:contain;position:absolute;inset:0;';
-  video.setAttribute('playsinline', '');
-  video.setAttribute('webkit-playsinline', '');
-  video.loop = true;
-  video.muted = _shortsMuted;
-  item.insertBefore(video, item.firstChild);
-
-  const url = s.url || '';
-  const isM3U8 = url.includes('.m3u8') || url.includes('/hls/');
-  if (isM3U8 && typeof Hls !== 'undefined' && Hls.isSupported()) {
-    const hls = new Hls({ enableWorker: false, maxBufferLength: 10 });
-    hls.attachMedia(video);
-    hls.on(Hls.Events.MEDIA_ATTACHED, () => hls.loadSource(url));
-    _shortsHlsMap[idx] = hls;
-  } else {
-    video.src = url;
-  }
-}
-
 function closeShortsPlayer() {
-  clearInterval(_shortsProgTimer);
-  document.getElementById('shortsPlayer').classList.remove('active');
+  _killShortsHls();
   const feed = document.getElementById('shortsFeed');
-  feed.querySelectorAll('video').forEach(v => { v.pause(); v.src = ''; try { v.load(); } catch(_) {} });
-  Object.values(_shortsHlsMap).forEach(h => { try { h.destroy(); } catch(_) {} });
-  _shortsHlsMap = {};
-  feed.innerHTML = '';
+  if (feed._onTS)    { feed.removeEventListener('touchstart', feed._onTS); feed._onTS = null; }
+  if (feed._onTE)    { feed.removeEventListener('touchend',   feed._onTE); feed._onTE = null; }
+  if (feed._onClick) { feed.removeEventListener('click',      feed._onClick); feed._onClick = null; }
+  document.getElementById('shortsPlayer').classList.remove('active');
+  document.getElementById('shortsTrack').innerHTML = '';
 }
 
 // ── Crypto payment ────────────────────────────────────────────────────────────
@@ -7448,7 +7489,9 @@ if (tg) {
 <div class="shorts-player" id="shortsPlayer">
   <button class="shorts-player-back" onclick="closeShortsPlayer()">‹</button>
   <div class="shorts-counter" id="shortsCounter"></div>
-  <div class="shorts-feed" id="shortsFeed"></div>
+  <div class="shorts-feed" id="shortsFeed">
+    <div class="shorts-track" id="shortsTrack"></div>
+  </div>
 </div>
 
 <!-- ── Crypto Payment Modal ── -->
