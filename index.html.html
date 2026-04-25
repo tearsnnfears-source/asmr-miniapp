@@ -613,6 +613,39 @@ body {
 }
 .av-tab-btn.pro-tab { border-color: #00E5FF33; }
 .av-tab-btn.pro-tab.active { background: #00E5FF; border-color: #00E5FF; color: #0E0E0F; }
+.av-tab-btn.yt-tab { border-color: rgba(244,67,54,0.35); }
+.av-tab-btn.yt-tab.active { background: #F44336; border-color: #F44336; color: #fff; }
+
+/* ── AV skeleton loader ── */
+.av-skeleton-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 10px 16px;
+}
+.av-skeleton-card {
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--dark2);
+}
+.av-skeleton-thumb {
+  height: 110px;
+  background: linear-gradient(90deg, var(--dark2) 25%, var(--dark3) 50%, var(--dark2) 75%);
+  background-size: 200% 100%;
+  animation: avShimmer 1.4s infinite;
+}
+.av-skeleton-info { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+.av-skeleton-line {
+  height: 10px; border-radius: 5px;
+  background: linear-gradient(90deg, var(--dark2) 25%, var(--dark3) 50%, var(--dark2) 75%);
+  background-size: 200% 100%;
+  animation: avShimmer 1.4s infinite;
+}
+.av-skeleton-line.short { width: 55%; }
+@keyframes avShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 
 /* ── Photo blur lock ── */
 .photos-lock-wrapper { position: relative; }
@@ -3340,6 +3373,7 @@ body {
       <div class="av-tab-toggle">
         <button class="av-tab-btn active" id="avTabVideos" onclick="avSwitchTab('videos')">Videos</button>
         <button class="av-tab-btn pro-tab" id="avTabVods" onclick="avSwitchTab('vods')">VODs ⚡</button>
+        <button class="av-tab-btn yt-tab" id="avTabYT" onclick="avSwitchTab('ytbackup')">▶ YT</button>
       </div>
     </div>
     <div class="av-filter-bar" id="avArtistFilter"></div>
@@ -4140,14 +4174,15 @@ function _avFiltered() {
   const q = avSearch.toLowerCase();
   return avAllVideos.filter(v => {
     const vtags = (v.tags || '').split(',').map(t => t.trim()).filter(Boolean);
-    const isVod = vtags.some(t => AV_VOD_TAGS.has(t));
-    if (avMode === 'vods' && !isVod) return false;
-    if (avMode === 'videos' && isVod) return false;
+    const isVod      = vtags.some(t => AV_VOD_TAGS.has(t));
+    const isYT       = vtags.some(t => AV_YT_TAGS.has(t));
+    const isSpecial  = isVod || isYT;
+    if (avMode === 'vods'     && !isVod)    return false;
+    if (avMode === 'ytbackup' && !isYT)     return false;
+    if (avMode === 'videos'   && isSpecial) return false;
     if (q && !v.title.toLowerCase().includes(q) && !(v.artistName||'').toLowerCase().includes(q)) return false;
     if (avArtist && v.artistName !== avArtist) return false;
-    if (avTag) {
-      if (!vtags.includes(avTag)) return false;
-    }
+    if (avTag && !vtags.includes(avTag)) return false;
     return true;
   });
 }
@@ -4180,10 +4215,12 @@ function avSetTag(name) {
 
 // ── AV mode: 'videos' | 'vods' ──────────────────────────────────────────────
 let avMode = 'videos';
-const AV_VOD_TAGS = new Set(['VOD', 'YTBACKUP']);
+const AV_VOD_TAGS    = new Set(['VOD']);
+const AV_YT_TAGS     = new Set(['YTBACKUP']);
+const AV_ALL_SPECIAL = new Set(['VOD', 'YTBACKUP']);
 
 function avSwitchTab(mode) {
-  if (mode === 'vods' && !hasProAccess()) {
+  if ((mode === 'vods' || mode === 'ytbackup') && !hasProAccess()) {
     showProGateModal();
     return;
   }
@@ -4193,6 +4230,7 @@ function avSwitchTab(mode) {
   document.getElementById('updatesSearchClear')?.classList.remove('active');
   document.getElementById('avTabVideos')?.classList.toggle('active', mode === 'videos');
   document.getElementById('avTabVods')?.classList.toggle('active', mode === 'vods');
+  document.getElementById('avTabYT')?.classList.toggle('active', mode === 'ytbackup');
   _avBuildArtistFilter();
   _avBuildTagFilter();
   _avRender(false);
@@ -4503,6 +4541,19 @@ function renderUpdatesGrid() {
   _avRender(false);
 }
 
+function _avShowSkeleton() {
+  const grid = document.getElementById('updatesGrid');
+  if (!grid) return;
+  grid.innerHTML = Array(8).fill(0).map(() => `
+    <div class="av-skeleton-card">
+      <div class="av-skeleton-thumb"></div>
+      <div class="av-skeleton-info">
+        <div class="av-skeleton-line"></div>
+        <div class="av-skeleton-line short"></div>
+      </div>
+    </div>`).join('');
+}
+
 async function showUpdatesPage() {
   openPage('updates');
   avPage = 0; avSearch = ''; avArtist = ''; avTag = ''; avMode = 'videos';
@@ -4510,6 +4561,11 @@ async function showUpdatesPage() {
   document.getElementById('updatesSearchClear')?.classList.remove('active');
   document.getElementById('avTabVideos')?.classList.add('active');
   document.getElementById('avTabVods')?.classList.remove('active');
+  document.getElementById('avTabYT')?.classList.remove('active');
+
+  // Show skeleton while loading
+  if (!avAllVideos.length) _avShowSkeleton();
+
   await _avEnsureLoaded();
   _avBuildArtistFilter();
   _avBuildTagFilter();
