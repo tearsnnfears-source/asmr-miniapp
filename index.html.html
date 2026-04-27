@@ -4075,10 +4075,12 @@ async function fetchVideosFromAPI() {
       allUpdates = data.videos.map(v => ({
         id: v.id,
         title: v.title,
+        url: v.url,
         embedUrl: v.embed_url || v.url,
         artistName: v.artist_name || '',
+        tags: v.tags || '',
         duration: v.duration || "00:00",
-        date: v.created_at ? new Date(v.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        date: v.created_at ? new Date(v.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
         thumbnailUrl: v.thumbnail_url || ''
       }));
       console.log('Loaded', allUpdates.length, 'videos from API');
@@ -6581,18 +6583,20 @@ async function loadFollowedFeed() {
     const data = await res.json();
     const videos = data.videos || [];
     if (!videos.length) return;
-    // Inject followed videos at top of allUpdates
-    const titleEl = document.getElementById('lastUpdatesTitle');
-    if (titleEl) titleEl.textContent = '🎬 For You';
     const followed = videos.map(v => ({
       id: v.id, title: v.title, url: v.url, artistName: v.artist_name,
       thumbnailUrl: v.thumbnail_url, tags: v.tags,
+      _ts: v.created_at ? new Date(v.created_at).getTime() : 0,
       date: v.created_at ? new Date(v.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '',
       duration: ''
     }));
-    // Merge: followed first, then rest (deduplicate)
+    // Merge + tag allUpdates with timestamp, sort newest first
     const followedIds = new Set(followed.map(v => v.id));
-    const merged = [...followed, ...allUpdates.filter(v => !followedIds.has(v.id))];
+    const rest = allUpdates
+      .filter(v => !followedIds.has(v.id))
+      .map(v => ({...v, _ts: v.date ? new Date(v.date).getTime() : 0}));
+    const merged = [...followed, ...rest]
+      .sort((a, b) => (b._ts || 0) - (a._ts || 0));
     const scroll = document.getElementById('updatesScroll');
     if (scroll) scroll.innerHTML = merged.slice(0, 6).map(_updateMiniCardHtml).join('');
   } catch(e) { console.warn('[followed feed]', e); }
