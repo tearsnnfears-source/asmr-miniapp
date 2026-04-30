@@ -4075,8 +4075,7 @@ async function fetchVideosFromAPI() {
       allUpdates = data.videos.map(v => ({
         id: v.id,
         title: v.title,
-        url: v.url,
-        embedUrl: v.embed_url || v.url,
+        embedUrl: '',
         artistName: v.artist_name || '',
         tags: v.tags || '',
         duration: v.duration || "00:00",
@@ -4131,13 +4130,7 @@ async function loadHomeShorts() {
     scroll.innerHTML = _homeShorts.map((s, idx) => {
       const thumb = s.thumbnail_url || '';
       const bg = thumb ? `style="background-image:url('${thumb.replace(/'/g,"\\'")}')"` : '';
-      const videoFallback = !thumb
-        ? `<video src="${(s.url||'').replace(/"/g,'%22')}" muted preload="metadata" playsinline
-            style="width:100%;height:100%;object-fit:cover;pointer-events:none;border-radius:12px"
-            onloadedmetadata="this.currentTime=1"></video>`
-        : '';
       return `<div class="shorts-home-card" ${bg} onclick="openShortsPlayer(_homeShorts,${idx},false)">
-        ${videoFallback}
         <div class="shorts-home-play">▶</div>
         <div class="shorts-home-label">${escapeHtml(s.title||'Short')}</div>
       </div>`;
@@ -4350,7 +4343,7 @@ function _killShortsHls() {
   });
 }
 
-function _loadShortsVideo(item, idx) {
+async function _loadShortsVideo(item, idx) {
   // Remove any existing video
   item.querySelectorAll('video').forEach(v => { v.pause(); v.remove(); });
 
@@ -4363,7 +4356,15 @@ function _loadShortsVideo(item, idx) {
   video.loop   = true;
   video.muted  = _shortsMuted;
 
-  const url    = s.url || '';
+  let url = '';
+  try {
+    const playable = await fetchPlayableContent(s.id);
+    url = playable.url || '';
+  } catch(e) {
+    showToast(e.status === 403 ? 'Subscribe to watch Shorts' : 'Video unavailable');
+    return;
+  }
+  if (!url) return;
   const isM3U8 = url.includes('.m3u8') || url.includes('/hls/');
 
   item.insertBefore(video, item.firstChild);
@@ -4371,18 +4372,6 @@ function _loadShortsVideo(item, idx) {
   const onReady = () => {
     video.play().catch(() => {});
     _startShortsProgress(idx, video);
-    // Preload next after current starts
-    setTimeout(() => {
-      const ni = document.getElementById(`si${idx + 1}`);
-      if (ni && !ni.querySelector('video') && idx + 1 < _shortsData.length) {
-        const nv = document.createElement('video');
-        nv.setAttribute('playsinline', ''); nv.setAttribute('webkit-playsinline', '');
-        nv.muted = true; nv.preload = 'metadata';
-        const ns = _shortsData[idx + 1];
-        nv.src = ns.url || '';
-        ni.insertBefore(nv, ni.firstChild);
-      }
-    }, 1000);
   };
 
   if (isM3U8 && typeof Hls !== 'undefined' && Hls.isSupported()) {
@@ -4531,7 +4520,7 @@ async function _avEnsureLoaded() {
     const data = await res.json();
     avAllVideos = (data.videos || []).map(v => ({
       id: v.id, title: v.title,
-      embedUrl: v.embed_url || v.url,
+      embedUrl: '',
       thumbnailUrl: v.thumbnail_url || '',
       artistName: v.artist_name || '',
       tags: v.tags || '',
@@ -4623,7 +4612,7 @@ function openUpdateDetail(id) {
   }
 
   // Open in video player overlay
-  openVideoPlayer(v.id, v.embedUrl, v.title, v.artistName || '', v.tags || '', v.thumbnailUrl || '');
+  openVideoPlayer(v.id, '', v.title, v.artistName || '', v.tags || '', v.thumbnailUrl || '');
 }
 
 function getInitials(fullName) {
@@ -4697,6 +4686,27 @@ function renderTelegramProfile(user) {
 function getTelegramInitData() {
   const tg = window.Telegram?.WebApp;
   return tg?.initData || "";
+}
+
+async function fetchPlayableContent(contentId) {
+  const initData = getTelegramInitData();
+  if (!initData || !contentId) {
+    const err = new Error('Open from Telegram');
+    err.status = 403;
+    throw err;
+  }
+  const res = await fetch(`${API_BASE}/miniapp/content/play`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ initData, content_id: contentId })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.url) {
+    const err = new Error(data.error || 'Content unavailable');
+    err.status = res.status;
+    throw err;
+  }
+  return data;
 }
 
 function escapeHtml(s) {
@@ -4801,7 +4811,7 @@ async function loadFavorites() {
       const artist = f.artist_name || '';
       const tags = (f.tags || '').split(',').filter(Boolean).map(t => buildTagBadge(t.trim())).join('');
       return `
-        <div class="profile-video-card" ${cardStyle} onclick="openVideoPlayer(${f.content_id||0},'${(f.url||'').replace(/'/g,"\\'")}','${(f.title||'').replace(/'/g,"\\'")}','${artist.replace(/'/g,"\\'")}','${(f.tags||'').replace(/'/g,"\\'")}','${thumb.replace(/'/g,"\\'")}')">
+        <div class="profile-video-card" ${cardStyle} onclick="openVideoPlayer(${f.content_id||0},'','${(f.title||'').replace(/'/g,"\\'")}','${artist.replace(/'/g,"\\'")}','${(f.tags||'').replace(/'/g,"\\'")}','${thumb.replace(/'/g,"\\'")}')">
           <div class="profile-video-icon">▶</div>
           <div class="profile-video-info">
             <div class="profile-video-title">${escapeHtml(f.title || 'Video')}</div>
@@ -4864,7 +4874,6 @@ async function toggleVideoFavorite() {
       body: JSON.stringify({
         initData, content_id: currentVideoId,
         title: document.getElementById('vpInfoTitle')?.textContent || 'Video',
-        url: document.getElementById('vpVideo')?.src || '',
       }),
     });
     const data = await res.json();
@@ -4929,7 +4938,7 @@ async function openPlaylistDetail(plId, plName) {
       return;
     }
     _lastPlaylistItems = data.items.map(v => ({
-      id: v.id, url: v.url || '', title: v.title || 'Video',
+      id: v.id, url: '', title: v.title || 'Video',
       artist: v.artist_name || '', tags: v.tags || '', thumbnailUrl: v.thumbnail_url || ''
     }));
     items.innerHTML = _lastPlaylistItems.map((v, idx) => {
@@ -5787,11 +5796,10 @@ function _videoCard(v) {
   const tags    = (v.tags||'').split(',').filter(Boolean);
   const tagsHtml= tags.map(t => buildTagBadge(t.trim())).join('');
   const safeT   = (v.title||'Video').replace(/'/g,"\\'").replace(/"/g,'&quot;');
-  const safeU   = (v.url||'').replace(/'/g,"\\'");
   const safeThumb = (v.thumbnail_url||'').replace(/'/g,"\\'");
   const cardStyle = v.thumbnail_url ? `style="--thumb:url('${v.thumbnail_url.replace(/"/g,'%22').replace(/'/g,"\\'")}')"` : '';
   return `<div class="profile-video-card" ${cardStyle}
-    onclick="openVideoPlayer(${v.id},'${safeU}','${safeT}','${currentArtistName.replace(/'/g,"\\'")}','${(v.tags||'').replace(/'/g,"\\'")}','${safeThumb}')">
+    onclick="openVideoPlayer(${v.id},'','${safeT}','${currentArtistName.replace(/'/g,"\\'")}','${(v.tags||'').replace(/'/g,"\\'")}','${safeThumb}')">
     <div class="profile-video-icon">▶</div>
     <div class="profile-video-info">
       <div class="profile-video-title">${v.title||'Video'}</div>
@@ -5890,13 +5898,8 @@ function _renderProfileShorts(shorts) {
   let html = shorts.map((s, idx) => {
     const thumb = s.thumbnail_url || '';
     const bg    = thumb ? `style="background-image:url('${thumb.replace(/'/g,"\\'")}')"` : '';
-    const vfb   = !thumb
-      ? `<video src="${(s.url||'').replace(/"/g,'%22')}" muted preload="metadata" playsinline
-           style="width:100%;height:100%;object-fit:cover;pointer-events:none"
-           onloadedmetadata="this.currentTime=1"></video>`
-      : '';
-    if (!canView) return `<div class="shorts-grid-item" ${bg} style="filter:blur(3px);pointer-events:none">${vfb}<div class="shorts-grid-play">🔒</div></div>`;
-    return `<div class="shorts-grid-item" ${bg} onclick="openShortsPlayer(_currentArtistShorts,${idx})">${vfb}<div class="shorts-grid-play">▶</div></div>`;
+    if (!canView) return `<div class="shorts-grid-item" ${bg} style="filter:blur(3px);pointer-events:none"><div class="shorts-grid-play">🔒</div></div>`;
+    return `<div class="shorts-grid-item" ${bg} onclick="openShortsPlayer(_currentArtistShorts,${idx})"><div class="shorts-grid-play">▶</div></div>`;
   }).join('');
 
   // Load more button for shorts (full width below grid)
@@ -5940,10 +5943,12 @@ function _renderProfilePhotos() {
     photoGrid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);grid-column:1/-1">No photos yet</div>';
     return;
   }
-  photoGrid.innerHTML = currentArtistPhotos.map((p, i) =>
-    `<div class="profile-photo-item" style="background-image:url('${p.url}')"
-      onclick="${hasVideoAccess() ? `openPhotoLightbox(${i})` : 'paywallSubscribe()'}"></div>`
-  ).join('') + (_profPMore
+  photoGrid.innerHTML = currentArtistPhotos.map((p, i) => {
+    const thumb = p.thumbnail_url || '';
+    const bg = thumb ? `style="background-image:url('${thumb.replace(/'/g,"\\'")}')"` : '';
+    return `<div class="profile-photo-item" ${bg}
+      onclick="${hasVideoAccess() ? `openPhotoLightbox(${i})` : 'paywallSubscribe()'}"></div>`;
+  }).join('') + (_profPMore
     ? `<div style="grid-column:1/-1">${_loadMoreBtn('loadMoreProfilePhotos()', 'Load more photos')}</div>`
     : '');
 
@@ -6007,7 +6012,16 @@ function closeLightbox() {
   _popBack();
 }
 
-function _lightboxRender(fade) {
+async function _photoUrlForIndex(index) {
+  const item = currentArtistPhotos[index];
+  if (!item) return '';
+  if (item._url) return item._url;
+  const playable = await fetchPlayableContent(item.id);
+  item._url = playable.url;
+  return item._url;
+}
+
+async function _lightboxRender(fade) {
   const img = document.getElementById('lightboxImg');
   const counter = document.getElementById('lightboxCounter');
   const prev = document.getElementById('lightboxPrev');
@@ -6018,14 +6032,23 @@ function _lightboxRender(fade) {
   prev.style.display = total > 1 ? '' : 'none';
   next.style.display = total > 1 ? '' : 'none';
 
+  const setImage = async () => {
+    try {
+      img.src = await _photoUrlForIndex(lightboxIndex);
+    } catch(e) {
+      showToast(e.status === 403 ? 'Subscribe to view photos' : 'Photo unavailable');
+      img.removeAttribute('src');
+    }
+  };
+
   if (fade) {
     img.classList.add('fading');
-    setTimeout(() => {
-      img.src = currentArtistPhotos[lightboxIndex].url;
+    setTimeout(async () => {
+      await setImage();
       img.classList.remove('fading');
     }, 150);
   } else {
-    img.src = currentArtistPhotos[lightboxIndex].url;
+    await setImage();
   }
 }
 
@@ -6157,28 +6180,16 @@ async function paywallTrial() {
     if (_paywallPending && hasVideoAccess()) {
       const p = _paywallPending;
       _paywallPending = null;
-      openVideoPlayer(p.contentId, p.url, p.title, p.artist, p.tagsRaw, p.thumbUrl);
+      openVideoPlayer(p.contentId, '', p.title, p.artist, p.tagsRaw, p.thumbUrl);
     }
   }
 }
 
-function _showVpPreviewEnd() {
-  const wrap = document.getElementById('vpWrap');
-  if (!wrap || wrap.querySelector('.vp-preview-end')) return;
-  const video = document.getElementById('vpVideo');
-  video.pause();
-  const div = document.createElement('div');
-  div.className = 'vp-preview-end';
-  div.innerHTML = `
-    <div class="vp-preview-end-icon">🔒</div>
-    <div class="vp-preview-end-title">Preview ended</div>
-    <div class="vp-preview-end-sub">Subscribe to watch the full video and access all content</div>
-    <button class="vp-preview-end-btn" onclick="paywallSubscribe()">🚀 Subscribe Now</button>
-    <button class="vp-preview-end-trial" onclick="paywallTrial()">🎁 Try 5 days free</button>`;
-  wrap.appendChild(div);
-}
-
-function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
+async function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
+  if (!hasVideoAccess()) {
+    showPaywall(title, artist);
+    return;
+  }
   currentVideoId = contentId;
 
   const overlay = document.getElementById('videoPlayerOverlay');
@@ -6234,7 +6245,24 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
   function showVideoError(msg) {
     let el = vpWrap.querySelector('.vp-error');
     if (!el) { el = document.createElement('div'); el.className = 'vp-error'; el.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);z-index:2;gap:12px;padding:20px;text-align:center'; vpWrap.appendChild(el); }
-    el.innerHTML = '<div style="font-size:32px">⚠️</div><div style="font-size:14px;color:#fff">'+msg+'</div><button onclick="window.open(\''+url.replace(/'/g,"\\'")+'\',\'_blank\')" style="background:var(--pink);color:#000;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer">Open in Browser</button>';
+    el.innerHTML = '<div style="font-size:32px">⚠️</div><div style="font-size:14px;color:#fff">'+escapeHtml(msg)+'</div>';
+  }
+
+  try {
+    const playable = await fetchPlayableContent(contentId);
+    url = playable.url || '';
+  } catch(e) {
+    if (e.status === 403) {
+      closeVideoPlayer();
+      showPaywall(title, artist);
+    } else {
+      showVideoError('Video is unavailable right now');
+    }
+    return;
+  }
+  if (!url) {
+    showVideoError('Video is unavailable right now');
+    return;
   }
 
   function tryPlay() {
@@ -6300,20 +6328,7 @@ function openVideoPlayer(contentId, url, title, artist, tagsRaw, thumbUrl) {
     tryPlay();
   }
 
-  // 30-second preview for non-subscribers
-  const vpWrap2 = document.getElementById('vpWrap');
-  vpWrap2?.querySelectorAll('.vp-preview-end').forEach(el => el.remove());
-  if (!hasVideoAccess()) {
-    video._previewCheck = () => {
-      if (video.currentTime >= 30) {
-        video.removeEventListener('timeupdate', video._previewCheck);
-        _showVpPreviewEnd();
-      }
-    };
-    video.addEventListener('timeupdate', video._previewCheck);
-  } else {
-    video._previewCheck = null;
-  }
+  video._previewCheck = null;
 
   // Autoplay-next / replay on video end
   video.onended = function() {
@@ -6381,7 +6396,7 @@ function openVideoPlayerInPlaylist(items, idx) {
   currentVpPlaylist = items;
   currentVpPlaylistIdx = idx;
   const item = items[idx];
-  openVideoPlayer(item.id, item.url, item.title, item.artist, item.tags, item.thumbnailUrl);
+  openVideoPlayer(item.id, '', item.title, item.artist, item.tags, item.thumbnailUrl);
   _renderVpQueue();
   document.getElementById('vpAutoplayBtn').style.display = 'inline-flex';
 }
@@ -6390,7 +6405,7 @@ function _vpPlayIdx(idx) {
   if (idx < 0 || idx >= currentVpPlaylist.length) return;
   currentVpPlaylistIdx = idx;
   const item = currentVpPlaylist[idx];
-  openVideoPlayer(item.id, item.url, item.title, item.artist, item.tags, item.thumbnailUrl);
+  openVideoPlayer(item.id, '', item.title, item.artist, item.tags, item.thumbnailUrl);
   _renderVpQueue();
   document.getElementById('vpAutoplayBtn').style.display = 'inline-flex';
 }
@@ -6440,7 +6455,7 @@ async function avSearchInput(q) {
       const res  = await fetch(`${API_BASE}/miniapp/search?q=${encodeURIComponent(q)}&limit=40`);
       const data = await res.json();
       const results = (data.results || []).map(v => ({
-        id: v.id, title: v.title, url: v.url, artistName: v.artist_name,
+        id: v.id, title: v.title, artistName: v.artist_name,
         thumbnailUrl: v.thumbnail_url, tags: v.tags,
         date: v.created_at ? new Date(v.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '',
         duration: ''
@@ -6584,7 +6599,7 @@ async function loadFollowedFeed() {
     const videos = data.videos || [];
     if (!videos.length) return;
     const followed = videos.map(v => ({
-      id: v.id, title: v.title, url: v.url, artistName: v.artist_name,
+      id: v.id, title: v.title, artistName: v.artist_name,
       thumbnailUrl: v.thumbnail_url, tags: v.tags,
       _ts: v.created_at ? new Date(v.created_at).getTime() : 0,
       date: v.created_at ? new Date(v.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '',
