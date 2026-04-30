@@ -7983,7 +7983,12 @@ async function confirmTrial() {
     // If this was triggered from the paywall, don't kick back to home
     if (!_paywallPending) {
       openPage('home');
-      setTimeout(openInviteModal, 400);
+      if (data.invite_link) {
+        setTimeout(() => openInviteModal(data.invite_link), 400);
+      } else {
+        showToast('Invite link is not ready yet');
+        startInvitePolling();
+      }
     } else {
       showToast('🎁 5 free days activated!');
     }
@@ -8473,7 +8478,19 @@ async function checkLanguageAndShowOverlay() {
 // ── Invite modal ──
 function openInviteModal(link) {
   const btn = document.getElementById('inviteJoinBtn');
-  if (btn && link) btn.href = link;
+  if (btn) {
+    if (link) {
+      btn.href = link;
+      btn.dataset.inviteUrl = link;
+      btn.style.opacity = '1';
+      btn.style.pointerEvents = 'auto';
+    } else {
+      btn.removeAttribute('href');
+      btn.dataset.inviteUrl = '';
+      btn.style.opacity = '0.55';
+      btn.style.pointerEvents = 'none';
+    }
+  }
   document.getElementById('inviteModal').classList.add('active');
 }
 function closeInviteModal() {
@@ -8482,10 +8499,20 @@ function closeInviteModal() {
 function openGroupLink(e) {
   e.preventDefault();
   const tg = window.Telegram?.WebApp;
-  const url = document.getElementById('inviteJoinBtn')?.href || '';
-  if (!url || url === '#' || url === window.location.href) return;
-  if (tg && typeof tg.openLink === 'function') tg.openLink(url);
-  else window.open(url, '_blank', 'noopener');
+  const btn = document.getElementById('inviteJoinBtn');
+  const url = btn?.dataset.inviteUrl || btn?.getAttribute('href') || '';
+  if (!url || url === '#' || url.startsWith(window.location.href)) {
+    showToast('Invite link is not ready yet');
+    return;
+  }
+  const isTelegramLink = /^https?:\/\/(t\.me|telegram\.me)\//i.test(url) || /^tg:\/\//i.test(url);
+  if (isTelegramLink && tg && typeof tg.openTelegramLink === 'function') {
+    tg.openTelegramLink(url);
+  } else if (tg && typeof tg.openLink === 'function') {
+    tg.openLink(url);
+  } else {
+    window.open(url, '_blank', 'noopener');
+  }
   closeInviteModal();
 }
 
@@ -8528,6 +8555,8 @@ const HOME_PREVIEW_URL = 'https://cdn.asmrleaks.tv/hls/asmrleaks/preview.mp4/ind
 let homePreviewHls = null;
 let homePreviewReady = false;
 let homePreviewNativeFullscreen = false;
+let homePreviewSourceAttached = false;
+let homePreviewPlayRequested = false;
 
 function getHomePreviewPlayer() { return document.getElementById('homePreviewPlayer'); }
 function getHomePreviewVideo() { return document.getElementById('homePreviewVideo'); }
@@ -8572,6 +8601,24 @@ function seekHomePreviewFromEvent(ev) {
   updateHomePreviewControls();
 }
 
+async function playHomePreviewVideo() {
+  const video = getHomePreviewVideo();
+  if (!video) return;
+  try {
+    await video.play();
+  } catch(e) {
+    // Some Telegram Android WebViews only allow async HLS playback muted.
+    try {
+      video.muted = true;
+      await video.play();
+    } catch(inner) {
+      console.log('[home preview] play failed:', inner?.message || e?.message || inner || e);
+      showHomePreviewError('Tap again to load preview');
+    }
+  }
+  updateHomePreviewControls();
+}
+
 async function toggleHomePreviewPlay(ev) {
   if (ev) {
     ev.preventDefault();
@@ -8580,11 +8627,14 @@ async function toggleHomePreviewPlay(ev) {
   initHomePreviewPlayer();
   const video = getHomePreviewVideo();
   if (!video) return;
+  homePreviewPlayRequested = true;
   try {
     if (video.paused || video.ended) {
-      await video.play();
+      if (!homePreviewSourceAttached || video.error) attachHomePreviewSource(true);
+      await playHomePreviewVideo();
     } else {
       video.pause();
+      homePreviewPlayRequested = false;
     }
   } catch(e) {
     console.log('[home preview] play failed:', e?.message || e);
@@ -8667,16 +8717,22 @@ function showHomePreviewError(message) {
   const player = getHomePreviewPlayer();
   const status = document.getElementById('homePreviewStatus');
   if (player) player.classList.remove('home-preview-ready', 'home-preview-playing');
-  if (status) status.textContent = message || 'Preview unavailable';
+  if (status) status.textContent = homePreviewPlayRequested ? (message || 'Preview unavailable') : 'Tap to preview';
 }
 
-function attachHomePreviewSource() {
+function attachHomePreviewSource(force = false) {
   const video = getHomePreviewVideo();
   if (!video) return;
+  if (homePreviewSourceAttached && !force) return;
   if (homePreviewHls) {
     try { homePreviewHls.destroy(); } catch(_) {}
     homePreviewHls = null;
   }
+  homePreviewSourceAttached = true;
+  const status = document.getElementById('homePreviewStatus');
+  if (status) status.textContent = 'Loading preview';
+  video.removeAttribute('src');
+  try { video.load(); } catch(_) {}
 
   const nativeHls = video.canPlayType('application/vnd.apple.mpegurl') !== '';
   const isAndroid = /android/i.test(navigator.userAgent);
@@ -8685,6 +8741,7 @@ function attachHomePreviewSource() {
   if (nativeHls && !isAndroid) {
     video.src = HOME_PREVIEW_URL;
     video.load();
+    if (homePreviewPlayRequested) setTimeout(playHomePreviewVideo, 80);
     return;
   }
 
@@ -8698,17 +8755,23 @@ function attachHomePreviewSource() {
       maxMaxBufferLength: 30,
       manifestLoadingTimeOut: 20000,
       fragLoadingTimeOut: 25000,
+      fragLoadingMaxRetry: 6,
+      manifestLoadingMaxRetry: 4,
       xhrSetup: function(xhr) { xhr.withCredentials = false; },
     });
     let recoveryAttempts = 0;
     homePreviewHls.on(Hls.Events.MEDIA_ATTACHED, () => homePreviewHls.loadSource(HOME_PREVIEW_URL));
-    homePreviewHls.on(Hls.Events.MANIFEST_PARSED, () => updateHomePreviewControls());
+    homePreviewHls.on(Hls.Events.MANIFEST_PARSED, () => {
+      updateHomePreviewControls();
+      if (homePreviewPlayRequested) playHomePreviewVideo();
+    });
     homePreviewHls.on(Hls.Events.ERROR, (_ev, data) => {
       if (!data.fatal) return;
       recoveryAttempts++;
       if (recoveryAttempts > 3) {
         try { homePreviewHls.destroy(); } catch(_) {}
         homePreviewHls = null;
+        homePreviewSourceAttached = false;
         showHomePreviewError('Preview unavailable');
         return;
       }
@@ -8723,7 +8786,9 @@ function attachHomePreviewSource() {
   if (nativeHls) {
     video.src = HOME_PREVIEW_URL;
     video.load();
+    if (homePreviewPlayRequested) setTimeout(playHomePreviewVideo, 80);
   } else {
+    homePreviewSourceAttached = false;
     showHomePreviewError('HLS not supported');
   }
 }
@@ -8740,8 +8805,13 @@ function initHomePreviewPlayer() {
   video.muted = false;
   ['loadedmetadata','durationchange','timeupdate','progress','waiting','canplay','play','pause','ended','error'].forEach(ev => {
     video.addEventListener(ev, () => {
-      if (ev === 'error') showHomePreviewError('Preview unavailable');
-      else updateHomePreviewControls();
+      if (ev === 'error') {
+        homePreviewSourceAttached = false;
+        showHomePreviewError('Preview unavailable');
+      } else {
+        updateHomePreviewControls();
+        if (ev === 'canplay' && homePreviewPlayRequested && video.paused) playHomePreviewVideo();
+      }
     });
   });
   video.addEventListener('click', () => toggleHomePreviewPlay());
@@ -8758,7 +8828,8 @@ function initHomePreviewPlayer() {
     }
   });
 
-  attachHomePreviewSource();
+  const status = document.getElementById('homePreviewStatus');
+  if (status) status.textContent = 'Tap to preview';
   updateHomePreviewControls();
 }
 
