@@ -4595,9 +4595,9 @@ async function loadShortVideoThumb(card) {
 
 async function loadHomeShorts() {
   try {
-    const res = await fetch(`${API_BASE}/miniapp/shorts?limit=30`);
+    const res = await fetch(`${API_BASE}/miniapp/shorts?limit=8`);
     const data = await res.json();
-    _homeShorts = (data.shorts || []).map(s => ({...s, artist: s.artist_name || ''}));
+    _homeShorts = (data.shorts || []).slice(0, 8).map(s => ({...s, artist: s.artist_name || ''}));
     const section = document.getElementById('shortsSection');
     const scroll  = document.getElementById('shortsScroll');
     if (!_homeShorts.length || !scroll) { if (section) section.style.display = 'none'; return; }
