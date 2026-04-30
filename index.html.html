@@ -226,6 +226,217 @@ body {
   font-size: 42px;
   color: rgba(255,255,255,0.1);
   margin-bottom: 10px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.home-preview-player {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  min-height: 100%;
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255,126,200,0.16), transparent 34%),
+    radial-gradient(circle at 80% 70%, rgba(204,255,0,0.1), transparent 32%),
+    #050506;
+  isolation: isolate;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+}
+
+.home-preview-player video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  background: #000;
+}
+
+.home-preview-player::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 46%, transparent 0 48%, rgba(0,0,0,0.2) 78%, rgba(0,0,0,0.58) 100%),
+    linear-gradient(180deg, rgba(0,0,0,0.14), transparent 44%, rgba(0,0,0,0.72));
+}
+
+.home-preview-status {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 4;
+  transform: translate(-50%, -50%);
+  padding: 8px 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 999px;
+  background: rgba(14,14,15,0.56);
+  color: rgba(255,255,255,0.82);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  pointer-events: none;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.home-preview-player.home-preview-ready .home-preview-status,
+.home-preview-player.home-preview-playing .home-preview-status {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.92);
+}
+
+.home-preview-controls {
+  position: absolute;
+  left: 10px;
+  right: auto;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  width: min(320px, calc(100% - 20px));
+  max-width: calc(100vw - 32px);
+  z-index: 5;
+  height: 42px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 10px;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.home-preview-btn {
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  background: rgba(14,14,15,0.64);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 10px 28px rgba(0,0,0,0.34);
+  transition: transform 0.14s ease, background 0.14s ease, border-color 0.14s ease;
+}
+
+.home-preview-btn:active {
+  transform: scale(0.94);
+  background: rgba(255,255,255,0.13);
+  border-color: rgba(255,255,255,0.22);
+}
+
+.home-preview-main-btn {
+  background: linear-gradient(135deg, rgba(255,126,200,0.95), rgba(200,107,255,0.95));
+  color: #0E0E0F;
+  border-color: rgba(255,126,200,0.55);
+  box-shadow: 0 8px 24px rgba(255,126,200,0.26);
+}
+
+.home-preview-btn svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.home-preview-main-btn svg {
+  fill: currentColor;
+  stroke: none;
+}
+
+.home-preview-player.home-preview-playing .home-preview-play-icon,
+.home-preview-player:not(.home-preview-playing) .home-preview-pause-icon {
+  display: none;
+}
+
+.home-preview-progress {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.home-preview-rail {
+  position: relative;
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.24);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.25);
+}
+
+.home-preview-buffer,
+.home-preview-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.home-preview-buffer { background: rgba(255,255,255,0.18); }
+.home-preview-fill {
+  background: linear-gradient(90deg, var(--pink), var(--lime));
+  box-shadow: 0 0 18px rgba(255,126,200,0.42);
+}
+
+body.home-preview-fullscreen-active {
+  overflow: hidden;
+}
+
+.home-preview-player.home-preview-immersive {
+  position: fixed !important;
+  inset: 0;
+  z-index: 6000;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100dvh;
+  max-width: none;
+  border-radius: 0;
+  border: none;
+  aspect-ratio: auto;
+  background: #000;
+}
+
+.home-preview-player.home-preview-immersive video {
+  object-fit: cover;
+}
+
+.home-preview-player.home-preview-immersive .home-preview-controls {
+  left: max(16px, env(safe-area-inset-left, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  width: auto;
+  max-width: none;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (orientation: portrait) and (max-width: 820px) {
+  .home-preview-player.home-preview-immersive.home-preview-force-landscape {
+    left: 50%;
+    top: 50%;
+    width: 100dvh;
+    height: 100dvw;
+    min-height: 100dvw;
+    transform: translate(-50%, -50%) rotate(90deg);
+    transform-origin: center;
+  }
 }
 
 .preview-text {
@@ -3571,13 +3782,26 @@ body {
 
       <div class="preview-section">
         <h2>Page Preview</h2>
-        <div style="position:relative;width:100%;aspect-ratio:16/9;border-radius:10px;overflow:hidden;margin-bottom:10px">
-          <iframe 
-            src="https://cdn.asmrleaks.tv/hls/amy_sucking.mp4/index.m3u8?autoplay=false" 
-            style="position:absolute;inset:0;width:100%;height:100%;border:none;border-radius:10px" 
-            allow="autoplay; fullscreen; encrypted-media" 
-            allowfullscreen>
-          </iframe>
+        <div class="preview-placeholder">
+          <div class="home-preview-player" id="homePreviewPlayer">
+            <video id="homePreviewVideo" playsinline webkit-playsinline preload="metadata" disablepictureinpicture controlslist="nodownload noplaybackrate noremoteplayback"></video>
+            <div class="home-preview-status" id="homePreviewStatus">Loading preview</div>
+            <div class="home-preview-controls">
+              <button class="home-preview-btn home-preview-main-btn" id="homePreviewPlayBtn" type="button" onclick="toggleHomePreviewPlay(event)" aria-label="Play or pause preview">
+                <svg class="home-preview-play-icon" viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"></polygon></svg>
+                <svg class="home-preview-pause-icon" viewBox="0 0 24 24"><rect x="7" y="5" width="3.5" height="14" rx="1"></rect><rect x="13.5" y="5" width="3.5" height="14" rx="1"></rect></svg>
+              </button>
+              <div class="home-preview-progress" id="homePreviewProgress" aria-label="Seek preview">
+                <div class="home-preview-rail">
+                  <div class="home-preview-buffer" id="homePreviewBuffer"></div>
+                  <div class="home-preview-fill" id="homePreviewFill"></div>
+                </div>
+              </div>
+              <button class="home-preview-btn" id="homePreviewFullscreenBtn" type="button" onclick="toggleHomePreviewFullscreen(event)" aria-label="Fullscreen preview">
+                <svg viewBox="0 0 24 24"><path d="M8 3H3v5"></path><path d="M16 3h5v5"></path><path d="M21 16v5h-5"></path><path d="M3 16v5h5"></path></svg>
+              </button>
+            </div>
+          </div>
         </div>
         <p class="preview-text">Watch the best ASMR content exclusively</p>
       </div>
@@ -8272,6 +8496,244 @@ function startInvitePolling() {
 }
 
 // ── Splash ──
+const HOME_PREVIEW_URL = 'https://cdn.asmrleaks.tv/hls/asmrleaks/preview.mp4/index.m3u8';
+let homePreviewHls = null;
+let homePreviewReady = false;
+let homePreviewNativeFullscreen = false;
+
+function getHomePreviewPlayer() { return document.getElementById('homePreviewPlayer'); }
+function getHomePreviewVideo() { return document.getElementById('homePreviewVideo'); }
+
+function getHomePreviewFullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement || null;
+}
+
+function updateHomePreviewControls() {
+  const player = getHomePreviewPlayer();
+  const video = getHomePreviewVideo();
+  if (!player || !video) return;
+
+  const duration = Number.isFinite(video.duration) ? video.duration : 0;
+  const current = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+  const progress = duration > 0 ? Math.min(1, Math.max(0, current / duration)) : 0;
+  const fill = document.getElementById('homePreviewFill');
+  const buffer = document.getElementById('homePreviewBuffer');
+
+  if (fill) fill.style.transform = `scaleX(${progress})`;
+  if (buffer) {
+    let buffered = 0;
+    try {
+      if (duration > 0 && video.buffered.length) {
+        buffered = Math.min(1, video.buffered.end(video.buffered.length - 1) / duration);
+      }
+    } catch(_) {}
+    buffer.style.transform = `scaleX(${buffered})`;
+  }
+
+  player.classList.toggle('home-preview-playing', !video.paused && !video.ended);
+  player.classList.toggle('home-preview-ready', video.readyState >= 2 || duration > 0);
+}
+
+function seekHomePreviewFromEvent(ev) {
+  const video = getHomePreviewVideo();
+  const progress = document.getElementById('homePreviewProgress');
+  if (!video || !progress || !Number.isFinite(video.duration) || video.duration <= 0) return;
+  const rect = progress.getBoundingClientRect();
+  const x = Math.min(rect.width, Math.max(0, ev.clientX - rect.left));
+  video.currentTime = (x / rect.width) * video.duration;
+  updateHomePreviewControls();
+}
+
+async function toggleHomePreviewPlay(ev) {
+  if (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+  }
+  initHomePreviewPlayer();
+  const video = getHomePreviewVideo();
+  if (!video) return;
+  try {
+    if (video.paused || video.ended) {
+      await video.play();
+    } else {
+      video.pause();
+    }
+  } catch(e) {
+    console.log('[home preview] play failed:', e?.message || e);
+  }
+  updateHomePreviewControls();
+}
+
+async function exitHomePreviewFullscreen() {
+  const player = getHomePreviewPlayer();
+  homePreviewNativeFullscreen = false;
+  player?.classList.remove('home-preview-immersive', 'home-preview-force-landscape');
+  document.body.classList.remove('home-preview-fullscreen-active');
+  try {
+    if (getHomePreviewFullscreenElement()) {
+      if (document.exitFullscreen) await document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      else if (document.msExitFullscreen) document.msExitFullscreen();
+    }
+  } catch(e) {
+    console.log('[home preview] exit fullscreen failed:', e?.message || e);
+  }
+  try { await screen.orientation?.unlock?.(); } catch(_) {}
+}
+
+async function toggleHomePreviewFullscreen(ev) {
+  if (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+  }
+  const player = getHomePreviewPlayer();
+  const video = getHomePreviewVideo();
+  if (!player || !video) return;
+  if (getHomePreviewFullscreenElement() || player.classList.contains('home-preview-immersive')) {
+    await exitHomePreviewFullscreen();
+    return;
+  }
+
+  player.classList.add('home-preview-immersive', 'home-preview-force-landscape');
+  document.body.classList.add('home-preview-fullscreen-active');
+  try { window.Telegram?.WebApp?.expand?.(); } catch(_) {}
+
+  let nativeEntered = false;
+  try {
+    if (player.requestFullscreen) {
+      try {
+        await player.requestFullscreen({ navigationUI: 'hide' });
+      } catch(_) {
+        await player.requestFullscreen();
+      }
+      nativeEntered = true;
+    } else if (player.webkitRequestFullscreen) {
+      player.webkitRequestFullscreen();
+      nativeEntered = true;
+    } else if (player.msRequestFullscreen) {
+      player.msRequestFullscreen();
+      nativeEntered = true;
+    }
+  } catch(e) {
+    console.log('[home preview] fullscreen fallback:', e?.message || e);
+  }
+  homePreviewNativeFullscreen = nativeEntered;
+  try { await screen.orientation?.lock?.('landscape'); } catch(_) {}
+
+  if (!nativeEntered && video.webkitEnterFullscreen && /iPad|iPhone|iPod/i.test(navigator.userAgent)) {
+    try { video.webkitEnterFullscreen(); } catch(_) {}
+  }
+}
+
+function handleHomePreviewFullscreenChange() {
+  const player = getHomePreviewPlayer();
+  if (!getHomePreviewFullscreenElement() && (homePreviewNativeFullscreen || player?.classList.contains('home-preview-immersive'))) {
+    homePreviewNativeFullscreen = false;
+    player?.classList.remove('home-preview-immersive', 'home-preview-force-landscape');
+    document.body.classList.remove('home-preview-fullscreen-active');
+    try { screen.orientation?.unlock?.(); } catch(_) {}
+  }
+}
+
+function showHomePreviewError(message) {
+  const player = getHomePreviewPlayer();
+  const status = document.getElementById('homePreviewStatus');
+  if (player) player.classList.remove('home-preview-ready', 'home-preview-playing');
+  if (status) status.textContent = message || 'Preview unavailable';
+}
+
+function attachHomePreviewSource() {
+  const video = getHomePreviewVideo();
+  if (!video) return;
+  if (homePreviewHls) {
+    try { homePreviewHls.destroy(); } catch(_) {}
+    homePreviewHls = null;
+  }
+
+  const nativeHls = video.canPlayType('application/vnd.apple.mpegurl') !== '';
+  const isAndroid = /android/i.test(navigator.userAgent);
+  const hlsAvailable = typeof Hls !== 'undefined' && Hls.isSupported();
+
+  if (nativeHls && !isAndroid) {
+    video.src = HOME_PREVIEW_URL;
+    video.load();
+    return;
+  }
+
+  if (hlsAvailable) {
+    homePreviewHls = new Hls({
+      enableWorker: false,
+      lowLatencyMode: false,
+      startLevel: -1,
+      capLevelToPlayerSize: true,
+      maxBufferLength: 15,
+      maxMaxBufferLength: 30,
+      manifestLoadingTimeOut: 20000,
+      fragLoadingTimeOut: 25000,
+      xhrSetup: function(xhr) { xhr.withCredentials = false; },
+    });
+    let recoveryAttempts = 0;
+    homePreviewHls.on(Hls.Events.MEDIA_ATTACHED, () => homePreviewHls.loadSource(HOME_PREVIEW_URL));
+    homePreviewHls.on(Hls.Events.MANIFEST_PARSED, () => updateHomePreviewControls());
+    homePreviewHls.on(Hls.Events.ERROR, (_ev, data) => {
+      if (!data.fatal) return;
+      recoveryAttempts++;
+      if (recoveryAttempts > 3) {
+        try { homePreviewHls.destroy(); } catch(_) {}
+        homePreviewHls = null;
+        showHomePreviewError('Preview unavailable');
+        return;
+      }
+      if (data.type === Hls.ErrorTypes.NETWORK_ERROR) setTimeout(() => homePreviewHls?.startLoad(), 800);
+      else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) homePreviewHls.recoverMediaError();
+      else showHomePreviewError('Preview unavailable');
+    });
+    homePreviewHls.attachMedia(video);
+    return;
+  }
+
+  if (nativeHls) {
+    video.src = HOME_PREVIEW_URL;
+    video.load();
+  } else {
+    showHomePreviewError('HLS not supported');
+  }
+}
+
+function initHomePreviewPlayer() {
+  if (homePreviewReady) return;
+  const player = getHomePreviewPlayer();
+  const video = getHomePreviewVideo();
+  const progress = document.getElementById('homePreviewProgress');
+  if (!player || !video || !progress) return;
+
+  homePreviewReady = true;
+  video.controls = false;
+  video.muted = false;
+  ['loadedmetadata','durationchange','timeupdate','progress','waiting','canplay','play','pause','ended','error'].forEach(ev => {
+    video.addEventListener(ev, () => {
+      if (ev === 'error') showHomePreviewError('Preview unavailable');
+      else updateHomePreviewControls();
+    });
+  });
+  video.addEventListener('click', () => toggleHomePreviewPlay());
+  video.addEventListener('webkitendfullscreen', () => exitHomePreviewFullscreen());
+  progress.addEventListener('pointerdown', ev => {
+    ev.preventDefault();
+    seekHomePreviewFromEvent(ev);
+  });
+  document.addEventListener('fullscreenchange', handleHomePreviewFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', handleHomePreviewFullscreenChange);
+  document.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape' && getHomePreviewPlayer()?.classList.contains('home-preview-immersive')) {
+      exitHomePreviewFullscreen();
+    }
+  });
+
+  attachHomePreviewSource();
+  updateHomePreviewControls();
+}
+
 function hideSplash() {
   const splash = document.getElementById('splash');
   if (!splash) return;
@@ -8310,6 +8772,7 @@ if (tg) {
     renderPricingCards();
     renderPaymentMethods();
     updateStatsBanner();
+    initHomePreviewPlayer();
   } catch(e) { console.error('[init] render error:', e); }
 
   // Load data in parallel
