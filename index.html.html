@@ -228,6 +228,7 @@ body {
   margin-bottom: 10px;
   min-width: 0;
   overflow: hidden;
+  position: relative;
 }
 
 .preview-placeholder video {
@@ -237,6 +238,32 @@ body {
   object-fit: cover;
   border-radius: 10px;
   background: #000;
+}
+.preview-tap-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  cursor: pointer;
+}
+.preview-tap-play.hidden { display: none; }
+.preview-tap-play-btn {
+  width: 56px;
+  height: 56px;
+  background: rgba(255,255,255,0.18);
+  backdrop-filter: blur(8px);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.preview-tap-play-btn svg {
+  width: 24px;
+  height: 24px;
+  fill: #fff;
+  margin-left: 4px;
 }
 .preview-text {
   font-size: 11px;
@@ -3610,6 +3637,11 @@ body {
       <div class="preview-section">
         <h2>Page Preview</h2>
         <div class="preview-placeholder">
+          <div class="preview-tap-play hidden" id="homePreviewPlayBtn" onclick="homePreviewTapPlay()">
+            <div class="preview-tap-play-btn">
+              <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </div>
+          </div>
           <video id="homePreviewVideo"
                  controls
                  autoplay
@@ -3617,6 +3649,7 @@ body {
                  playsinline
                  webkit-playsinline
                  preload="auto"
+                 poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                  controlslist="nodownload noplaybackrate noremoteplayback">
           </video>
         </div>
@@ -8357,10 +8390,21 @@ function initHomePreviewPlayer() {
   const nativeHls = video.canPlayType('application/vnd.apple.mpegurl') !== '';
   const hlsAvailable = typeof Hls !== 'undefined' && Hls.isSupported();
 
+  video.addEventListener('playing', () => {
+    const o = document.getElementById('homePreviewPlayBtn');
+    if (o) o.classList.add('hidden');
+  });
+
   function tryAutoplay() {
+    const overlay = document.getElementById('homePreviewPlayBtn');
     const playPromise = video.play();
-    if (playPromise && playPromise.catch) {
-      playPromise.catch(e => console.log('[home preview] autoplay blocked:', e?.message || e));
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => { if (overlay) overlay.classList.add('hidden'); })
+        .catch(e => {
+          console.log('[home preview] autoplay blocked:', e?.message || e);
+          if (overlay) overlay.classList.remove('hidden');
+        });
     }
   }
 
@@ -8401,6 +8445,15 @@ function initHomePreviewPlayer() {
   video.load();
   tryAutoplay();
 }
+function homePreviewTapPlay() {
+  const v = document.getElementById('homePreviewVideo');
+  const o = document.getElementById('homePreviewPlayBtn');
+  if (!v) return;
+  v.play()
+    .then(() => { if (o) o.classList.add('hidden'); })
+    .catch(e => console.warn('[home preview] tap failed:', e));
+}
+
 function hideSplash() {
   const splash = document.getElementById('splash');
   if (!splash) return;
