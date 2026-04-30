@@ -1886,15 +1886,15 @@ body {
 }
 .shorts-home-label {
   position: absolute;
-  bottom: 0; left: 0; right: 0;
-  background: linear-gradient(transparent, rgba(0,0,0,0.75));
-  padding: 14px 6px 6px;
-  font-size: 9px;
-  color: rgba(255,255,255,0.9);
+  bottom: 6px; left: 7px; right: 7px;
+  font-size: 10px;
+  color: var(--lime);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-weight: 500;
+  font-weight: 700;
+  letter-spacing: -0.1px;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.9), 0 0 8px rgba(204,255,0,0.25);
 }
 
 /* ── Shorts grid (3-col, portrait thumbnails) ── */
@@ -1929,7 +1929,15 @@ body {
   opacity: 0.85;
 }
 .shorts-grid-label {
-  display: none;
+  position: absolute;
+  bottom: 6px; left: 7px; right: 7px;
+  color: var(--lime);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.9), 0 0 8px rgba(204,255,0,0.25);
 }
 
 /* ── PHOTO LIGHTBOX ── */
@@ -4406,6 +4414,10 @@ let _shortThumbQueue = [];
 let _shortThumbActive = 0;
 const SHORT_THUMB_CONCURRENCY = 3;
 
+function shortArtistLabel(item) {
+  return item?.artist_name || item?.artist || item?.artistName || 'Artist';
+}
+
 function hydrateShortVideoThumbs(root = document) {
   if (!hasVideoAccess()) return;
   const cards = root.querySelectorAll('[data-short-thumb-id]:not([data-short-thumb-state])');
@@ -4525,7 +4537,7 @@ async function loadHomeShorts() {
       const previewAttr = !thumb ? `data-short-thumb-id="${Number(s.id)||0}"` : '';
       return `<div class="shorts-home-card" ${bg} ${previewAttr} onclick="openShortsPlayer(_homeShorts,${idx},false)">
         <div class="shorts-home-play">▶</div>
-        <div class="shorts-home-label">${escapeHtml(s.title||'Short')}</div>
+        <div class="shorts-home-label">${escapeHtml(shortArtistLabel(s))}</div>
       </div>`;
     }).join('');
     hydrateShortVideoThumbs(scroll);
@@ -6050,10 +6062,21 @@ function openPage(page) {
     renderArtistsGrid();
     updateStatsBanner();
   }
+  resetPageScroll(pageEl);
+  requestAnimationFrame(() => resetPageScroll(pageEl));
+  setTimeout(() => resetPageScroll(pageEl), 80);
+}
+
+function resetPageScroll(pageEl) {
   const scroll = pageEl?.querySelector('.page-scroll');
-  if (scroll) scroll.scrollTop = 0;
-  const mc = pageEl?.querySelector('.main-container');
-  if (mc) mc.scrollTop = 0;
+  if (scroll) { scroll.scrollTop = 0; scroll.scrollLeft = 0; }
+  if (pageEl) { pageEl.scrollTop = 0; pageEl.scrollLeft = 0; }
+  const mc = document.querySelector('.main-container');
+  if (mc) { mc.scrollTop = 0; mc.scrollLeft = 0; }
+  try { window.scrollTo(0, 0); } catch(_) {}
+  try { window.Telegram?.WebApp?.scrollTo?.(0, 0); } catch(_) {}
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
 }
 
 function showArtistsPage() {
@@ -6287,14 +6310,18 @@ function _renderProfileShorts(shorts) {
   }
   if (shortTab) shortTab.style.display = '';
   if (!shortsList) return;
+  const wrapper = shortsList.parentElement;
+  wrapper?.querySelectorAll('.photos-lock-overlay').forEach(el => el.remove());
+  wrapper?.classList.remove('photos-lock-wrapper');
 
-  const canView = hasVideoAccess();
   let html = shorts.map((s, idx) => {
     const thumb = s.thumbnail_url || '';
     const bg    = thumb ? `style="background-image:url('${thumb.replace(/'/g,"\\'")}')"` : '';
-    if (!canView) return `<div class="shorts-grid-item" ${bg} style="filter:blur(3px);pointer-events:none"><div class="shorts-grid-play">🔒</div></div>`;
     const previewAttr = !thumb ? `data-short-thumb-id="${Number(s.id)||0}"` : '';
-    return `<div class="shorts-grid-item" ${bg} ${previewAttr} onclick="openShortsPlayer(_currentArtistShorts,${idx})"><div class="shorts-grid-play">▶</div></div>`;
+    return `<div class="shorts-grid-item" ${bg} ${previewAttr} onclick="openShortsPlayer(_currentArtistShorts,${idx})">
+      <div class="shorts-grid-play">▶</div>
+      <div class="shorts-grid-label">${escapeHtml(shortArtistLabel(s))}</div>
+    </div>`;
   }).join('');
 
   // Load more button for shorts (full width below grid)
@@ -6304,17 +6331,6 @@ function _renderProfileShorts(shorts) {
   cleanupShortVideoThumbs(shortsList);
   shortsList.innerHTML = html;
   hydrateShortVideoThumbs(shortsList);
-
-  if (!canView) {
-    const wrapper = shortsList.parentElement;
-    wrapper.querySelectorAll('.photos-lock-overlay').forEach(el => el.remove());
-    const ov = document.createElement('div');
-    ov.className = 'photos-lock-overlay'; ov.onclick = paywallSubscribe;
-    ov.innerHTML = `<div class="photos-lock-icon">🔒</div>
-      <div class="photos-lock-text">Subscribe to unlock Shorts</div>
-      <button class="photos-lock-btn" onclick="event.stopPropagation();paywallSubscribe()">Subscribe Now</button>`;
-    wrapper.style.position = 'relative'; wrapper.appendChild(ov);
-  }
 }
 
 async function loadMoreProfileShorts() {
