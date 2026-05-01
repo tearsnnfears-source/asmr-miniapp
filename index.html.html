@@ -6430,10 +6430,12 @@ function _renderProfilePhotos() {
     photoGrid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);grid-column:1/-1">No photos yet</div>';
     return;
   }
+  cleanupProfilePhotoThumbs(photoGrid);
   photoGrid.innerHTML = currentArtistPhotos.map((p, i) => {
-    const thumb = p.thumbnail_url || '';
-    const bg = thumb ? `style="background-image:url('${thumb.replace(/'/g,"\\'")}')"` : '';
-    return `<div class="profile-photo-item" ${bg}
+    const cached = p.thumbnail_url || p._url || '';
+    const bg = cached ? `style="background-image:url('${cached.replace(/'/g,"\\'")}')"` : '';
+    const lazyAttr = !cached ? `data-photo-thumb-id="${Number(p.id)||0}"` : '';
+    return `<div class="profile-photo-item" ${bg} ${lazyAttr}
       onclick="${hasVideoAccess() ? `openPhotoLightbox(${i})` : 'paywallSubscribe()'}"></div>`;
   }).join('') + (_profPMore
     ? `<div style="grid-column:1/-1">${_loadMoreBtn('loadMoreProfilePhotos()', 'Load more photos')}</div>`
@@ -6450,6 +6452,88 @@ function _renderProfilePhotos() {
     photosWrapper.appendChild(overlay);
   } else {
     photoGrid.classList.remove('blurred');
+    hydrateProfilePhotoThumbs(photoGrid);
+  }
+}
+
+// ── Lazy thumbnail loading for photos without thumbnail_url ──
+let _photoThumbObserver = null;
+const _photoThumbQueue = [];
+let _photoThumbActive = 0;
+const PHOTO_THUMB_CONCURRENCY = 4;
+
+function hydrateProfilePhotoThumbs(root = document) {
+  if (!hasVideoAccess()) return;
+  const cards = root.querySelectorAll('[data-photo-thumb-id]:not([data-photo-thumb-state])');
+  if (!cards.length) return;
+  if ('IntersectionObserver' in window) {
+    if (!_photoThumbObserver) {
+      _photoThumbObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          _photoThumbObserver.unobserve(entry.target);
+          queueProfilePhotoThumb(entry.target);
+        });
+      }, { rootMargin: '200px' });
+    }
+    cards.forEach(card => {
+      card.dataset.photoThumbState = 'observing';
+      _photoThumbObserver.observe(card);
+    });
+  } else {
+    cards.forEach(queueProfilePhotoThumb);
+  }
+}
+
+function cleanupProfilePhotoThumbs(root = document) {
+  root.querySelectorAll('[data-photo-thumb-id]').forEach(card => {
+    try { _photoThumbObserver?.unobserve(card); } catch(_) {}
+  });
+}
+
+function queueProfilePhotoThumb(card) {
+  if (!card || card.dataset.photoThumbState === 'loading' || card.dataset.photoThumbState === 'ready') return;
+  card.dataset.photoThumbState = 'queued';
+  _photoThumbQueue.push(card);
+  pumpProfilePhotoThumbs();
+}
+
+function pumpProfilePhotoThumbs() {
+  while (_photoThumbActive < PHOTO_THUMB_CONCURRENCY && _photoThumbQueue.length) {
+    const card = _photoThumbQueue.shift();
+    _photoThumbActive++;
+    loadProfilePhotoThumb(card).finally(() => {
+      _photoThumbActive = Math.max(0, _photoThumbActive - 1);
+      pumpProfilePhotoThumbs();
+    });
+  }
+}
+
+async function loadProfilePhotoThumb(card) {
+  const contentId = Number(card?.dataset?.photoThumbId || 0);
+  if (!contentId || !hasVideoAccess() || !card.isConnected) return;
+  card.dataset.photoThumbState = 'loading';
+  try {
+    const photo = currentArtistPhotos.find(p => Number(p.id) === contentId);
+    let url = photo?._url || '';
+    if (!url) {
+      const playable = await fetchPlayableContent(contentId);
+      url = playable.url || '';
+      if (photo) photo._url = url;
+    }
+    if (!card.isConnected) return;
+    if (!url) throw new Error('empty photo url');
+    const img = new Image();
+    img.onload = () => {
+      if (!card.isConnected) return;
+      card.style.backgroundImage = `url('${url.replace(/'/g,"\\'")}')`;
+      card.dataset.photoThumbState = 'ready';
+    };
+    img.onerror = () => { card.dataset.photoThumbState = 'error'; };
+    img.src = url;
+  } catch(e) {
+    card.dataset.photoThumbState = 'error';
+    console.warn('[photo-thumb]', e?.message || e);
   }
 }
 
@@ -7683,7 +7767,10 @@ function updateCTAButtons() {
   const profileVipBadge = document.getElementById('profileVipBadge');
   const isInfiniteSub = typeof serverDaysLeft === "number" && serverDaysLeft > INFINITE_SUB_DAYS_THRESHOLD;
   const hasAccess = isSubscribed || (typeof serverDaysLeft === "number" && serverDaysLeft > 0);
-  if (hasAccess) hydrateShortVideoThumbs(document);
+  if (hasAccess) {
+    hydrateShortVideoThumbs(document);
+    hydrateProfilePhotoThumbs(document);
+  }
   const showSubscribeBtn =
     serverShowSubscribe === true ||
     (serverShowSubscribe === null && !hasAccess);
