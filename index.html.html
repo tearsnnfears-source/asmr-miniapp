@@ -4892,16 +4892,31 @@ function closeShortsPlayer() {
   _popBack();
 }
 
-// ── Crypto payment ────────────────────────────────────────────────────────────
-let _cryptoOrderUuid = null;
-let _cryptoAddress   = null;
+// ── Crypto payment (Cryptocloud hosted checkout) ─────────────────────────────
+// Old manual flow (TX hash entry + admin /confirm_crypto) replaced by Cryptocloud.
+// Flow: open modal → POST /miniapp/cryptocloud/checkout → open hosted pay URL
+// in external browser → poll /miniapp/check_invite for invite link (auto-issued
+// by the bot after Cryptocloud postback verifies the payment).
+let _cryptocloudPayUrl = null;
+let _cryptocloudOrderId = null;
+let _cryptocloudBusy = false;
 
 function openCryptoModal() {
   document.getElementById('cryptoStep1').style.display = 'block';
   document.getElementById('cryptoStep2').style.display = 'none';
-  document.getElementById('cryptoTxInput').value = '';
-  _cryptoOrderUuid = null;
-  _cryptoAddress   = null;
+  _cryptocloudPayUrl = null;
+  _cryptocloudOrderId = null;
+  _cryptocloudBusy = false;
+  // Refresh tier label & price on every open (selectedTier may have changed).
+  try {
+    const priceMap = { plus: 6, pro: 8, elite: 10 };
+    const tierLabel = (selectedTier || 'plus').toUpperCase();
+    const price = priceMap[selectedTier] ?? 6;
+    const lblTier = document.getElementById('cryptoTierLabel');
+    const lblPrice = document.getElementById('cryptoPriceLabel');
+    if (lblTier)  lblTier.textContent  = tierLabel;
+    if (lblPrice) lblPrice.textContent = `$${price} USD`;
+  } catch(e) {}
   document.getElementById('cryptoModal').classList.add('active');
 }
 
@@ -4909,49 +4924,51 @@ function closeCryptoModal() {
   document.getElementById('cryptoModal').classList.remove('active');
 }
 
-async function selectCryptoMethod(currency) {
+async function payWithCryptocloud() {
+  if (_cryptocloudBusy) return;
+  _cryptocloudBusy = true;
   const initData = getTelegramInitData();
-  showToast('⏳ Creating order...');
+  const btn = document.getElementById('cryptocloudPayBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Creating invoice...'; }
   try {
-    const res = await fetch(`${API_BASE}/miniapp/crypto/checkout`, {
+    const res = await fetch(`${API_BASE}/miniapp/cryptocloud/checkout`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ initData, tier: selectedTier, currency })
+      body: JSON.stringify({ initData, tier: selectedTier })
     });
-    const data = await res.json();
-    if (data.error) { showToast('❌ ' + data.error); return; }
-    _cryptoOrderUuid = data.order_uuid;
-    _cryptoAddress   = data.wallet_address;
-    document.getElementById('cryptoAmountDisplay').textContent  = `${data.amount} ${data.symbol}`;
-    document.getElementById('cryptoNetworkDisplay').textContent = data.network;
-    document.getElementById('cryptoAddressDisplay').textContent = data.wallet_address;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error || !data.pay_url) {
+      showToast('❌ ' + (data.error || 'Failed to create invoice'));
+      if (btn) { btn.disabled = false; btn.textContent = '💎 Pay with Crypto'; }
+      _cryptocloudBusy = false;
+      return;
+    }
+    _cryptocloudPayUrl  = data.pay_url;
+    _cryptocloudOrderId = data.order_id;
+
+    // Open hosted invoice in external browser / TG WebApp.
+    const tg = window.Telegram?.WebApp;
+    if (tg && typeof tg.openLink === 'function') tg.openLink(_cryptocloudPayUrl);
+    else window.open(_cryptocloudPayUrl, '_blank', 'noopener');
+
+    // Switch modal to "waiting for confirmation" view and start polling for invite.
     document.getElementById('cryptoStep1').style.display = 'none';
     document.getElementById('cryptoStep2').style.display = 'block';
-  } catch(e) { showToast('❌ Network error'); }
+    if (btn) { btn.disabled = false; btn.textContent = '💎 Pay with Crypto'; }
+    _cryptocloudBusy = false;
+    startInvitePolling();
+  } catch(e) {
+    showToast('❌ Network error');
+    if (btn) { btn.disabled = false; btn.textContent = '💎 Pay with Crypto'; }
+    _cryptocloudBusy = false;
+  }
 }
 
-function copyCryptoAddress() {
-  if (!_cryptoAddress) return;
-  navigator.clipboard?.writeText(_cryptoAddress).catch(() => {});
-  showToast('📋 Address copied!');
-}
-
-async function submitCryptoTx() {
-  const tx = document.getElementById('cryptoTxInput').value.trim();
-  if (!tx) { showToast('⚠️ Paste your TX hash first'); return; }
-  if (!_cryptoOrderUuid) { showToast('❌ No active order'); return; }
-  const initData = getTelegramInitData();
-  try {
-    const res = await fetch(`${API_BASE}/miniapp/crypto/claim`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ initData, order_uuid: _cryptoOrderUuid, tx_hash: tx })
-    });
-    const data = await res.json();
-    if (data.error) { showToast('❌ ' + data.error); return; }
-    closeCryptoModal();
-    showToast('✅ TX submitted! Admin will confirm shortly.');
-  } catch(e) { showToast('❌ Network error'); }
+function reopenCryptocloudInvoice() {
+  if (!_cryptocloudPayUrl) { showToast('❌ No active invoice'); return; }
+  const tg = window.Telegram?.WebApp;
+  if (tg && typeof tg.openLink === 'function') tg.openLink(_cryptocloudPayUrl);
+  else window.open(_cryptocloudPayUrl, '_blank', 'noopener');
 }
 
 function showProGateModal() {
@@ -8546,46 +8563,59 @@ if (tg) {
   </div>
 </div>
 
-<!-- ── Crypto Payment Modal ── -->
+<!-- ── Crypto Payment Modal (Cryptocloud hosted checkout) ── -->
 <div class="crypto-modal" id="cryptoModal">
   <div class="crypto-sheet">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div class="crypto-sheet-title">💎 Pay with <span style="color:var(--lime)">Crypto</span></div>
       <button onclick="closeCryptoModal()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:0">✕</button>
     </div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Select network, send exact amount, paste TX hash to confirm.</div>
 
-    <!-- Step 1: choose network -->
+    <!-- Step 1: confirm and open hosted invoice -->
     <div id="cryptoStep1">
-      <div style="font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:10px">Select Network</div>
-      <button class="crypto-method-btn" onclick="selectCryptoMethod('USDT_TRC20')">
-        <span class="crypto-method-icon">💚</span>
-        <div><div class="crypto-method-name">USDT — TRC20</div><div class="crypto-method-desc">Tron network · Fast &amp; cheap</div></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5">
+        Pay in any crypto (USDT&nbsp;TRC20/TON, BTC, ETH) via the secure Cryptocloud checkout. Once payment is confirmed on-chain you'll automatically receive a one-time invite link.
+      </div>
+
+      <div style="background:var(--dark3);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:12px;color:var(--muted)">Plan</span>
+          <span id="cryptoTierLabel" style="font-size:14px;font-weight:600;color:var(--text)">PLUS</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:12px;color:var(--muted)">Period</span>
+          <span style="font-size:14px;font-weight:600;color:var(--text)">31 days</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:12px;color:var(--muted)">Amount</span>
+          <span id="cryptoPriceLabel" style="font-size:18px;font-weight:700;color:var(--lime)">$6 USD</span>
+        </div>
+      </div>
+
+      <button id="cryptocloudPayBtn" onclick="payWithCryptocloud()" style="width:100%;background:linear-gradient(135deg,var(--lime),#B3E600);color:#0E0E0F;border:none;border-radius:14px;padding:16px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer">
+        💎 Pay with Crypto
       </button>
-      <button class="crypto-method-btn" onclick="selectCryptoMethod('USDT_TON')">
-        <span class="crypto-method-icon">💎</span>
-        <div><div class="crypto-method-name">USDT — TON</div><div class="crypto-method-desc">Telegram network</div></div>
-      </button>
-      <button class="crypto-method-btn" onclick="selectCryptoMethod('ETH')">
-        <span class="crypto-method-icon">⬡</span>
-        <div><div class="crypto-method-name">ETH — Ethereum</div><div class="crypto-method-desc">Ethereum mainnet</div></div>
-      </button>
+      <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.5">
+        Powered by Cryptocloud · Invoice is valid for 1 hour
+      </div>
     </div>
 
-    <!-- Step 2: send + submit TX -->
+    <!-- Step 2: waiting for postback confirmation -->
     <div id="cryptoStep2" style="display:none">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Send exactly:</div>
-      <div style="font-size:28px;font-weight:700;color:var(--lime);margin-bottom:2px" id="cryptoAmountDisplay"></div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:10px" id="cryptoNetworkDisplay"></div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600">To address:</div>
-      <div class="crypto-address-box" id="cryptoAddressDisplay" onclick="copyCryptoAddress()"></div>
-      <button onclick="copyCryptoAddress()" style="width:100%;background:var(--dark3);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;margin-bottom:14px">📋 Copy Address</button>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600">Paste TX hash after sending:</div>
-      <input class="crypto-tx-input" id="cryptoTxInput" placeholder="0x... or transaction ID" />
-      <button onclick="submitCryptoTx()" style="width:100%;background:linear-gradient(135deg,var(--lime),#B3E600);color:#0E0E0F;border:none;border-radius:14px;padding:16px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer">
-        ✅ I've sent — Confirm TX
+      <div style="text-align:center;padding:18px 0 4px">
+        <div style="font-size:36px;margin-bottom:8px">⏳</div>
+        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px">Waiting for payment…</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:16px">
+          Complete the payment in the Cryptocloud window.<br>
+          Once confirmed on-chain (usually 1–5 min) you'll get an invite link automatically.
+        </div>
+      </div>
+      <button onclick="reopenCryptocloudInvoice()" style="width:100%;background:var(--dark3);border:1px solid var(--border);border-radius:12px;padding:13px;color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;font-weight:600;cursor:pointer;margin-bottom:8px">
+        🔄 Reopen invoice
       </button>
-      <button onclick="document.getElementById('cryptoStep1').style.display='block';document.getElementById('cryptoStep2').style.display='none'" style="width:100%;background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:10px;font-family:'DM Sans',sans-serif">← Change network</button>
+      <button onclick="closeCryptoModal()" style="width:100%;background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:10px;font-family:'DM Sans',sans-serif">
+        Close (we'll DM you the invite link)
+      </button>
     </div>
   </div>
 </div>
