@@ -3600,9 +3600,151 @@ body {
   40% { transform: scale(1); opacity: 1; background: var(--pink); }
 }
 
+/* ── MAINTENANCE / DB DOWNTIME OVERLAY ── */
+.maint-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000; /* above splash (9999) */
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: radial-gradient(ellipse at 30% 40%, rgba(255,126,200,0.10) 0%, transparent 55%),
+              radial-gradient(ellipse at 70% 60%, rgba(204,255,0,0.08) 0%, transparent 55%),
+              #0e0e0f;
+  -webkit-tap-highlight-color: transparent;
+}
+.maint-modal.active { display: flex; }
+
+.maint-card {
+  width: 100%;
+  max-width: 420px;
+  background: linear-gradient(180deg, #161618 0%, #0f0f10 100%);
+  border: 1px solid rgba(255,126,200,0.35);
+  border-radius: 22px;
+  padding: 30px 24px 24px;
+  text-align: center;
+  box-shadow: 0 16px 60px rgba(0,0,0,0.55), 0 0 80px rgba(255,126,200,0.08);
+  font-family: 'DM Sans', sans-serif;
+  position: relative;
+  overflow: hidden;
+}
+
+.maint-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% -20%, rgba(204,255,0,0.10) 0%, transparent 55%);
+  pointer-events: none;
+}
+
+.maint-mark {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 18px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--pink), var(--lime));
+  color: #0E0E0F;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 8px 24px rgba(255,126,200,0.25);
+}
+
+.maint-tag {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--lime);
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.maint-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 30px;
+  letter-spacing: 2px;
+  color: #fff;
+  margin-bottom: 12px;
+  position: relative;
+  z-index: 1;
+}
+.maint-title em { font-style: normal; color: var(--pink); }
+
+.maint-desc {
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(255,255,255,0.65);
+  margin-bottom: 22px;
+  position: relative;
+  z-index: 1;
+}
+
+.maint-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
+}
+
+.maint-retry-btn {
+  background: var(--lime);
+  color: #0E0E0F;
+  border: none;
+  border-radius: 999px;
+  padding: 12px 24px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.maint-retry-btn:active { transform: scale(0.97); }
+.maint-retry-btn:disabled { opacity: 0.6; cursor: default; }
+
+.maint-countdown {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: rgba(255,255,255,0.4);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+body.maint-lock { overflow: hidden; touch-action: none; }
+
 </style>
 </head>
 <body>
+
+<!-- ── MAINTENANCE / DB DOWNTIME OVERLAY ── -->
+<div class="maint-modal" id="maintModal" role="alertdialog" aria-labelledby="maintTitle" aria-describedby="maintDesc">
+  <div class="maint-card">
+    <div class="maint-mark">!</div>
+    <div class="maint-tag">Temporary Downtime</div>
+    <div class="maint-title" id="maintTitle">WE'RE HAVING <em>TROUBLE</em></div>
+    <div class="maint-desc" id="maintDesc">
+      Database sync is temporarily unavailable.<br>
+      Your account, favorites and library are safe — we'll be back shortly.
+    </div>
+    <div class="maint-actions">
+      <button class="maint-retry-btn" id="maintRetryBtn" onclick="_retryMaintenance()">Retry now</button>
+      <span class="maint-countdown" id="maintCountdown">Auto retry in 30s</span>
+    </div>
+  </div>
+</div>
 
 <div class="splash" id="splash">
   <div class="splash-glow"></div>
@@ -8478,6 +8620,95 @@ function hideSplash() {
   setTimeout(() => { splash.style.display = 'none'; }, 520);
 }
 
+// ── Maintenance / DB downtime detection ─────────────────────────────────────
+// Mirrors the maintenance screen on asmrleaks.tv. Probes /health on boot and
+// surfaces a friendly overlay (instead of a half-broken page) if Railway/DB
+// is down. The overlay auto-retries every 30s and offers a manual retry.
+const MAINT_RETRY_SECS = 30;
+const MAINT_HEALTH_TIMEOUT_MS = 5000;
+let _maintShown   = false;
+let _maintTimerId = null;
+let _maintLeft    = MAINT_RETRY_SECS;
+let _maintBusy    = false;
+
+async function _checkDatabaseHealth() {
+  // Returns true when the backend's /health endpoint replies 200 within timeout.
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), MAINT_HEALTH_TIMEOUT_MS);
+    const res = await fetch(`${API_BASE}/health`, {
+      method: 'GET',
+      cache: 'no-store',
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => null);
+    return !!(data && data.status === 'ok');
+  } catch (e) {
+    return false;
+  }
+}
+
+function _showMaintenanceScreen() {
+  if (_maintShown) return;
+  _maintShown = true;
+  const m = document.getElementById('maintModal');
+  if (m) m.classList.add('active');
+  document.body.classList.add('maint-lock');
+  // Hide the splash so the maintenance card is the only thing visible.
+  try {
+    const splash = document.getElementById('splash');
+    if (splash) splash.style.display = 'none';
+  } catch (e) {}
+  _scheduleMaintRetry();
+}
+
+function _hideMaintenanceScreen() {
+  _maintShown = false;
+  const m = document.getElementById('maintModal');
+  if (m) m.classList.remove('active');
+  document.body.classList.remove('maint-lock');
+  if (_maintTimerId) { clearInterval(_maintTimerId); _maintTimerId = null; }
+}
+
+function _scheduleMaintRetry() {
+  if (_maintTimerId) { clearInterval(_maintTimerId); _maintTimerId = null; }
+  _maintLeft = MAINT_RETRY_SECS;
+  const label = document.getElementById('maintCountdown');
+  if (label) label.textContent = `Auto retry in ${_maintLeft}s`;
+  _maintTimerId = setInterval(() => {
+    _maintLeft -= 1;
+    if (_maintLeft <= 0) {
+      clearInterval(_maintTimerId);
+      _maintTimerId = null;
+      _retryMaintenance();
+      return;
+    }
+    if (label) label.textContent = `Auto retry in ${_maintLeft}s`;
+  }, 1000);
+}
+
+async function _retryMaintenance() {
+  if (_maintBusy) return;
+  _maintBusy = true;
+  const btn   = document.getElementById('maintRetryBtn');
+  const label = document.getElementById('maintCountdown');
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+  if (label) label.textContent = 'Checking…';
+  const ok = await _checkDatabaseHealth();
+  if (ok) {
+    if (label) label.textContent = 'Back online — reloading…';
+    if (btn)   btn.textContent   = 'Reloading…';
+    // Full reload so the normal init runs cleanly with a fresh DB connection.
+    setTimeout(() => { try { location.reload(); } catch (e) {} }, 400);
+    return;
+  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Retry now'; }
+  _maintBusy = false;
+  _scheduleMaintRetry();
+}
+
 const tg = window.Telegram?.WebApp;
 
 if (tg) {
@@ -8511,6 +8742,16 @@ if (tg) {
     updateStatsBanner();
     initHomePreviewPlayer();
   } catch(e) { console.error('[init] render error:', e); }
+
+  // ── Health probe ──────────────────────────────────────────────────────────
+  // Cheap GET /health on the bot. If it fails (Railway down, DB unreachable),
+  // show the maintenance overlay and abort the rest of init — the overlay's
+  // own auto-retry will reload the page when the backend comes back.
+  const healthOk = await _checkDatabaseHealth();
+  if (!healthOk) {
+    _showMaintenanceScreen();
+    return; // skip data load + splash hide; the overlay handles UX from here.
+  }
 
   // Load data in parallel
   try {
