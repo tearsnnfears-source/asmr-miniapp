@@ -6397,6 +6397,15 @@ let _profVMore = false, _profSMore = false, _profPMore = false;
 let _profVTag  = '';
 let _profKnownTags = new Set();
 
+function _profileNewestFirst(items) {
+  return [...(items || [])].sort((a, b) => {
+    const aTime = Date.parse(a?.created_at || '') || 0;
+    const bTime = Date.parse(b?.created_at || '') || 0;
+    if (aTime !== bTime) return bTime - aTime;
+    return Number(b?.id || 0) - Number(a?.id || 0);
+  });
+}
+
 async function loadArtistProfileContent(name) {
   currentArtistName = name;
   activeTagFilter = '';
@@ -6413,7 +6422,7 @@ async function loadArtistProfileContent(name) {
     const data = await res.json();
 
     // ── Videos
-    currentArtistVideos = data.videos || [];
+    currentArtistVideos = _profileNewestFirst(data.videos || []);
     _profVMore = data.videos_more || false;
     _profVOff  = currentArtistVideos.length;
     currentArtistVideos.forEach(v =>
@@ -6423,14 +6432,14 @@ async function loadArtistProfileContent(name) {
     _buildProfileTagFilter();
 
     // ── Shorts
-    const shorts = (data.shorts || []).map(s => ({...s, artist: name}));
+    const shorts = _profileNewestFirst(data.shorts || []).map(s => ({...s, artist: name}));
     _profSMore = data.shorts_more || false;
     _profSOff  = shorts.length;
     window._currentArtistShorts = shorts;
     _renderProfileShorts(shorts);
 
     // ── Photos
-    currentArtistPhotos = data.photos || [];
+    currentArtistPhotos = _profileNewestFirst(data.photos || []);
     _profPMore = data.photos_more || false;
     _profPOff  = currentArtistPhotos.length;
     _renderProfilePhotos();
@@ -6506,7 +6515,7 @@ async function filterByTag(btn, tag) {
     const url = `${API_BASE}/miniapp/artist_content?name=${encodeURIComponent(_profName)}&type=video&offset=0&tag=${encodeURIComponent(tag)}`;
     const res  = await fetch(url);
     const data = await res.json();
-    currentArtistVideos = data.items || [];
+    currentArtistVideos = _profileNewestFirst(data.items || []);
     _profVMore = data.has_more;
     _profVOff  = currentArtistVideos.length;
     currentArtistVideos.forEach(v =>
@@ -6524,11 +6533,11 @@ async function loadMoreProfileVideos() {
   try {
     const res  = await fetch(url);
     const data = await res.json();
-    const more = data.items || [];
+    const more = _profileNewestFirst(data.items || []);
     _profVMore = data.has_more;
     _profVOff += more.length;
     more.forEach(v => (v.tags||'').split(',').filter(Boolean).forEach(t => _profKnownTags.add(t.trim())));
-    currentArtistVideos = [...currentArtistVideos, ...more];
+    currentArtistVideos = _profileNewestFirst([...currentArtistVideos, ...more]);
     _renderProfileVideos();
   } catch(e) { showToast('Error loading more'); }
 }
@@ -6571,7 +6580,7 @@ async function loadMoreProfileShorts() {
   try {
     const res  = await fetch(url);
     const data = await res.json();
-    const more = (data.items || []).map(s => ({...s, artist: _profName}));
+    const more = _profileNewestFirst(data.items || []).map(s => ({...s, artist: _profName}));
     _profSMore = data.has_more;
     _profSOff += more.length;
     window._currentArtistShorts = [...(window._currentArtistShorts || []), ...more];
@@ -6617,10 +6626,10 @@ async function loadMoreProfilePhotos() {
   try {
     const res  = await fetch(url);
     const data = await res.json();
-    const more = data.items || [];
+    const more = _profileNewestFirst(data.items || []);
     _profPMore = data.has_more;
     _profPOff += more.length;
-    currentArtistPhotos = [...currentArtistPhotos, ...more];
+    currentArtistPhotos = _profileNewestFirst([...currentArtistPhotos, ...more]);
     _renderProfilePhotos();
   } catch(e) { showToast('Error loading more'); }
 }
