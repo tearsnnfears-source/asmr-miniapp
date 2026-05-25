@@ -1,6 +1,19 @@
 // Shared UI: Phone frame, icons, header, thumbnails, bottom navs
 // All names prefixed/specific to avoid collisions.
 
+// Nav context — created here so screen files (loaded after ui.jsx) can read it
+// without worrying about load order. app.jsx provides the value at the root.
+window.NavContext = window.NavContext || React.createContext(null);
+// Safe consumer: returns a no-op stub when no provider is mounted (e.g. when a
+// component is used outside the AppShell, like in standalone previews).
+function useNav() {
+  const ctx = React.useContext(window.NavContext);
+  return ctx || { go: () => {}, back: () => {}, replace: () => {}, reset: () => {},
+                  onTab: () => {}, activeTab: '', centerMode: 'subscribe',
+                  isPro: false, screen: 'home', params: {}, canGoBack: false };
+}
+window.useNav = useNav;
+
 const C = {
   pink: '#FF7EC8',
   lime: '#CCFF00',
@@ -147,6 +160,7 @@ function Avatar({ artist, size = 36, ring }) {
 
 // App Header — avatar + name + VIP, clickable area on left → profile
 function AppHeader({ user = { name: 'Sofia R.', vip: 'PLUS', days: 27 }, accent = C.pink }) {
+  const nav = useNav();
   return (
     <div style={{
       padding: '8px 14px 10px',
@@ -156,7 +170,7 @@ function AppHeader({ user = { name: 'Sofia R.', vip: 'PLUS', days: 27 }, accent 
       borderBottom: `1px solid ${C.border}`,
     }}>
       {/* clickable cluster → profile */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+      <div onClick={() => nav.go('profile')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
         <Avatar artist={{ id: 'u1', name: user.name }} size={40} ring={accent} />
         <div>
           <div style={{ fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -193,11 +207,15 @@ const iconBtn = {
 };
 
 // NEW Bottom nav — 5 tabs with center action (Subscribe → Profile after subscribing)
-function BottomNav({ active = 'home', centerMode = 'subscribe', accent = C.pink, subAccent = C.lime }) {
+// `active` / `centerMode` props from screens override; otherwise pulled from nav context.
+function BottomNav({ active, centerMode, accent = C.pink, subAccent = C.lime }) {
+  const nav = useNav();
+  const activeTab = active != null ? active : nav.activeTab;
+  const center = centerMode != null ? centerMode : nav.centerMode;
   const tabs = [
     { id: 'home', label: 'Home', icon: 'home', filled: 'homeFilled' },
     { id: 'shorts', label: 'Shorts', icon: 'shorts', filled: 'shortsFilled' },
-    { id: 'center', label: centerMode === 'subscribe' ? 'Subscribe' : 'Profile', center: true },
+    { id: 'center', label: center === 'subscribe' ? 'Subscribe' : 'Profile', center: true },
     { id: 'artists', label: 'Artists', icon: 'artists', filled: 'artists' },
     { id: 'favorites', label: 'Saved', icon: 'star', filled: 'starFilled' },
   ];
@@ -214,11 +232,11 @@ function BottomNav({ active = 'home', centerMode = 'subscribe', accent = C.pink,
     }}>
       {tabs.map(t => {
         if (t.center) {
-          const isSub = centerMode === 'subscribe';
+          const isSub = center === 'subscribe';
           if (isSub) {
             return (
               <div key={t.id} style={{ display: 'flex', justifyContent: 'center' }}>
-                <button style={{
+                <button onClick={() => nav.onTab('center')} style={{
                   marginTop: -24,
                   height: 50, padding: '0 14px',
                   borderRadius: 999,
@@ -240,7 +258,7 @@ function BottomNav({ active = 'home', centerMode = 'subscribe', accent = C.pink,
           }
           return (
             <div key={t.id} style={{ display: 'flex', justifyContent: 'center' }}>
-              <button style={{
+              <button onClick={() => nav.onTab('center')} style={{
                 marginTop: -22, position: 'relative',
                 width: 56, height: 56, borderRadius: '50%',
                 background: C.dark3,
@@ -262,10 +280,10 @@ function BottomNav({ active = 'home', centerMode = 'subscribe', accent = C.pink,
             </div>
           );
         }
-        const isActive = t.id === active;
+        const isActive = t.id === activeTab;
         const IconC = Ico[isActive ? t.filled : t.icon];
         return (
-          <button key={t.id} style={{
+          <button key={t.id} onClick={() => nav.onTab(t.id)} style={{
             background: 'none', border: 'none', cursor: 'pointer',
             color: isActive ? accent : C.muted2,
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,

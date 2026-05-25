@@ -66,14 +66,15 @@ function ShortsTab({ accent = C.pink, mode = 'grid' /* 'grid' | 'player' */ }) {
           ))}
         </div>
       </div>
-      <BottomNav active="shorts" accent={accent} centerMode="subscribe" />
+      <BottomNav active="shorts" accent={accent} />
     </Phone>
   );
 }
 
 function ShortsTile({ s, accent, fresh }) {
+  const nav = window.useNav();
   return (
-    <div style={{
+    <div onClick={() => nav.go('shorts-player', { id: s.id })} style={{
       position: 'relative', aspectRatio: '9/16', borderRadius: 14,
       overflow: 'hidden', background: s.thumb.bg, cursor: 'pointer',
     }}>
@@ -97,6 +98,7 @@ function ShortsTile({ s, accent, fresh }) {
 
 // Swipe player (fullscreen vertical feed)
 function ShortsPlayer({ accent = C.pink }) {
+  const nav = window.useNav();
   const s = SHORTS[0];
   return (
     <Phone>
@@ -110,7 +112,7 @@ function ShortsPlayer({ accent = C.pink }) {
 
         {/* top row: back + counter */}
         <div style={{ position: 'absolute', top: 50, left: 12, right: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <button style={{
+          <button onClick={() => nav.back()} style={{
             width: 36, height: 36, borderRadius: '50%',
             background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
@@ -173,6 +175,7 @@ function ShortsPlayer({ accent = C.pink }) {
 
 // ── VIDEO PAGE ────────────────────────────────────────────────
 function VideoPage({ accent = C.pink, density = 'comfortable' }) {
+  const nav = window.useNav();
   const v = VIDEOS[0];
   return (
     <Phone>
@@ -182,7 +185,7 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         flexShrink: 0, background: C.dark,
       }}>
-        <button style={{
+        <button onClick={() => nav.back()} style={{
           width: 36, height: 36, borderRadius: 12,
           background: C.dark2, border: `1px solid ${C.border}`,
           color: C.text, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
@@ -257,10 +260,10 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
 
         {/* Artist card */}
         <div style={{ padding: '12px 14px 6px' }}>
-          <div style={{
+          <div onClick={() => nav.go('artist', { id: v.artist.id })} style={{
             background: C.dark2, border: `1px solid ${C.border}`,
             borderRadius: 16, padding: 12,
-            display: 'flex', alignItems: 'center', gap: 12,
+            display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
           }}>
             <Avatar artist={v.artist} size={48} ring={accent} />
             <div style={{ flex: 1, minWidth: 0 }}>

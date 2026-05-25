@@ -69,15 +69,16 @@ function ArtistsPage({ accent = C.pink }) {
           {artists.map(a => <ArtistCard key={a.id} a={a} accent={accent} />)}
         </div>
       </div>
-      <BottomNav active="artists" accent={accent} centerMode="profile" />
+      <BottomNav active="artists" accent={accent} />
     </Phone>
   );
 }
 
 function ArtistCard({ a, accent }) {
+  const nav = window.useNav();
   const tColor = tagColor(a.tag);
   return (
-    <div style={{
+    <div onClick={() => nav.go('artist', { id: a.id })} style={{
       position: 'relative', aspectRatio: '3/4', borderRadius: 14,
       overflow: 'hidden', background: `linear-gradient(135deg, ${tColor}, ${C.purple})`,
       cursor: 'pointer',
@@ -164,16 +165,17 @@ function SavedPage({ accent = C.pink, initialTab = 'videos' }) {
         {tab === 'photos' && <LikedPhotos accent={accent} />}
         {tab === 'albums' && <PhotoAlbums accent={accent} />}
       </div>
-      <BottomNav active="favorites" accent={accent} centerMode="profile" />
+      <BottomNav active="favorites" accent={accent} />
     </Phone>
   );
 }
 
 function LikedVideos({ accent }) {
+  const nav = window.useNav();
   return (
     <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       {SAVED_VIDEOS.map(v => (
-        <div key={v.id} style={{ display: 'flex', gap: 10 }}>
+        <div key={v.id} onClick={() => nav.go('video', { id: v.id })} style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
           <div style={{ width: 130, flexShrink: 0 }}>
             <Thumb thumb={v.thumb} duration={v.duration} />
           </div>

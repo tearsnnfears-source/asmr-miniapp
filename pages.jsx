@@ -2,6 +2,7 @@
 
 // ── PROFILE PAGE ──────────────────────────────────────────────
 function ProfilePage({ accent = C.pink }) {
+  const nav = window.useNav();
   const stats = [
     { val: '27', unit: 'd', label: 'Days left' },
     { val: '142', label: 'Saved' },
@@ -70,9 +71,9 @@ function ProfilePage({ accent = C.pink }) {
         {/* Row list */}
         <div style={{ padding: '8px 14px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           <RowGroup label="Library">
-            <Row icon="⭐" color={accent} label="My saved" badge="142" />
-            <Row icon="📂" color={accent} label="Albums & playlists" badge="8" />
-            <Row icon="🔄" color={accent} label="Renew subscription" />
+            <Row icon="⭐" color={accent} label="My saved" badge="142" onClick={() => nav.go('saved')} />
+            <Row icon="📂" color={accent} label="Albums & playlists" badge="8" onClick={() => nav.go('saved', { tab: 'albums' })} />
+            <Row icon="🔄" color={accent} label="Renew subscription" onClick={() => nav.go('subscription')} />
           </RowGroup>
           <RowGroup label="App">
             <Row icon="🌐" label="Language" value="English" />
@@ -80,13 +81,13 @@ function ProfilePage({ accent = C.pink }) {
             <Row icon="🌗" label="Appearance" value="Dark" />
           </RowGroup>
           <RowGroup label="Help">
-            <Row icon="❓" label="FAQ" />
+            <Row icon="❓" label="FAQ" onClick={() => nav.go('faq')} />
             <Row icon="💬" label="Support" />
             <Row icon="📜" label="Terms · Privacy" />
           </RowGroup>
         </div>
       </div>
-      <BottomNav active="" accent={accent} centerMode="profile" />
+      <BottomNav active="" accent={accent} />
     </Phone>
   );
 }
@@ -99,9 +100,9 @@ function RowGroup({ label, children }) {
     </div>
   );
 }
-function Row({ icon, color, label, value, badge }) {
+function Row({ icon, color, label, value, badge, onClick }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderBottom: `1px solid ${C.border}`, cursor: 'pointer' }}>
+    <div onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderBottom: `1px solid ${C.border}`, cursor: 'pointer' }}>
       <div style={{
         width: 28, height: 28, borderRadius: 8,
         background: color ? `${color}1c` : 'rgba(255,255,255,0.05)',
@@ -118,6 +119,7 @@ function Row({ icon, color, label, value, badge }) {
 
 // ── SUBSCRIPTION PAGE ─────────────────────────────────────────
 function SubscriptionPage({ accent = C.pink }) {
+  const nav = window.useNav();
   const [plan, setPlan] = React.useState('year');
   const plans = [
     { id: 'week',  title: '5 days FREE', price: '$0', sub: 'then $4.99/wk · cancel anytime', tag: 'TRY FREE', tagBg: C.lime, accent: C.lime },
@@ -138,9 +140,9 @@ function SubscriptionPage({ accent = C.pink }) {
     <Phone>
       {/* Slim header */}
       <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.dark2, borderBottom: `1px solid ${C.border}` }}>
-        <button style={{ ...iconBtn, border: 'none' }}><Ico.chevL /></button>
+        <button onClick={() => nav.back()} style={{ ...iconBtn, border: 'none' }}><Ico.chevL /></button>
         <span style={{ fontSize: 13, fontWeight: 700 }}>Get PRO</span>
-        <button style={{ ...iconBtn, border: 'none', fontSize: 18, color: C.muted }}>×</button>
+        <button onClick={() => nav.back()} style={{ ...iconBtn, border: 'none', fontSize: 18, color: C.muted }}>×</button>
       </div>
 
       <div style={SCROLL_BODY}>
@@ -214,7 +216,7 @@ function SubscriptionPage({ accent = C.pink }) {
 
         {/* CTA */}
         <div style={{ padding: '14px 14px 8px' }}>
-          <button style={{
+          <button onClick={() => { nav.setPro(true); nav.reset('home'); }} style={{
             width: '100%',
             background: `linear-gradient(135deg, ${accent}, ${C.purple})`,
             border: 'none', color: '#000',
@@ -246,11 +248,12 @@ const FAQ_ITEMS = [
   { q: 'Can I request specific artists?', a: 'Yes — drop a request via Support. We add 2–3 new artists per month based on votes.' },
 ];
 function FAQPage({ accent = C.pink }) {
+  const nav = window.useNav();
   const [open, setOpen] = React.useState(0);
   return (
     <Phone>
       <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.dark2, borderBottom: `1px solid ${C.border}` }}>
-        <button style={{ ...iconBtn, border: 'none' }}><Ico.chevL /></button>
+        <button onClick={() => nav.back()} style={{ ...iconBtn, border: 'none' }}><Ico.chevL /></button>
         <span style={{ fontSize: 13, fontWeight: 700 }}>Help</span>
         <div style={{ width: 38 }} />
       </div>
@@ -344,6 +347,7 @@ function FAQPage({ accent = C.pink }) {
 // ── PAYWALL LOCK ──────────────────────────────────────────────
 // Shown when a free user taps a locked video / artist
 function PaywallLock({ accent = C.pink, mode = 'video' /* 'video' | 'artist' */ }) {
+  const nav = window.useNav();
   return (
     <Phone>
       <AppHeader accent={accent} />
@@ -414,7 +418,7 @@ function PaywallLock({ accent = C.pink, mode = 'video' /* 'video' | 'artist' */ 
             </div>
 
             {/* CTAs */}
-            <button style={{
+            <button onClick={() => nav.go('subscription')} style={{
               width: '100%', marginTop: 18,
               background: `linear-gradient(135deg, ${accent}, ${C.purple})`,
               border: 'none', color: '#000',
@@ -422,7 +426,7 @@ function PaywallLock({ accent = C.pink, mode = 'video' /* 'video' | 'artist' */ 
               fontFamily: "'Bebas Neue', sans-serif",
               fontSize: 17, letterSpacing: 1, cursor: 'pointer',
             }}>TRY 5 DAYS FREE</button>
-            <button style={{
+            <button onClick={() => nav.go('subscription')} style={{
               width: '100%', marginTop: 8,
               background: 'transparent', border: `1px solid ${C.border2}`, color: C.muted2,
               padding: '11px', borderRadius: 14,
@@ -431,13 +435,14 @@ function PaywallLock({ accent = C.pink, mode = 'video' /* 'video' | 'artist' */ 
           </div>
         </div>
       </div>
-      <BottomNav active="home" accent={accent} centerMode="subscribe" />
+      <BottomNav active="home" accent={accent} />
     </Phone>
   );
 }
 
 // ── ARTIST PAGE ───────────────────────────────────────────────
 function ArtistPage({ accent = C.pink }) {
+  const nav = window.useNav();
   const a = window.ARTISTS[0];
   const tColor = tagColor(a.tag);
   const [tab, setTab] = React.useState('videos');
@@ -449,7 +454,7 @@ function ArtistPage({ accent = C.pink }) {
     <Phone>
       {/* Slim back bar */}
       <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'absolute', top: 44, left: 0, right: 0, zIndex: 5 }}>
-        <button style={{
+        <button onClick={() => nav.back()} style={{
           width: 36, height: 36, borderRadius: 12,
           background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
@@ -573,7 +578,7 @@ function ArtistPage({ accent = C.pink }) {
           </div>
         )}
       </div>
-      <BottomNav active="artists" accent={accent} centerMode="profile" />
+      <BottomNav active="artists" accent={accent} />
     </Phone>
   );
 }

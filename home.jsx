@@ -43,15 +43,16 @@ function HomeV1({ accent = C.pink, density = 'comfortable' }) {
           ))}
         </div>
       </div>
-      <BottomNav active="home" accent={accent} centerMode="subscribe" />
+      <BottomNav active="home" accent={accent} />
     </Phone>
   );
 }
 
 // Big-card row used in V1
 function FeedCard({ v, accent, density, featured }) {
+  const nav = window.useNav();
   return (
-    <div>
+    <div onClick={() => nav.go('video', { id: v.id })} style={{ cursor: 'pointer' }}>
       <Thumb thumb={v.thumb} duration={v.duration} badge={featured ? { label: 'Just dropped', bg: accent } : null} />
       <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
         <Avatar artist={v.artist} size={36} ring={v.artist.fresh ? accent : null} />
@@ -63,14 +64,14 @@ function FeedCard({ v, accent, density, featured }) {
             overflow: 'hidden',
           }}>{v.title}</div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 3, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ color: C.muted2, fontWeight: 600 }}>{v.artist.name}</span>
+            <span onClick={(e) => { e.stopPropagation(); nav.go('artist', { id: v.artist.id }); }} style={{ color: C.muted2, fontWeight: 600, cursor: 'pointer' }}>{v.artist.name}</span>
             <span>·</span>
             <span>{v.views} views</span>
             <span>·</span>
             <span>{v.age}</span>
           </div>
         </div>
-        <button style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0 }}><Ico.more /></button>
+        <button onClick={(e) => e.stopPropagation()} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0 }}><Ico.more /></button>
       </div>
     </div>
   );
@@ -79,15 +80,16 @@ function FeedCard({ v, accent, density, featured }) {
 // ── HOME V2 — Editorial ───────────────────────────────────────
 // Hero promo on top, category tiles, mixed feed
 function HomeV2({ accent = C.pink, density = 'comfortable' }) {
+  const nav = window.useNav();
   return (
     <Phone>
       <AppHeader accent={accent} />
       <div style={SCROLL_BODY}>
         {/* Hero — large featured drop */}
         <div style={{ padding: '12px 14px 4px' }}>
-          <div style={{
+          <div onClick={() => nav.go('video', { id: VIDEOS[0].id })} style={{
             position: 'relative', borderRadius: 18, overflow: 'hidden',
-            aspectRatio: '16/10', background: VIDEOS[0].thumb.bg,
+            aspectRatio: '16/10', background: VIDEOS[0].thumb.bg, cursor: 'pointer',
           }}>
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.85) 100%)' }} />
             <div style={{ position: 'absolute', left: '50%', top: '40%', transform: 'translate(-50%, -50%)', width: 50, height: 50, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: `2px solid ${VIDEOS[0].thumb.dot}` }} />
@@ -153,15 +155,16 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
           <FeedCard v={VIDEOS[6]} accent={accent} density={density} />
         </div>
       </div>
-      <BottomNav active="home" accent={accent} centerMode="profile" />
+      <BottomNav active="home" accent={accent} />
     </Phone>
   );
 }
 
 // Compact horizontal row — thumbnail-left
 function CompactRow({ v, accent }) {
+  const nav = window.useNav();
   return (
-    <div style={{ display: 'flex', gap: 10 }}>
+    <div onClick={() => nav.go('video', { id: v.id })} style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
       <div style={{ width: 140, flexShrink: 0 }}>
         <Thumb thumb={v.thumb} duration={v.duration} />
       </div>
@@ -220,14 +223,15 @@ function HomeV3({ accent = C.pink, density = 'comfortable' }) {
           })}
         </div>
       </div>
-      <BottomNav active="home" accent={accent} centerMode="subscribe" />
+      <BottomNav active="home" accent={accent} />
     </Phone>
   );
 }
 
 function MosaicCard({ v, accent, wide }) {
+  const nav = window.useNav();
   return (
-    <div>
+    <div onClick={() => nav.go('video', { id: v.id })} style={{ cursor: 'pointer' }}>
       <Thumb thumb={v.thumb} duration={v.duration} aspect={wide ? 16/9 : 4/3} />
       <div style={{ marginTop: 7 }}>
         <div style={{
