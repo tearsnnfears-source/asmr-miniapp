@@ -220,6 +220,28 @@ function DebugSummary() {
   const tg = window.Telegram?.WebApp;
   const tgUser = tg?.initDataUnsafe?.user;
 
+  // Parse initData query string into key→decoded-value pairs so we can spot
+  // missing or malformed fields without leaking the raw hash.
+  const initData = window.getInitData?.() || '';
+  const initDataPairs = React.useMemo(() => {
+    if (!initData) return [];
+    return initData.split('&').map(pair => {
+      const [k, ...rest] = pair.split('=');
+      const v = rest.join('=');
+      let decoded = '';
+      try { decoded = decodeURIComponent(v); } catch (_) { decoded = v; }
+      // For long values (user JSON, hash) show length, then a preview.
+      const preview = decoded.length > 80 ? decoded.slice(0, 60) + '… (' + decoded.length + ' chars)' : decoded;
+      return { key: k, preview, full: decoded };
+    });
+  }, [initData]);
+
+  const copyInitData = () => {
+    try {
+      navigator.clipboard.writeText(initData);
+    } catch (_) {}
+  };
+
   return (
     <div style={{
       background: 'rgba(80,40,140,0.18)',
@@ -232,12 +254,39 @@ function DebugSummary() {
     }}>
       <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, fontFamily: 'system-ui' }}>Live state</div>
       <Field label="API_BASE" value={window.API_BASE} />
-      <Field label="initData length" value={String(window.getInitData?.().length || 0)} />
+      <Field label="initData length" value={String(initData.length)} />
       <Field label="tg.user" value={tgUser ? `${tgUser.first_name || ''} (${tgUser.id})` : '(none)'} />
       <Field label="user.data" value={summarize(userEntry)} multi={userEntry?.data} />
       <Field label="favorites.data" value={summarize(favEntry)} multi={favEntry?.data} />
       <Field label="artists.data" value={summarize(artistsEntry, true)} />
       <Field label="videos:500" value={summarize(videosEntry, true)} />
+
+      {/* initData field breakdown */}
+      <div style={{ marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4, color: '#A5B4FC', display: 'flex', alignItems: 'center', gap: 8 }}>
+          initData fields
+          <button onClick={copyInitData} style={{
+            background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+            color: '#fff', fontSize: 9, padding: '2px 8px', borderRadius: 4,
+            fontWeight: 600, cursor: 'pointer',
+          }}>copy raw</button>
+        </div>
+        {initDataPairs.length === 0 && (
+          <div style={{ color: '#FFB4B4', fontSize: 11 }}>(empty initData)</div>
+        )}
+        {initDataPairs.map((p, i) => (
+          <div key={i} style={{ marginBottom: 2 }}>
+            <span style={{ color: p.key === 'user' ? '#4ADE80' : (p.key === 'hash' ? '#FFA94D' : '#A5B4FC') }}>{p.key}:</span>{' '}
+            <span style={{ color: '#fff', fontSize: 10.5, wordBreak: 'break-all' }}>{p.preview}</span>
+          </div>
+        ))}
+        {/* Highlight whether `user` key is present at all */}
+        {!initDataPairs.find(p => p.key === 'user') && (
+          <div style={{ marginTop: 6, padding: '6px 8px', background: 'rgba(255,77,77,0.18)', borderRadius: 4, color: '#FF8888', fontSize: 11 }}>
+            ⚠ No <b>user=</b> field in initData. Backend can't parse user.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
