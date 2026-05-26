@@ -487,6 +487,66 @@ function useArtistContent(artistName, type = '', offset = 0) {
   );
 }
 
+// useArtistContentList — paginated list of one content type for one artist.
+// Seeds from the mixed initial /artist_content response (first page) so the
+// first render is instant, then fetches subsequent offsets on loadMore.
+function useArtistContentList(artistName, type /* 'video' | 'short' | 'photo' */) {
+  const initial = useArtistContent(artistName);
+  const key = type === 'video' ? 'videos' : type === 'short' ? 'shorts' : 'photos';
+  const moreKey = key + '_more';
+  const initialItems = initial.data?.[key] || [];
+  const initialHasMore = !!initial.data?.[moreKey];
+
+  // Extra pages appended by loadMore. Keyed by artist+type so the state
+  // doesn't leak when the user navigates between artists.
+  const [extra, setExtra] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [hasMore, setHasMore] = React.useState(initialHasMore);
+  const lastKey = React.useRef('');
+  React.useEffect(() => {
+    const k = `${artistName}:${type}`;
+    if (lastKey.current !== k) {
+      setExtra([]);
+      setHasMore(initialHasMore);
+      lastKey.current = k;
+    } else if (extra.length === 0) {
+      // Same artist/type, but initial has-more flag refreshed.
+      setHasMore(initialHasMore);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [artistName, type, initialHasMore]);
+
+  const items = React.useMemo(() => [...initialItems, ...extra], [initialItems, extra]);
+
+  const loadMore = React.useCallback(async () => {
+    if (loading || !hasMore || !artistName) return;
+    setLoading(true);
+    try {
+      const offset = items.length;
+      const data = await apiGet('/miniapp/artist_content', { name: artistName, type, offset: String(offset) });
+      const norm = (it, i) => {
+        const v = normalizeVideo({
+          id: it.id, title: it.title,
+          thumbnail_url: it.thumbnail_url, artist_name: it.artist_name || artistName,
+          duration: it.duration, created_at: it.created_at, views: it.views || 0,
+        }, i);
+        v.url = it.url || '';
+        v.contentType = it.content_type || '';
+        return v;
+      };
+      const newItems = (data.items || []).map(norm);
+      setExtra(prev => [...prev, ...newItems]);
+      setHasMore(!!data.has_more);
+    } catch (e) {
+      console.warn('[artist_content loadMore]', e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [artistName, type, items.length, loading, hasMore]);
+
+  return { items, hasMore, loading: loading || initial.loading, loadMore };
+}
+
 // Search — GET /miniapp/search?q=&limit=
 function useSearch(q, limit = 20) {
   const enabled = q && q.length >= 2;
@@ -744,7 +804,7 @@ initTelegram();
 Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
-  useVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useSearch, userFromTelegram,
+  useVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useSearch, userFromTelegram,
   actionFavoriteToggle, actionFollow, actionReact, actionStartCryptoCheckout, actionStartFreeTrial,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded

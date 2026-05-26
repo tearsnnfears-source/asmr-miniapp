@@ -542,9 +542,11 @@ function ArtistPage({ accent = C.pink }) {
   const tColor = tagColor(a.tag);
   const [tab, setTab] = React.useState('videos');
 
-  // Live content from /miniapp/artist_content (mixed initial load).
-  const contentState = window.useArtistContent(a.name);
-  const content = contentState.data || { videos: [], photos: [], shorts: [] };
+  // Live content with true pagination — each list fetches /artist_content
+  // with offset when Load more is tapped.
+  const videos = window.useArtistContentList(a.name, 'video');
+  const shorts = window.useArtistContentList(a.name, 'short');
+  const photos = window.useArtistContentList(a.name, 'photo');
 
   // Follow state + optimistic toggle.
   const followStatus = window.useFollowStatus(a.name);
@@ -558,21 +560,21 @@ function ArtistPage({ accent = C.pink }) {
     });
   };
 
-  // Per-tab pagination state.
-  const [visibleVideos, setVisibleVideos] = React.useState(10);
-  const [visibleShorts, setVisibleShorts] = React.useState(9);
-  const [visiblePhotos, setVisiblePhotos] = React.useState(24);
-  // Best-effort follower count — we don't currently get this from the API.
-  // The `videos + photos + shorts` totals are real; hide Followers if 0.
+  // Tab counts use the *total* from the artist record (a.videos, a.photos)
+  // when available — that's the true catalog size. The currently loaded
+  // pages can be smaller until the user pages through.
+  const totalVideos = a.videos || videos.items.length;
+  const totalPhotos = a.photos || photos.items.length;
+  const totalShorts = shorts.items.length + (shorts.hasMore ? '+' : '');
   const stats = [
-    { v: content.videos.length || a.videos || 0, l: 'Videos' },
-    { v: (content.photos.length || a.photos || 0).toLocaleString(), l: 'Photos' },
-    { v: content.shorts.length || 0, l: 'Shorts' },
+    { v: totalVideos, l: 'Videos' },
+    { v: (totalPhotos || 0).toLocaleString(), l: 'Photos' },
+    { v: totalShorts || 0, l: 'Shorts' },
   ];
 
   // Empty-state: artist exists but has no content uploaded yet — show a
   // link to the group thread if the backend gave us topic_url.
-  const hasAnyContent = content.videos.length + content.shorts.length + content.photos.length > 0;
+  const hasAnyContent = videos.items.length + shorts.items.length + photos.items.length > 0;
   const topicUrl = a.topicUrl || a.raw?.topic_url || '';
 
   const openTopic = () => {
@@ -584,20 +586,15 @@ function ArtistPage({ accent = C.pink }) {
   return (
     <Phone>
       {/* Slim back bar — pinned to the top of the player surface, not 44px
-          below it (the old offset was for the fake status bar we removed). */}
-      <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'absolute', top: 'calc(8px + env(safe-area-inset-top, 0px))', left: 0, right: 0, zIndex: 5 }}>
+          below it (the old offset was for the fake status bar we removed).
+          Share button removed — Telegram WebView already shows the user a
+          way to open the group via the bot if they need it. */}
+      <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', flexShrink: 0, position: 'absolute', top: 'calc(8px + env(safe-area-inset-top, 0px))', left: 0, right: 0, zIndex: 5 }}>
         <button onClick={() => nav.back()} style={{
           width: 36, height: 36, borderRadius: 12,
           background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
         }}><Ico.chevL /></button>
-        {topicUrl && (
-          <button onClick={openTopic} style={{
-            width: 36, height: 36, borderRadius: 12,
-            background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-          }}><Ico.share /></button>
-        )}
       </div>
 
       <div style={SCROLL_BODY}>
@@ -688,9 +685,9 @@ function ArtistPage({ accent = C.pink }) {
             {/* Tabs */}
             <div style={{ padding: '14px 14px 0', display: 'flex', gap: 18, borderBottom: `1px solid ${C.border}` }}>
               {[
-                { id: 'videos', l: 'Videos', c: content.videos.length },
-                { id: 'shorts', l: 'Shorts', c: content.shorts.length },
-                { id: 'photos', l: 'Photos', c: content.photos.length },
+                { id: 'videos', l: 'Videos', c: totalVideos },
+                { id: 'shorts', l: 'Shorts', c: shorts.items.length + (shorts.hasMore ? '+' : '') },
+                { id: 'photos', l: 'Photos', c: totalPhotos },
               ].map(t => {
                 const active = t.id === tab;
                 return (
@@ -708,57 +705,65 @@ function ArtistPage({ accent = C.pink }) {
               })}
             </div>
 
-            {/* Videos */}
+            {/* Videos — real list, paginated through /artist_content */}
             {tab === 'videos' && (
               <div>
                 <div style={{ padding: '12px 14px 4px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {content.videos.slice(0, visibleVideos).map(v => <CompactRow key={v.id} v={v} accent={accent} />)}
+                  {videos.items.map(v => <CompactRow key={v.id} v={v} accent={accent} />)}
                 </div>
-                {visibleVideos < content.videos.length && (
+                {videos.hasMore && (
                   <div style={{ padding: '6px 14px 18px' }}>
-                    <button onClick={() => setVisibleVideos(n => n + 10)} style={loadMoreBtnStyle(accent)}>Load more</button>
+                    <button disabled={videos.loading} onClick={videos.loadMore} style={loadMoreBtnStyle(accent)}>
+                      {videos.loading ? 'Loading…' : 'Load more'}
+                    </button>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Shorts */}
+            {/* Shorts — real video previews, 3-col grid */}
             {tab === 'shorts' && (
               <div>
                 <div style={{ padding: '12px 14px 4px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-                  {content.shorts.slice(0, visibleShorts).map((s, i) => (
-                    <div key={s.id || i} onClick={() => nav.go('shorts', {})} style={{ aspectRatio: '9/16', borderRadius: 10, background: s.thumb.bg, position: 'relative', overflow: 'hidden', cursor: 'pointer' }}>
-                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.7) 100%)' }} />
+                  {shorts.items.map((s, i) => (
+                    <div key={s.id || i} style={{ aspectRatio: '9/16', borderRadius: 10, overflow: 'hidden', position: 'relative', background: '#161617' }}>
+                      <window.ShortsThumbVideo short={s} />
+                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.6) 100%)', pointerEvents: 'none' }} />
                       {s.duration && <span style={{ position: 'absolute', right: 5, bottom: 5, fontSize: 9, fontWeight: 700, color: '#fff' }}>{s.duration}</span>}
                     </div>
                   ))}
                 </div>
-                {visibleShorts < content.shorts.length && (
+                {shorts.hasMore && (
                   <div style={{ padding: '6px 14px 18px' }}>
-                    <button onClick={() => setVisibleShorts(n => n + 9)} style={loadMoreBtnStyle(accent)}>Load more</button>
+                    <button disabled={shorts.loading} onClick={shorts.loadMore} style={loadMoreBtnStyle(accent)}>
+                      {shorts.loading ? 'Loading…' : 'Load more'}
+                    </button>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Photos */}
+            {/* Photos — real thumbnails from artist content */}
             {tab === 'photos' && (
               <div>
                 <div style={{ padding: '12px 14px 4px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
-                  {content.photos.slice(0, visiblePhotos).map((p, i) => (
-                    <div key={p.id || i} style={{
-                      aspectRatio: '1/1', borderRadius: 6, overflow: 'hidden', position: 'relative',
-                      background: p.thumb?.src
-                        ? `url('${p.thumb.src.replace(/'/g, "\\'")}') center/cover no-repeat`
-                        : (p.thumb?.bg || '#1a1a1c'),
-                    }}>
-                      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.15)' }} />
-                    </div>
-                  ))}
+                  {photos.items.map((p, i) => {
+                    const url = p.thumb?.src || p.raw?.url || p.raw?.thumbnail_url || '';
+                    return (
+                      <div key={p.id || i} style={{
+                        aspectRatio: '1/1', borderRadius: 6, overflow: 'hidden', position: 'relative',
+                        background: url
+                          ? `url('${url.replace(/'/g, "\\'")}') center/cover no-repeat`
+                          : (p.thumb?.bg || '#1a1a1c'),
+                      }} />
+                    );
+                  })}
                 </div>
-                {visiblePhotos < content.photos.length && (
+                {photos.hasMore && (
                   <div style={{ padding: '6px 14px 18px' }}>
-                    <button onClick={() => setVisiblePhotos(n => n + 24)} style={loadMoreBtnStyle(accent)}>Load more</button>
+                    <button disabled={photos.loading} onClick={photos.loadMore} style={loadMoreBtnStyle(accent)}>
+                      {photos.loading ? 'Loading…' : 'Load more'}
+                    </button>
                   </div>
                 )}
               </div>
