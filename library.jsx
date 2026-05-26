@@ -80,13 +80,29 @@ function ArtistsPage({ accent = C.pink }) {
 function ArtistCard({ a, accent }) {
   const nav = window.useNav();
   const tColor = tagColor(a.tag);
+  const photoUrl = a.profilePhoto || a.photo || '';
+  // Card has the artist photo filling its whole area; gradient is only used
+  // when no photo is available (still preserves the layout).
+  const cardBg = photoUrl
+    ? `url('${photoUrl.replace(/'/g, "\\'")}') center/cover no-repeat`
+    : `linear-gradient(135deg, ${tColor}, ${C.purple})`;
   return (
     <div onClick={() => nav.go('artist', { id: a.id })} style={{
       position: 'relative', aspectRatio: '3/4', borderRadius: 14,
-      overflow: 'hidden', background: `linear-gradient(135deg, ${tColor}, ${C.purple})`,
+      overflow: 'hidden', background: cardBg,
       cursor: 'pointer',
     }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 30%, rgba(0,0,0,0.25), rgba(0,0,0,0.85) 100%)' }} />
+      {/* Bottom-up scrim so text stays readable on any photo */}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.55) 70%, rgba(0,0,0,0.92) 100%)' }} />
+      {/* Letter fallback when no photo */}
+      {!photoUrl && (
+        <div style={{
+          position: 'absolute', left: '50%', top: '38%',
+          transform: 'translate(-50%, -50%)',
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 80, color: 'rgba(255,255,255,0.8)', lineHeight: 1,
+        }}>{a.name?.[0]}</div>
+      )}
       {a.fresh && (
         <span style={{
           position: 'absolute', left: 8, top: 8, background: C.lime, color: '#000',
@@ -94,22 +110,26 @@ function ArtistCard({ a, accent }) {
           letterSpacing: 0.5, textTransform: 'uppercase',
         }}>NEW</span>
       )}
+      {a.hot && !a.fresh && (
+        <span style={{
+          position: 'absolute', left: 8, top: 8, background: C.orange, color: '#000',
+          fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 999,
+          letterSpacing: 0.5, textTransform: 'uppercase',
+        }}>HOT</span>
+      )}
       <div style={{ position: 'absolute', right: 8, top: 8 }}>
-        <button style={{
+        <button onClick={(e) => e.stopPropagation()} style={{
           background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
           width: 28, height: 28, borderRadius: '50%', cursor: 'pointer',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         }}><Ico.heart /></button>
       </div>
-      <div style={{ position: 'absolute', left: '50%', top: '38%', transform: 'translate(-50%, -50%)' }}>
-        <Avatar artist={a} size={56} ring={tColor} />
-      </div>
       <div style={{ position: 'absolute', left: 10, right: 10, bottom: 10 }}>
-        <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.15 }}>{a.name}</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>{a.handle}</div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 6, fontSize: 9.5, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.15, textShadow: '0 1px 8px rgba(0,0,0,0.6)' }}>{a.name}</div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>{a.handle}</div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 6, fontSize: 9.5, color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
           <span>📹 {a.videos}</span>
-          <span>📷 {a.photos.toLocaleString()}</span>
+          <span>📷 {(a.photos || 0).toLocaleString()}</span>
         </div>
       </div>
     </div>

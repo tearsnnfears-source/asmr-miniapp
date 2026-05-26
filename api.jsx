@@ -307,6 +307,35 @@ function useTags() {
   );
 }
 
+// Build a "best we can" user from Telegram WebApp data alone (no server).
+// Used as the fallback shape so even if /miniapp/profile dies the header
+// still shows the right name/username from initDataUnsafe.user.
+function userFromTelegram() {
+  const tgUser = getTelegramUser();
+  if (!tgUser) {
+    return {
+      name: 'You', username: '', telegramId: 0,
+      daysLeft: 0, isPro: false, trialUsed: false, tier: 'free',
+      badges: [], tributeProUrl: '', tributePlusUrl: '',
+      raw: null,
+    };
+  }
+  const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ');
+  return {
+    name: fullName || tgUser.username || 'You',
+    username: (tgUser.username || '').replace(/^@/, ''),
+    telegramId: tgUser.id || 0,
+    daysLeft: 0,
+    isPro: false,
+    trialUsed: false,
+    tier: 'free',
+    badges: [],
+    tributeProUrl: '',
+    tributePlusUrl: '',
+    raw: null,
+  };
+}
+
 // User profile drives isPro / centerMode / days-left in the header.
 function useUser() {
   return useFetch(
@@ -315,10 +344,11 @@ function useUser() {
       const initData = getInitData();
       if (!initData) throw new Error('no initData');
       const p = await apiPost('/miniapp/profile', { initData });
+      const tgFallback = userFromTelegram();
       return {
-        name: p.full_name || getTelegramUser()?.first_name || 'You',
-        username: (p.username || '').replace(/^@/, ''),
-        telegramId: p.telegram_id,
+        name: p.full_name || tgFallback.name,
+        username: (p.username || tgFallback.username || '').replace(/^@/, ''),
+        telegramId: p.telegram_id || tgFallback.telegramId,
         daysLeft: typeof p.days_left === 'number' ? p.days_left : 0,
         isPro: typeof p.days_left === 'number' ? p.days_left > 0 : false,
         trialUsed: !!p.trial_used,
@@ -329,13 +359,8 @@ function useUser() {
         raw: p,
       };
     },
-    // Fallback when not in Telegram: pretend free user with mock name.
-    {
-      name: 'Sofia R.', username: 'sofia', telegramId: 0,
-      daysLeft: 0, isPro: false, trialUsed: false, tier: 'free',
-      badges: [], tributeProUrl: '', tributePlusUrl: '',
-      raw: null,
-    },
+    // Fallback: real Telegram identity when available, generic outside Telegram.
+    userFromTelegram(),
     [],
   );
 }
@@ -393,7 +418,7 @@ initTelegram();
 Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
-  useVideos, useShorts, useTags, useUser, useArtists, useStats,
+  useVideos, useShorts, useTags, useUser, useArtists, useStats, userFromTelegram,
   actionFavoriteToggle, actionFollow, actionStartCryptoCheckout, actionStartFreeTrial,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded

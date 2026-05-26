@@ -5,8 +5,29 @@
 function ShortsTab({ accent = C.pink, mode = 'grid' /* 'grid' | 'player' */ }) {
   if (mode === 'player') return <ShortsPlayer accent={accent} />;
 
-  const shortsState = window.useShorts(40);
-  const shorts = shortsState.data || [];
+  // Paginated load: start with 20, +20 per "Load more" tap.
+  const [limit, setLimit] = React.useState(20);
+  const shortsState = window.useShorts(limit);
+  // Enrich each short with the artist photo when API didn't ship a thumbnail.
+  const artistsState = window.useArtists();
+  const shorts = React.useMemo(() => {
+    const list = shortsState.data || [];
+    const byName = new Map((artistsState.data || []).map(a => [a.name, a]));
+    return list.map(s => {
+      if (s.thumb?.src) return s; // already has a real thumb URL
+      const artist = byName.get(s.artist?.name);
+      const photo = artist?.profilePhoto || artist?.photo;
+      if (!photo) return s;
+      return {
+        ...s,
+        thumb: {
+          bg: `url('${photo.replace(/'/g, "\\'")}') center/cover no-repeat`,
+          dot: '#FF7EC8',
+          src: photo,
+        },
+      };
+    });
+  }, [shortsState.data, artistsState.data]);
 
   return (
     <Phone>
@@ -63,11 +84,26 @@ function ShortsTab({ accent = C.pink, mode = 'grid' /* 'grid' | 'player' */ }) {
         </div>
 
         {/* 2-column grid of shorts */}
-        <div style={{ padding: '12px 14px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={{ padding: '12px 14px 12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {shorts.map((s, i) => (
             <ShortsTile key={s.id} s={s} accent={accent} fresh={i < 2} />
           ))}
         </div>
+        {/* Load more */}
+        {shorts.length >= limit && (
+          <div style={{ padding: '4px 14px 18px' }}>
+            <button onClick={() => setLimit(l => l + 20)} style={{
+              width: '100%',
+              background: 'transparent',
+              color: accent,
+              border: `1px solid ${accent}55`,
+              borderRadius: 12,
+              padding: '12px',
+              fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}>{shortsState.loading ? 'Loading…' : 'Load more'}</button>
+          </div>
+        )}
       </div>
       <BottomNav active="shorts" accent={accent} />
     </Phone>

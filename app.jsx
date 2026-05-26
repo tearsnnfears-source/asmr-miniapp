@@ -73,7 +73,7 @@ function AppShell() {
   // is instant. Hooks return state but we don't use it here — the goal is to
   // populate the module-level cache before screens mount their own consumers.
   window.useVideos(500);
-  window.useShorts(40);
+  window.useShorts(20);
   const artistsState = window.useArtists();
   // Tweak toggle still wins for local testing.
   const [proOverride, setProOverride] = React.useState(null);
@@ -127,31 +127,28 @@ function AppShell() {
     catch (e) { return false; }
   }, []);
 
-  // Splash: covers the UI until *real* data has landed (artists + user).
-  // A cache entry counts as "real" only if it has no error — fallbacks still
-  // get cached but with an error attached, which we treat as "API failed,
-  // proceed with mock".
+  // Splash: covers the UI until artists are in. User loads in background — if
+  // /profile is slow we don't want it to block first paint. Header falls back
+  // to tg.initDataUnsafe.user.first_name (always available inside Telegram).
   const hasReal = (key) => {
     const e = window._apiCache?.get(key);
     return e?.data !== undefined && !e.error;
   };
-  // Outside Telegram we can't load real user — treat as ready so preview works.
-  const userReal = hasReal('user') || !(window.isInsideTelegram && window.isInsideTelegram());
-  const artistsReal = hasReal('artists');
-  const dataReady = userReal && artistsReal;
+  const dataReady = hasReal('artists');
 
   const [splashVisible, setSplashVisible] = React.useState(true);
-  // Hard timeout — never let splash block forever (API could be down).
+  // Hard timeout: 4s. Matches the live app's typical ready time and avoids
+  // trapping the user when API is unreachable.
   React.useEffect(() => {
-    const maxHide = setTimeout(() => setSplashVisible(false), 8000);
+    const maxHide = setTimeout(() => setSplashVisible(false), 4000);
     return () => clearTimeout(maxHide);
   }, []);
-  // Hide once real data is in cache. Minimum on-screen 600ms so it doesn't flash.
+  // Hide once artists are in. Minimum 500ms so it doesn't flicker.
   const mountTimeRef = React.useRef(Date.now());
   React.useEffect(() => {
     if (!dataReady) return;
     const elapsed = Date.now() - mountTimeRef.current;
-    const remaining = Math.max(0, 600 - elapsed);
+    const remaining = Math.max(0, 500 - elapsed);
     const t = setTimeout(() => setSplashVisible(false), remaining);
     return () => clearTimeout(t);
   }, [dataReady]);
