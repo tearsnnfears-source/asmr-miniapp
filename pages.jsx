@@ -131,8 +131,8 @@ function ProfilePage({ accent = C.pink }) {
         {/* Row list */}
         <div style={{ padding: '8px 14px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           <RowGroup label="Library">
-            <Row icon="⭐" color={accent} label="My saved" badge="142" onClick={() => nav.go('saved')} />
-            <Row icon="📂" color={accent} label="Albums & playlists" badge="8" onClick={() => nav.go('saved', { tab: 'albums' })} />
+            <Row icon="⭐" color={accent} label="My saved" badge={String(window.useFavorites().data?.count || 0)} onClick={() => nav.go('saved')} />
+            <Row icon="📂" color={accent} label="Albums & playlists" onClick={() => nav.go('saved', { tab: 'albums' })} />
             <Row icon="🔄" color={accent} label="Renew subscription" onClick={() => nav.go('subscription')} />
           </RowGroup>
           <RowGroup label="App">

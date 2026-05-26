@@ -75,6 +75,7 @@ function AppShell() {
   window.useVideos(500);
   window.useShorts(20);
   const artistsState = window.useArtists();
+  window.useFavorites();
   // Tweak toggle still wins for local testing.
   const [proOverride, setProOverride] = React.useState(null);
   const isPro = proOverride != null ? proOverride : (t.startPro ? true : user.isPro);
@@ -134,7 +135,9 @@ function AppShell() {
     const e = window._apiCache?.get(key);
     return e?.data !== undefined && !e.error;
   };
-  const dataReady = hasReal('artists');
+  // Wait for both artists *and* videos so the Home hero doesn't flash mock
+  // content while the real list is still loading.
+  const dataReady = hasReal('artists') && hasReal('videos:500');
 
   const [splashVisible, setSplashVisible] = React.useState(true);
   // Hard timeout: 4s. Matches the live app's typical ready time and avoids

@@ -170,8 +170,11 @@ function compactViews(n) {
 function normalizeVideo(v, idx = 0) {
   const artistName = v.artist_name || v.artistName || 'Unknown';
   const artistId = 'a-' + (v.artist_id || artistName.toLowerCase().replace(/\W+/g, ''));
+  // Keep id in its native shape (server gives numeric IDs); FeedCard onClick
+  // routes through this id and VideoPage's /miniapp/content/play needs it numeric.
+  const rawId = v.id != null ? v.id : `v${idx}`;
   return {
-    id: v.id != null ? String(v.id) : `v${idx}`,
+    id: rawId,
     title: v.title || 'Untitled',
     duration: v.duration || '',
     age: relativeAge(v.created_at),
@@ -184,7 +187,7 @@ function normalizeVideo(v, idx = 0) {
       handle: '@' + artistName.toLowerCase().replace(/\s+/g, ''),
       tag: ['pink', 'lime', 'blue', 'purple', 'orange'][Math.abs((idx | 0)) % 5],
       videos: 0, photos: 0,
-      fresh: idx < 3, // first few feel "fresh"
+      fresh: idx < 3,
     },
   };
 }
@@ -257,6 +260,22 @@ function normalizeArtist(a, idx = 0) {
   };
 }
 
+// Sort priority matches the live miniapp's renderArtistsGrid():
+//   READY (▶ IN APP) → 3
+//   NEW              → 2
+//   HOT              → 1
+//   none             → 0
+// Within the same tier, more content (photos + videos) comes first.
+function artistTagPriority(a) {
+  if (a.ready) return 3;
+  if (a.fresh) return 2; // tag_new
+  if (a.hot) return 1;
+  return 0;
+}
+function artistTotalContent(a) {
+  return (a.photos || 0) + (a.videos || 0);
+}
+
 function useArtists() {
   return useFetch(
     'artists',
@@ -264,6 +283,13 @@ function useArtists() {
       const data = await apiGet('/miniapp/artists');
       const list = (data.artists || []).map(normalizeArtist);
       if (!list.length) throw new Error('empty artists');
+      // Sort: READY > NEW > HOT > by content count.
+      list.sort((a, b) => {
+        const pa = artistTagPriority(a);
+        const pb = artistTagPriority(b);
+        if (pa !== pb) return pb - pa;
+        return artistTotalContent(b) - artistTotalContent(a);
+      });
       return list;
     },
     window.ARTISTS || [],
@@ -339,6 +365,34 @@ function userFromTelegram() {
   };
 }
 
+// Favorites — POST /miniapp/favorites with initData → list of saved videos.
+// Server returns { count, items: [{content_id, title, thumbnail_url, artist_name, duration, ...}] }
+function useFavorites() {
+  return useFetch(
+    'favorites',
+    async () => {
+      const initData = getInitData();
+      if (!initData) throw new Error('no initData');
+      const data = await apiPost('/miniapp/favorites', { initData });
+      const items = (data.items || data.favorites || []).map((it, i) => {
+        // Items shaped like videos — reuse the same normalizer for thumbs/artist
+        return normalizeVideo({
+          id: it.content_id || it.id,
+          title: it.title,
+          thumbnail_url: it.thumbnail_url,
+          artist_name: it.artist_name,
+          duration: it.duration,
+          created_at: it.saved_at || it.created_at,
+          views: it.views || 0,
+        }, i);
+      });
+      return { items, count: data.count != null ? data.count : items.length };
+    },
+    { items: [], count: 0 },
+    [],
+  );
+}
+
 // User profile drives isPro / centerMode / days-left in the header.
 function useUser() {
   return useFetch(
@@ -348,18 +402,26 @@ function useUser() {
       if (!initData) throw new Error('no initData');
       const p = await apiPost('/miniapp/profile', { initData });
       const tgFallback = userFromTelegram();
-      const days = typeof p.days_left === 'number' ? p.days_left : 0;
+      // days_left can come back as number, string, or be absent. Coerce.
+      const rawDays = p.days_left;
+      const days = typeof rawDays === 'number' ? rawDays
+                 : (typeof rawDays === 'string' && !isNaN(+rawDays) ? +rawDays : 0);
       const INFINITE_THRESHOLD = 9000;
+      const tier = (p.tier || 'free').toLowerCase();
+      // A user is "PRO" if they have remaining days OR a non-free tier
+      // (covers lifetime users where days_left isn't returned).
+      const knownTiers = ['plus', 'pro', 'elite', 'vip', 'founder'];
+      const isPro = days > 0 || knownTiers.includes(tier);
       return {
         name: p.full_name || tgFallback.name,
         username: (p.username || tgFallback.username || '').replace(/^@/, ''),
         telegramId: p.telegram_id || tgFallback.telegramId,
         photo: tgFallback.photo, // server doesn't ship it; use Telegram's
         daysLeft: days,
-        isPro: days > 0,
-        isInfinite: days > INFINITE_THRESHOLD,
+        isPro,
+        isInfinite: days > INFINITE_THRESHOLD || (isPro && days === 0),
         trialUsed: !!p.trial_used,
-        tier: (p.tier || 'free').toLowerCase(),
+        tier,
         badges: Array.isArray(p.badges) ? p.badges : (p.badge ? p.badge.split(',').map(s => s.trim()).filter(Boolean) : []),
         tributeProUrl: p.tribute_pro_url || '',
         tributePlusUrl: p.tribute_plus_url || '',
@@ -425,7 +487,7 @@ initTelegram();
 Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
-  useVideos, useShorts, useTags, useUser, useArtists, useStats, userFromTelegram,
+  useVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, userFromTelegram,
   actionFavoriteToggle, actionFollow, actionStartCryptoCheckout, actionStartFreeTrial,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded

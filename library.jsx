@@ -103,20 +103,28 @@ function ArtistCard({ a, accent }) {
           fontSize: 80, color: 'rgba(255,255,255,0.8)', lineHeight: 1,
         }}>{a.name?.[0]}</div>
       )}
-      {a.fresh && (
+      {/* Priority: READY > NEW > HOT — only one badge at a time, matches main */}
+      {a.ready ? (
+        <span style={{
+          position: 'absolute', left: 8, top: 8,
+          background: '#4ADE80', color: '#000',
+          fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 999,
+          letterSpacing: 0.5, textTransform: 'uppercase',
+          display: 'inline-flex', alignItems: 'center', gap: 3,
+        }}>▶ IN APP</span>
+      ) : a.fresh ? (
         <span style={{
           position: 'absolute', left: 8, top: 8, background: C.lime, color: '#000',
           fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 999,
           letterSpacing: 0.5, textTransform: 'uppercase',
-        }}>NEW</span>
-      )}
-      {a.hot && !a.fresh && (
+        }}>✨ NEW</span>
+      ) : a.hot ? (
         <span style={{
-          position: 'absolute', left: 8, top: 8, background: C.orange, color: '#000',
+          position: 'absolute', left: 8, top: 8, background: '#FF6B4A', color: '#000',
           fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 999,
           letterSpacing: 0.5, textTransform: 'uppercase',
-        }}>HOT</span>
-      )}
+        }}>🔥 HOT</span>
+      ) : null}
       <div style={{ position: 'absolute', right: 8, top: 8 }}>
         <button onClick={(e) => e.stopPropagation()} style={{
           background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
@@ -139,8 +147,10 @@ function ArtistCard({ a, accent }) {
 // ── SAVED / LIBRARY PAGE ──────────────────────────────────────
 function SavedPage({ accent = C.pink, initialTab = 'videos' }) {
   const [tab, setTab] = React.useState(initialTab);
+  const favState = window.useFavorites();
+  const favCount = favState.data?.count || 0;
   const tabs = [
-    { id: 'videos', label: 'Liked videos', count: SAVED_VIDEOS.length },
+    { id: 'videos', label: 'Liked videos', count: favCount },
     { id: 'playlists', label: 'Playlists', count: VIDEO_PLAYLISTS.length },
     { id: 'photos', label: 'Liked photos', count: LIKED_PHOTOS.length },
     { id: 'albums', label: 'Albums', count: PHOTO_ALBUMS.length },
@@ -156,7 +166,7 @@ function SavedPage({ accent = C.pink, initialTab = 'videos' }) {
             My <span style={{ color: accent }}>library</span>
           </div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>
-            {SAVED_VIDEOS.length} videos · {LIKED_PHOTOS.length} photos · {VIDEO_PLAYLISTS.length + PHOTO_ALBUMS.length} collections
+            {favCount} videos · {LIKED_PHOTOS.length} photos · {VIDEO_PLAYLISTS.length + PHOTO_ALBUMS.length} collections
           </div>
         </div>
 
@@ -195,9 +205,29 @@ function SavedPage({ accent = C.pink, initialTab = 'videos' }) {
 
 function LikedVideos({ accent }) {
   const nav = window.useNav();
+  const favState = window.useFavorites();
+  const items = favState.data?.items || [];
+  if (favState.loading && !items.length) {
+    return (
+      <div style={{ padding: '40px 14px', textAlign: 'center', color: C.muted, fontSize: 13 }}>
+        Loading your saves…
+      </div>
+    );
+  }
+  if (!items.length) {
+    return (
+      <div style={{ padding: '40px 14px', textAlign: 'center' }}>
+        <div style={{ fontSize: 36, marginBottom: 12 }}>⭐</div>
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>No saved videos yet</div>
+        <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+          Tap the heart on any video to save it for later
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {SAVED_VIDEOS.map(v => (
+      {items.map(v => (
         <div key={v.id} onClick={() => nav.go('video', { id: v.id })} style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
           <div style={{ width: 130, flexShrink: 0 }}>
             <Thumb thumb={v.thumb} duration={v.duration} />
@@ -207,7 +237,7 @@ function LikedVideos({ accent }) {
             <div style={{ fontSize: 10.5, color: C.muted, marginTop: 4 }}>{v.artist.name}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
               <span style={{ color: accent }}><Ico.heartFilled /></span>
-              <span style={{ fontSize: 10, color: C.muted }}>Saved {v.savedAt}</span>
+              <span style={{ fontSize: 10, color: C.muted }}>{v.age || 'Saved'}</span>
             </div>
           </div>
         </div>
