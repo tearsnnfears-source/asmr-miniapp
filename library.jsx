@@ -23,10 +23,31 @@ const PHOTO_ALBUMS = [
 // ── ARTISTS PAGE ──────────────────────────────────────────────
 function ArtistsPage({ accent = C.pink }) {
   const [tab, setTab] = React.useState('all');
+  const [query, setQuery] = React.useState('');
+  const [visible, setVisible] = React.useState(24);
   const artistsState = window.useArtists();
   const statsState = window.useStats();
+  const followsState = window.useFollows();
   const artists = artistsState.data || [];
   const stats = statsState.data || { photos: 0, videos: 0, artists: 0 };
+  const followedNames = followsState.data?.names || new Set();
+
+  // Filter pipeline: tab (All|Followed) → search query → visible cap.
+  const filtered = React.useMemo(() => {
+    let list = artists;
+    if (tab === 'followed') {
+      list = list.filter(a => followedNames.has(a.name));
+    }
+    if (query.trim()) {
+      const q = query.trim().toLowerCase();
+      list = list.filter(a => a.name.toLowerCase().includes(q) || (a.handle || '').toLowerCase().includes(q));
+    }
+    return list;
+  }, [artists, tab, query, followedNames]);
+
+  // Reset Load-more when the filters change.
+  React.useEffect(() => { setVisible(24); }, [tab, query]);
+
   return (
     <Phone>
       <AppHeader accent={accent} />
@@ -39,10 +60,20 @@ function ArtistsPage({ accent = C.pink }) {
             borderRadius: 12, padding: '10px 12px',
           }}>
             <span style={{ color: C.muted }}><Ico.search /></span>
-            <input placeholder="Search artists…" style={{
-              flex: 1, background: 'transparent', border: 'none', color: C.text,
-              fontSize: 13, outline: 'none', fontFamily: 'inherit',
-            }}/>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search artists…"
+              style={{
+                flex: 1, background: 'transparent', border: 'none', color: C.text,
+                fontSize: 13, outline: 'none', fontFamily: 'inherit',
+              }}/>
+            {query && (
+              <button onClick={() => setQuery('')} style={{
+                background: 'transparent', border: 'none', color: C.muted,
+                cursor: 'pointer', fontSize: 16, padding: 0, lineHeight: 1,
+              }}>✕</button>
+            )}
           </div>
         </div>
 
@@ -50,16 +81,19 @@ function ArtistsPage({ accent = C.pink }) {
         <div style={{ padding: '8px 14px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <div style={{
             fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, letterSpacing: 1.2,
-          }}>All <span style={{ color: accent }}>artists</span></div>
+          }}>{tab === 'followed' ? 'Followed' : 'All'} <span style={{ color: accent }}>artists</span></div>
           <div style={{ display: 'flex', gap: 4, background: C.dark3, borderRadius: 999, padding: 3 }}>
-            {['all', 'fresh', 'saved'].map(t => (
-              <button key={t} onClick={() => setTab(t)} style={{
-                background: tab === t ? accent : 'transparent',
-                color: tab === t ? '#000' : C.muted2,
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'followed', label: 'Followed' },
+            ].map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)} style={{
+                background: tab === t.id ? accent : 'transparent',
+                color: tab === t.id ? '#000' : C.muted2,
                 border: 'none', padding: '6px 12px',
                 borderRadius: 999, fontSize: 11, fontWeight: 700,
-                cursor: 'pointer', textTransform: 'capitalize',
-              }}>{t}</button>
+                cursor: 'pointer',
+              }}>{t.label}</button>
             ))}
           </div>
         </div>
@@ -67,10 +101,33 @@ function ArtistsPage({ accent = C.pink }) {
           {stats.photos.toLocaleString()} photos · {stats.videos.toLocaleString()} videos
         </div>
 
+        {/* Empty states */}
+        {tab === 'followed' && filtered.length === 0 && (
+          <div style={{ padding: '40px 14px', textAlign: 'center', color: C.muted, fontSize: 13 }}>
+            <div style={{ fontSize: 32, marginBottom: 10 }}>💜</div>
+            You aren't following anyone yet — tap the heart on a card.
+          </div>
+        )}
+        {query.trim() && filtered.length === 0 && (
+          <div style={{ padding: '40px 14px', textAlign: 'center', color: C.muted, fontSize: 13 }}>
+            No artists match "<b style={{ color: C.text }}>{query}</b>"
+          </div>
+        )}
+
         {/* Grid 2-col */}
         <div style={{ padding: '0 14px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {artists.map(a => <ArtistCard key={a.id} a={a} accent={accent} />)}
+          {filtered.slice(0, visible).map(a => <ArtistCard key={a.id} a={a} accent={accent} />)}
         </div>
+        {visible < filtered.length && (
+          <div style={{ padding: '4px 14px 18px' }}>
+            <button onClick={() => setVisible(v => v + 24)} style={{
+              width: '100%', background: 'transparent', color: accent,
+              border: `1px solid ${accent}55`, borderRadius: 12,
+              padding: '12px', fontSize: 13, fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}>Load more ({filtered.length - visible} left)</button>
+          </div>
+        )}
       </div>
       <BottomNav active="artists" accent={accent} />
     </Phone>
@@ -81,6 +138,17 @@ function ArtistCard({ a, accent }) {
   const nav = window.useNav();
   const tColor = tagColor(a.tag);
   const photoUrl = a.profilePhoto || a.photo || '';
+  const followStatus = window.useFollowStatus(a.name);
+  const [localFollow, setLocalFollow] = React.useState(null);
+  const isFollowing = localFollow != null ? localFollow : followStatus.following;
+  const onHeart = (e) => {
+    e.stopPropagation();
+    const next = !isFollowing;
+    setLocalFollow(next);
+    window.actionFollow(a.name).then(r => {
+      if (!r.ok) { setLocalFollow(!next); console.warn('[follow]', r); }
+    });
+  };
   // Card has the artist photo filling its whole area; gradient is only used
   // when no photo is available (still preserves the layout).
   const cardBg = photoUrl
@@ -126,11 +194,12 @@ function ArtistCard({ a, accent }) {
         }}>🔥 HOT</span>
       ) : null}
       <div style={{ position: 'absolute', right: 8, top: 8 }}>
-        <button onClick={(e) => e.stopPropagation()} style={{
-          background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
+        <button onClick={onHeart} style={{
+          background: isFollowing ? accent : 'rgba(0,0,0,0.55)',
+          border: 'none', color: isFollowing ? '#000' : '#fff',
           width: 28, height: 28, borderRadius: '50%', cursor: 'pointer',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        }}><Ico.heart /></button>
+        }}>{isFollowing ? <Ico.heartFilled /> : <Ico.heart />}</button>
       </div>
       <div style={{ position: 'absolute', left: 10, right: 10, bottom: 10 }}>
         <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.15, textShadow: '0 1px 8px rgba(0,0,0,0.6)' }}>{a.name}</div>

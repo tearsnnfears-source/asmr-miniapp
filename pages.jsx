@@ -518,60 +518,113 @@ function PaywallLock({ accent = C.pink, mode = 'video' /* 'video' | 'artist' */ 
   );
 }
 
+function loadMoreBtnStyle(accent) {
+  return {
+    width: '100%',
+    background: 'transparent',
+    color: accent,
+    border: `1px solid ${accent}55`,
+    borderRadius: 12,
+    padding: '12px',
+    fontSize: 13, fontWeight: 700, cursor: 'pointer',
+    fontFamily: 'inherit',
+  };
+}
+
 // ── ARTIST PAGE ───────────────────────────────────────────────
 function ArtistPage({ accent = C.pink }) {
   const nav = window.useNav();
   const requestedId = nav.params?.id;
-  const videosState = window.useVideos(500);
-  const allVideos = videosState.data || [];
   const artistsState = window.useArtists();
   const allArtists = artistsState.data || [];
-  // Prefer real artist record (has photo, stats, tags) over the
-  // bare artist embedded in a video.
   let a = allArtists.find(x => x.id === requestedId);
-  if (!a) a = allVideos.find(v => v.artist?.id === requestedId)?.artist;
   if (!a) a = allArtists[0] || window.ARTISTS[0];
   const tColor = tagColor(a.tag);
   const [tab, setTab] = React.useState('videos');
-  const vids = allVideos.filter(v => v.artist?.name === a.name).slice(0, 12);
-  const photos = Array.from({ length: 12 }, (_, i) => window.makeThumb(i + 1));
-  const shortsState = window.useShorts(300);
-  const shorts = (shortsState.data || []).filter(s => s.artist?.name === a.name).slice(0, 6);
+
+  // Live content from /miniapp/artist_content (mixed initial load).
+  const contentState = window.useArtistContent(a.name);
+  const content = contentState.data || { videos: [], photos: [], shorts: [] };
+
+  // Follow state + optimistic toggle.
+  const followStatus = window.useFollowStatus(a.name);
+  const [localFollow, setLocalFollow] = React.useState(null);
+  const isFollowing = localFollow != null ? localFollow : followStatus.following;
+  const onFollowClick = () => {
+    const next = !isFollowing;
+    setLocalFollow(next);
+    window.actionFollow(a.name).then(r => {
+      if (!r.ok) { setLocalFollow(!next); console.warn('[follow]', r); }
+    });
+  };
+
+  // Per-tab pagination state.
+  const [visibleVideos, setVisibleVideos] = React.useState(10);
+  const [visibleShorts, setVisibleShorts] = React.useState(9);
+  const [visiblePhotos, setVisiblePhotos] = React.useState(24);
+  // Best-effort follower count — we don't currently get this from the API.
+  // The `videos + photos + shorts` totals are real; hide Followers if 0.
+  const stats = [
+    { v: content.videos.length || a.videos || 0, l: 'Videos' },
+    { v: (content.photos.length || a.photos || 0).toLocaleString(), l: 'Photos' },
+    { v: content.shorts.length || 0, l: 'Shorts' },
+  ];
+
+  // Empty-state: artist exists but has no content uploaded yet — show a
+  // link to the group thread if the backend gave us topic_url.
+  const hasAnyContent = content.videos.length + content.shorts.length + content.photos.length > 0;
+  const topicUrl = a.topicUrl || a.raw?.topic_url || '';
+
+  const openTopic = () => {
+    if (!topicUrl) return;
+    const tg = window.Telegram?.WebApp;
+    tg?.openLink ? tg.openLink(topicUrl) : window.open(topicUrl, '_blank');
+  };
 
   return (
     <Phone>
-      {/* Slim back bar */}
-      <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'absolute', top: 44, left: 0, right: 0, zIndex: 5 }}>
+      {/* Slim back bar — pinned to the top of the player surface, not 44px
+          below it (the old offset was for the fake status bar we removed). */}
+      <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'absolute', top: 'calc(8px + env(safe-area-inset-top, 0px))', left: 0, right: 0, zIndex: 5 }}>
         <button onClick={() => nav.back()} style={{
           width: 36, height: 36, borderRadius: 12,
           background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
         }}><Ico.chevL /></button>
-        <button style={{
-          width: 36, height: 36, borderRadius: 12,
-          background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-        }}><Ico.share /></button>
+        {topicUrl && (
+          <button onClick={openTopic} style={{
+            width: 36, height: 36, borderRadius: 12,
+            background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          }}><Ico.share /></button>
+        )}
       </div>
 
       <div style={SCROLL_BODY}>
         {/* Hero */}
         <div style={{
           position: 'relative', height: 220,
-          background: `linear-gradient(135deg, ${tColor}, ${C.purple})`,
+          background: a.profilePhoto || a.photo
+            ? `url('${(a.profilePhoto || a.photo).replace(/'/g, "\\'")}') center/cover no-repeat, linear-gradient(135deg, ${tColor}, ${C.purple})`
+            : `linear-gradient(135deg, ${tColor}, ${C.purple})`,
           overflow: 'hidden',
         }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 40% 40%, rgba(255,255,255,0.15), transparent 60%)' }} />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 30%, rgba(14,14,15,0.95) 100%)' }} />
-          {/* avatar */}
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, transparent 30%, rgba(14,14,15,0.95) 100%)' }} />
           <div style={{ position: 'absolute', left: 14, bottom: 14, display: 'flex', alignItems: 'flex-end', gap: 12 }}>
             <Avatar artist={a} size={80} ring={C.text} />
             <div style={{ paddingBottom: 4 }}>
-              <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.1 }}>{a.name}</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>{a.handle}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.1, textShadow: '0 1px 6px rgba(0,0,0,0.6)' }}>{a.name}</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>{a.handle}</div>
             </div>
           </div>
-          {a.fresh && (
+          {a.ready && (
+            <span style={{
+              position: 'absolute', right: 14, bottom: 18,
+              background: '#4ADE80', color: '#000', fontSize: 9.5, fontWeight: 800,
+              padding: '4px 10px', borderRadius: 999, letterSpacing: 0.8, textTransform: 'uppercase',
+            }}>▶ In app</span>
+          )}
+          {!a.ready && a.fresh && (
             <span style={{
               position: 'absolute', right: 14, bottom: 18,
               background: C.lime, color: '#000', fontSize: 9.5, fontWeight: 800,
@@ -580,14 +633,10 @@ function ArtistPage({ accent = C.pink }) {
           )}
         </div>
 
-        {/* Stats + follow */}
+        {/* Stats row */}
         <div style={{ padding: '14px 14px 6px', display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0 }}>
-            {[
-              { v: a.videos, l: 'Videos' },
-              { v: a.photos.toLocaleString(), l: 'Photos' },
-              { v: '24K', l: 'Followers' },
-            ].map((s, i) => (
+            {stats.map((s, i) => (
               <div key={i} style={{ textAlign: 'center', borderRight: i < 2 ? `1px solid ${C.border}` : 'none', padding: '0 4px' }}>
                 <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: accent, lineHeight: 1 }}>{s.v}</div>
                 <div style={{ fontSize: 10, color: C.muted, fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase', marginTop: 3 }}>{s.l}</div>
@@ -595,75 +644,126 @@ function ArtistPage({ accent = C.pink }) {
             ))}
           </div>
         </div>
+
+        {/* Action row: Follow + bell only (bookmark removed per request) */}
         <div style={{ padding: '8px 14px 6px', display: 'flex', gap: 8 }}>
-          <button style={{
+          <button onClick={onFollowClick} style={{
             flex: 1,
-            background: accent, color: '#000', border: 'none',
-            padding: '11px', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-          }}>+ Follow</button>
+            background: isFollowing ? 'transparent' : accent,
+            color: isFollowing ? accent : '#000',
+            border: isFollowing ? `1px solid ${accent}` : 'none',
+            padding: '11px', borderRadius: 12, fontSize: 13, fontWeight: 700,
+            cursor: 'pointer', fontFamily: 'inherit',
+          }}>{isFollowing ? '✓ Following' : '+ Follow'}</button>
           <button style={{
             background: C.dark3, border: `1px solid ${C.border2}`, color: C.text,
             padding: '11px 14px', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer',
             display: 'inline-flex', alignItems: 'center', gap: 6,
-          }}><Ico.bell /></button>
-          <button style={{
-            background: C.dark3, border: `1px solid ${C.border2}`, color: C.text,
-            padding: '11px 14px', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-          }}><Ico.bookmark /></button>
+          }} title="Notify when new content drops"><Ico.bell /></button>
         </div>
 
-        {/* About */}
-        <div style={{ padding: '8px 14px 4px', fontSize: 12, color: C.muted2, lineHeight: 1.55 }}>
-          Soft-spoken creator · 3DIO mic · weekly drops. Best with headphones in the dark.
-        </div>
-
-        {/* Tabs */}
-        <div style={{ padding: '14px 14px 0', display: 'flex', gap: 18, borderBottom: `1px solid ${C.border}` }}>
-          {[
-            { id: 'videos', l: 'Videos', c: a.videos },
-            { id: 'shorts', l: 'Shorts', c: 41 },
-            { id: 'photos', l: 'Photos', c: a.photos.toLocaleString() },
-          ].map(t => {
-            const active = t.id === tab;
-            return (
-              <button key={t.id} onClick={() => setTab(t.id)} style={{
-                background: 'none', border: 'none', padding: '10px 0',
-                borderBottom: `2px solid ${active ? accent : 'transparent'}`,
-                color: active ? C.text : C.muted, cursor: 'pointer',
-                fontFamily: 'inherit', fontSize: 13, fontWeight: active ? 700 : 500,
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-              }}>
-                {t.l}
-                <span style={{ fontSize: 10, color: C.muted }}>{t.c}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Content */}
-        {tab === 'videos' && (
-          <div style={{ padding: '12px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {vids.map(v => <CompactRow key={v.id} v={v} accent={accent} />)}
+        {/* Empty state when the artist exists but has nothing uploaded yet */}
+        {!contentState.loading && !hasAnyContent && (
+          <div style={{ padding: '32px 18px', textAlign: 'center' }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>💬</div>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>
+              Available in the group
+            </div>
+            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 14 }}>
+              {a.name}'s content lives in the Telegram group for now.
+            </div>
+            {topicUrl && (
+              <button onClick={openTopic} style={{
+                background: accent, color: '#000', border: 'none',
+                padding: '10px 20px', borderRadius: 999,
+                fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}>Open in Telegram</button>
+            )}
           </div>
         )}
-        {tab === 'shorts' && (
-          <div style={{ padding: '12px 14px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-            {shorts.concat(shorts).map((s, i) => (
-              <div key={i} style={{ aspectRatio: '9/16', borderRadius: 10, background: s.thumb.bg, position: 'relative', overflow: 'hidden' }}>
-                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.7) 100%)' }} />
-                <span style={{ position: 'absolute', right: 5, bottom: 5, fontSize: 9, fontWeight: 700, color: '#fff' }}>{s.duration}</span>
+
+        {hasAnyContent && (
+          <React.Fragment>
+            {/* Tabs */}
+            <div style={{ padding: '14px 14px 0', display: 'flex', gap: 18, borderBottom: `1px solid ${C.border}` }}>
+              {[
+                { id: 'videos', l: 'Videos', c: content.videos.length },
+                { id: 'shorts', l: 'Shorts', c: content.shorts.length },
+                { id: 'photos', l: 'Photos', c: content.photos.length },
+              ].map(t => {
+                const active = t.id === tab;
+                return (
+                  <button key={t.id} onClick={() => setTab(t.id)} style={{
+                    background: 'none', border: 'none', padding: '10px 0',
+                    borderBottom: `2px solid ${active ? accent : 'transparent'}`,
+                    color: active ? C.text : C.muted, cursor: 'pointer',
+                    fontFamily: 'inherit', fontSize: 13, fontWeight: active ? 700 : 500,
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                  }}>
+                    {t.l}
+                    <span style={{ fontSize: 10, color: C.muted }}>{t.c}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Videos */}
+            {tab === 'videos' && (
+              <div>
+                <div style={{ padding: '12px 14px 4px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {content.videos.slice(0, visibleVideos).map(v => <CompactRow key={v.id} v={v} accent={accent} />)}
+                </div>
+                {visibleVideos < content.videos.length && (
+                  <div style={{ padding: '6px 14px 18px' }}>
+                    <button onClick={() => setVisibleVideos(n => n + 10)} style={loadMoreBtnStyle(accent)}>Load more</button>
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
-        )}
-        {tab === 'photos' && (
-          <div style={{ padding: '12px 14px 16px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
-            {photos.map((p, i) => (
-              <div key={i} style={{ aspectRatio: '1/1', borderRadius: 6, background: p.bg, position: 'relative', overflow: 'hidden' }}>
-                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.15)' }} />
+            )}
+
+            {/* Shorts */}
+            {tab === 'shorts' && (
+              <div>
+                <div style={{ padding: '12px 14px 4px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                  {content.shorts.slice(0, visibleShorts).map((s, i) => (
+                    <div key={s.id || i} onClick={() => nav.go('shorts', {})} style={{ aspectRatio: '9/16', borderRadius: 10, background: s.thumb.bg, position: 'relative', overflow: 'hidden', cursor: 'pointer' }}>
+                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.7) 100%)' }} />
+                      {s.duration && <span style={{ position: 'absolute', right: 5, bottom: 5, fontSize: 9, fontWeight: 700, color: '#fff' }}>{s.duration}</span>}
+                    </div>
+                  ))}
+                </div>
+                {visibleShorts < content.shorts.length && (
+                  <div style={{ padding: '6px 14px 18px' }}>
+                    <button onClick={() => setVisibleShorts(n => n + 9)} style={loadMoreBtnStyle(accent)}>Load more</button>
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+            )}
+
+            {/* Photos */}
+            {tab === 'photos' && (
+              <div>
+                <div style={{ padding: '12px 14px 4px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
+                  {content.photos.slice(0, visiblePhotos).map((p, i) => (
+                    <div key={p.id || i} style={{
+                      aspectRatio: '1/1', borderRadius: 6, overflow: 'hidden', position: 'relative',
+                      background: p.thumb?.src
+                        ? `url('${p.thumb.src.replace(/'/g, "\\'")}') center/cover no-repeat`
+                        : (p.thumb?.bg || '#1a1a1c'),
+                    }}>
+                      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.15)' }} />
+                    </div>
+                  ))}
+                </div>
+                {visiblePhotos < content.photos.length && (
+                  <div style={{ padding: '6px 14px 18px' }}>
+                    <button onClick={() => setVisiblePhotos(n => n + 24)} style={loadMoreBtnStyle(accent)}>Load more</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </React.Fragment>
         )}
       </div>
       <BottomNav active="artists" accent={accent} />

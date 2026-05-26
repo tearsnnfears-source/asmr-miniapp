@@ -413,6 +413,95 @@ function userFromTelegram() {
   };
 }
 
+// Follows — POST /miniapp/follows → { artists: [{name, photo_url, profile_photo_url}] }
+function useFollows() {
+  return useFetch(
+    'follows',
+    async () => {
+      const initData = getInitData();
+      if (!initData) throw new Error('no initData');
+      const data = await apiPost('/miniapp/follows', { initData });
+      const list = (data.artists || []).map((a, i) => normalizeArtist({
+        name: a.name,
+        photo_url: a.photo_url,
+        profile_photo_url: a.profile_photo_url,
+        photos: 0, videos: 0,
+      }, i));
+      return { artists: list, names: new Set(list.map(a => a.name)) };
+    },
+    { artists: [], names: new Set() },
+    [],
+  );
+}
+
+// Cheap derived hook: is the current user following this artist?
+function useFollowStatus(artistName) {
+  const follows = useFollows();
+  const isF = artistName && follows.data?.names?.has(artistName);
+  return { following: !!isF, loading: follows.loading };
+}
+
+// Artist content — GET /miniapp/artist_content?name=X&type=Y&offset=O
+// Without `type` returns the initial mixed payload (videos/shorts/photos +
+// *_more flags). Cached per artist+type+offset.
+function useArtistContent(artistName, type = '', offset = 0) {
+  return useFetch(
+    `artist_content:${artistName}:${type || 'all'}:${offset}`,
+    async () => {
+      if (!artistName) throw new Error('no artist');
+      const query = { name: artistName };
+      if (type) query.type = type;
+      if (offset) query.offset = String(offset);
+      const data = await apiGet('/miniapp/artist_content', query);
+      // Server returns either {videos, shorts, photos, *_more} or
+      // {type, items, has_more, offset}. Normalize each item to our shape.
+      const norm = (it, i) => {
+        const v = normalizeVideo({
+          id: it.id, title: it.title,
+          thumbnail_url: it.thumbnail_url, artist_name: it.artist_name || artistName,
+          duration: it.duration, created_at: it.created_at, views: it.views || 0,
+        }, i);
+        v.url = it.url || '';
+        v.contentType = it.content_type || '';
+        return v;
+      };
+      if (type) {
+        return {
+          type, offset: data.offset || 0, has_more: !!data.has_more,
+          items: (data.items || []).map(norm),
+        };
+      }
+      return {
+        artist: data.artist,
+        videos: (data.videos || []).map(norm),
+        videos_more: !!data.videos_more,
+        photos: (data.photos || []).map(norm),
+        photos_more: !!data.photos_more,
+        shorts: (data.shorts || []).map(norm),
+        shorts_more: !!data.shorts_more,
+      };
+    },
+    type ? { type, offset, has_more: false, items: [] }
+         : { artist: artistName, videos: [], videos_more: false, photos: [], photos_more: false, shorts: [], shorts_more: false },
+    [artistName, type, offset],
+  );
+}
+
+// Search — GET /miniapp/search?q=&limit=
+function useSearch(q, limit = 20) {
+  const enabled = q && q.length >= 2;
+  return useFetch(
+    `search:${q}:${limit}`,
+    async () => {
+      if (!enabled) return { results: [] };
+      const data = await apiGet('/miniapp/search', { q, limit: String(limit) });
+      return { results: (data.results || []).map((v, i) => normalizeVideo(v, i)) };
+    },
+    { results: [] },
+    [q, limit, enabled],
+  );
+}
+
 // Favorites — POST /miniapp/favorites with initData → list of saved items.
 // Server returns { count, items: [{content_id, title, thumbnail_url, artist_name, content_type, ...}] }
 // We split into videos vs shorts using the new content_type field (backend
@@ -598,13 +687,28 @@ async function actionFavoriteToggle(contentId) {
   return p;
 }
 
+// Per-artist lock to coalesce fast double-taps into one follow request.
+const _followLocks = new Map();
 async function actionFollow(artistName) {
   const initData = getInitData();
-  if (!initData) return { ok: false, reason: 'no-tg' };
-  try {
-    const res = await apiPost('/miniapp/follow', { initData, artist: artistName });
-    return { ok: true, ...res };
-  } catch (e) { return { ok: false, error: e.message }; }
+  if (!initData || !artistName) return { ok: false, reason: 'no-tg' };
+  const inflight = _followLocks.get(artistName);
+  if (inflight) return inflight;
+  const p = (async () => {
+    try {
+      // Backend wants `artist_name`, not `artist` — earlier we shipped the
+      // wrong field and follow silently did nothing.
+      const res = await apiPost('/miniapp/follow', { initData, artist_name: artistName });
+      invalidate('follows');
+      return { ok: true, ...res };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    } finally {
+      _followLocks.delete(artistName);
+    }
+  })();
+  _followLocks.set(artistName, p);
+  return p;
 }
 
 async function actionStartCryptoCheckout(plan = 'year') {
@@ -640,7 +744,7 @@ initTelegram();
 Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
-  useVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, userFromTelegram,
+  useVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useSearch, userFromTelegram,
   actionFavoriteToggle, actionFollow, actionReact, actionStartCryptoCheckout, actionStartFreeTrial,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded
