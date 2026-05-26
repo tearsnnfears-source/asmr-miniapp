@@ -296,6 +296,7 @@ function normalizeArtist(a, idx = 0) {
     tag: tags[idx % tags.length],
     videos: a.videos || 0,
     photos: a.photos || 0,
+    shorts: a.shorts || 0,
     photo: a.photo_url && a.photo_url.trim() ? a.photo_url : '',
     profilePhoto: a.profile_photo_url && a.profile_photo_url.trim() ? a.profile_photo_url : '',
     fresh: !!a.tag_new,

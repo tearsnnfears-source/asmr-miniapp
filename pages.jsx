@@ -560,17 +560,21 @@ function ArtistPage({ accent = C.pink }) {
     });
   };
 
-  // Tab counts use the *total* from the artist record (a.videos, a.photos)
-  // when available — that's the true catalog size. The currently loaded
-  // pages can be smaller until the user pages through.
+  // Tab counts use the *total* from the artist record (a.videos / a.photos /
+  // a.shorts) when available — that's the true catalog size. Live counts as
+  // fallback so the UI still shows something if the artists endpoint hasn't
+  // landed yet.
   const totalVideos = a.videos || videos.items.length;
   const totalPhotos = a.photos || photos.items.length;
-  const totalShorts = shorts.items.length + (shorts.hasMore ? '+' : '');
+  const totalShorts = a.shorts || shorts.items.length;
   const stats = [
     { v: totalVideos, l: 'Videos' },
     { v: (totalPhotos || 0).toLocaleString(), l: 'Photos' },
     { v: totalShorts || 0, l: 'Shorts' },
   ];
+
+  // Photo lightbox state — null = closed, number = index in photos.items.
+  const [lightboxIdx, setLightboxIdx] = React.useState(null);
 
   // Empty-state: artist exists but has no content uploaded yet — show a
   // link to the group thread if the backend gave us topic_url.
@@ -686,7 +690,7 @@ function ArtistPage({ accent = C.pink }) {
             <div style={{ padding: '14px 14px 0', display: 'flex', gap: 18, borderBottom: `1px solid ${C.border}` }}>
               {[
                 { id: 'videos', l: 'Videos', c: totalVideos },
-                { id: 'shorts', l: 'Shorts', c: shorts.items.length + (shorts.hasMore ? '+' : '') },
+                { id: 'shorts', l: 'Shorts', c: totalShorts },
                 { id: 'photos', l: 'Photos', c: totalPhotos },
               ].map(t => {
                 const active = t.id === tab;
@@ -743,15 +747,16 @@ function ArtistPage({ accent = C.pink }) {
               </div>
             )}
 
-            {/* Photos — real thumbnails from artist content */}
+            {/* Photos — real thumbnails from artist content; tap opens lightbox */}
             {tab === 'photos' && (
               <div>
                 <div style={{ padding: '12px 14px 4px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
                   {photos.items.map((p, i) => {
                     const url = p.thumb?.src || p.raw?.url || p.raw?.thumbnail_url || '';
                     return (
-                      <div key={p.id || i} style={{
+                      <div key={p.id || i} onClick={() => setLightboxIdx(i)} style={{
                         aspectRatio: '1/1', borderRadius: 6, overflow: 'hidden', position: 'relative',
+                        cursor: 'pointer',
                         background: url
                           ? `url('${url.replace(/'/g, "\\'")}') center/cover no-repeat`
                           : (p.thumb?.bg || '#1a1a1c'),
@@ -771,6 +776,15 @@ function ArtistPage({ accent = C.pink }) {
           </React.Fragment>
         )}
       </div>
+      {/* Photo lightbox overlay — full-screen, watermarked. */}
+      {lightboxIdx != null && (
+        <window.PhotoLightbox
+          photos={photos.items}
+          index={lightboxIdx}
+          onNav={(i) => setLightboxIdx(i)}
+          onClose={() => setLightboxIdx(null)}
+        />
+      )}
       <BottomNav active="artists" accent={accent} />
     </Phone>
   );

@@ -433,4 +433,131 @@ function ShortsThumbVideo({ short }) {
   );
 }
 
-Object.assign(window, { VideoPlayer, ShortsThumbVideo, fetchPlayableContent, prefetchPlayable });
+// ── PhotoLightbox ─────────────────────────────────────────────
+// Full-screen photo viewer. Takes a list of photo items (normalized — id,
+// thumb.src) and the current index. ‹ / › navigate, ✕ closes. Resolves the
+// real image URL via fetchPlayableContent (same protected pipeline as video)
+// and caches per id. Watermark in the bottom-left matches the live miniapp.
+function PhotoLightbox({ photos, index, onClose, onNav }) {
+  const total = photos?.length || 0;
+  const safe = Math.max(0, Math.min(total - 1, index));
+  const photo = photos[safe];
+  const [url, setUrl] = React.useState('');
+  const [err, setErr] = React.useState('');
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!photo) return;
+    let alive = true;
+    setLoading(true); setErr(''); setUrl('');
+    const id = photo.raw?.id ?? photo.id;
+    fetchPlayableContent(id)
+      .then(({ url }) => { if (alive) { setUrl(url); setLoading(false); } })
+      .catch(e => { if (alive) { setErr(e.status === 403 ? 'Subscribe to view photos' : 'Photo unavailable'); setLoading(false); } });
+    return () => { alive = false; };
+  }, [photo?.id]);
+
+  // Swipe horizontally to navigate.
+  const startX = React.useRef(null);
+  const onTouchStart = (e) => { startX.current = e.touches?.[0]?.clientX ?? null; };
+  const onTouchEnd = (e) => {
+    if (startX.current == null) return;
+    const dx = (e.changedTouches?.[0]?.clientX ?? startX.current) - startX.current;
+    startX.current = null;
+    if (Math.abs(dx) > 50) {
+      if (dx < 0 && safe < total - 1) onNav(safe + 1);
+      else if (dx > 0 && safe > 0) onNav(safe - 1);
+    }
+  };
+  React.useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowLeft' && safe > 0) onNav(safe - 1);
+      else if (e.key === 'ArrowRight' && safe < total - 1) onNav(safe + 1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [safe, total, onClose, onNav]);
+
+  if (!photo) return null;
+
+  return (
+    <div
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9000,
+        background: '#000',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        touchAction: 'pan-y',
+      }}>
+      {/* Counter */}
+      <span style={{
+        position: 'absolute', top: 'calc(14px + env(safe-area-inset-top, 0px))',
+        left: '50%', transform: 'translateX(-50%)',
+        fontSize: 13, fontWeight: 600,
+        background: 'rgba(0,0,0,0.6)', padding: '4px 10px', borderRadius: 999,
+        color: '#fff',
+      }}>{safe + 1} / {total}</span>
+      {/* Close */}
+      <button onClick={onClose} style={{
+        position: 'absolute', top: 'calc(10px + env(safe-area-inset-top, 0px))',
+        right: 12,
+        width: 36, height: 36, borderRadius: '50%',
+        background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff',
+        fontSize: 22, cursor: 'pointer', lineHeight: 1,
+      }}>×</button>
+      {/* Prev / next arrows */}
+      {total > 1 && safe > 0 && (
+        <button onClick={() => onNav(safe - 1)} style={lbNavStyle('left')}>‹</button>
+      )}
+      {total > 1 && safe < total - 1 && (
+        <button onClick={() => onNav(safe + 1)} style={lbNavStyle('right')}>›</button>
+      )}
+      {/* Image */}
+      {loading && (
+        <div style={{
+          width: 36, height: 36,
+          border: '3px solid rgba(255,255,255,0.1)',
+          borderTopColor: 'rgba(255,255,255,0.55)',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }} />
+      )}
+      {err && (
+        <div style={{ color: '#FFB4B4', fontSize: 13, textAlign: 'center', padding: 20 }}>{err}</div>
+      )}
+      {url && (
+        <img
+          src={url}
+          alt=""
+          style={{
+            maxWidth: '100%', maxHeight: '100%',
+            objectFit: 'contain',
+            userSelect: 'none', pointerEvents: 'none',
+          }}
+        />
+      )}
+      {/* Watermark — same SVG path as the live miniapp lightbox. */}
+      <div style={{ position: 'absolute', bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))', left: 16, pointerEvents: 'none', userSelect: 'none', opacity: 0.28 }}>
+        <svg viewBox="50 350 935 420" width="110" height="49" xmlns="http://www.w3.org/2000/svg">
+          <path fill="white" d="M54.42 668L249.735 363.5H334.56L408.075 668H322.38L268.005 404.39H301.935L145.335 668H54.42ZM139.68 608.84L174.48 545.33H323.25L332.82 608.84H139.68ZM432.928 668L493.828 363.5H579.958L532.978 599.705H678.268L664.348 668H432.928ZM734.349 668L781.764 431.795H688.239L702.159 363.5H974.904L960.984 431.795H867.894L820.479 668H734.349Z" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+function lbNavStyle(side) {
+  return {
+    position: 'absolute',
+    [side]: 12,
+    top: '50%', transform: 'translateY(-50%)',
+    width: 40, height: 60,
+    background: 'rgba(0,0,0,0.45)',
+    border: 'none', borderRadius: 12,
+    color: '#fff', fontSize: 28, cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  };
+}
+
+Object.assign(window, { VideoPlayer, ShortsThumbVideo, PhotoLightbox, fetchPlayableContent, prefetchPlayable });
