@@ -32,7 +32,7 @@ async function fetchPlayableContent(contentId) {
   return data;
 }
 
-function VideoPlayer({ video, accent }) {
+function VideoPlayer({ video, accent, fillParent = false, vertical = false, autoStart = false }) {
   const v = video;
   const [phase, setPhase] = React.useState('idle'); // 'idle' | 'loading' | 'playing' | 'error'
   const [errorMsg, setErrorMsg] = React.useState('');
@@ -44,6 +44,15 @@ function VideoPlayer({ video, accent }) {
   React.useEffect(() => () => {
     if (hlsRef.current) { try { hlsRef.current.destroy(); } catch (_) {} hlsRef.current = null; }
   }, []);
+
+  // For shorts: auto-start playback as soon as the surface is mounted.
+  // Avoids a redundant tap on a vertical immersive player.
+  React.useEffect(() => {
+    if ((vertical || autoStart) && phase === 'idle') {
+      onPlayTap();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [v.id]);
 
   const onPlayTap = async () => {
     if (phase === 'loading') return;
@@ -180,22 +189,35 @@ function VideoPlayer({ video, accent }) {
     }
   }
 
+  // Layout: shorts/vertical fill the parent; regular videos keep 16:9.
+  const containerStyle = fillParent || vertical ? {
+    position: 'absolute', inset: 0,
+    background: v.thumb?.bg || '#000',
+    overflow: 'hidden',
+  } : {
+    position: 'relative', aspectRatio: '16/9',
+    background: v.thumb?.bg || '#000',
+    overflow: 'hidden',
+  };
+  // Vertical shorts: cover the surface (crops a bit but no letterbox).
+  // Regular videos: contain (full frame visible).
+  const videoFit = vertical ? 'cover' : 'contain';
+
   return (
-    <div style={{
-      position: 'relative', aspectRatio: '16/9',
-      background: v.thumb?.bg || '#000',
-      overflow: 'hidden',
-    }}>
+    <div style={containerStyle}>
       {phase === 'playing' && (
         <video
           ref={videoRef}
-          controls
+          controls={!vertical}
           playsInline
           webkit-playsinline="true"
+          autoPlay={vertical || autoStart}
+          loop={vertical}
           style={{
             position: 'absolute', inset: 0,
             width: '100%', height: '100%',
             background: '#000',
+            objectFit: videoFit,
           }}
         />
       )}

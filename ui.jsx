@@ -277,6 +277,9 @@ function BottomNav({ active, centerMode, accent = C.pink, subAccent = C.lime }) 
               </div>
             );
           }
+          // Profile avatar in the center slot — uses the live user from
+          // context so it shows the real Telegram photo, not a letter.
+          const u = nav.user || {};
           return (
             <div key={t.id} style={{ display: 'flex', justifyContent: 'center' }}>
               <button onClick={() => nav.onTab('center')} style={{
@@ -288,7 +291,7 @@ function BottomNav({ active, centerMode, accent = C.pink, subAccent = C.lime }) 
                 boxShadow: `0 0 0 4px ${C.dark2}`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <Avatar artist={{ id: 'u1', name: 'Sofia' }} size={44} />
+                <Avatar artist={{ id: 'u-' + (u.telegramId || 0), name: u.name || 'You', photo: u.photo }} size={44} />
                 <span style={{
                   position: 'absolute', bottom: -2, right: -2,
                   background: subAccent, color: '#000',

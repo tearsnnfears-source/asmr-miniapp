@@ -146,10 +146,12 @@ function ShortsPlayer({ accent = C.pink }) {
     <Phone>
       {/* No header - immersive */}
       <div style={{ flex: 1, position: 'relative', background: '#000' }}>
-        {/* current short — full bleed */}
-        <div style={{ position: 'absolute', inset: 0, background: s.thumb.bg }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, transparent 30%, transparent 60%, rgba(0,0,0,0.85) 100%)' }} />
+        {/* Real player fills the whole bleed; thumb is its poster. */}
+        <div style={{ position: 'absolute', inset: 0 }}>
+          <window.VideoPlayer video={s} accent={accent} fillParent vertical />
         </div>
+        {/* Bottom scrim for readable overlay text */}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, transparent 25%, transparent 55%, rgba(0,0,0,0.85) 100%)', pointerEvents: 'none' }} />
 
         {/* top row: back + counter */}
         <div style={{ position: 'absolute', top: 50, left: 12, right: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
