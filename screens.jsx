@@ -501,95 +501,278 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
           background: C.dark2, border: `1px solid ${C.border}`,
           color: C.text, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
         }}><Ico.chevL /></button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button style={iconBtnSmall}><Ico.search /></button>
-          <button style={iconBtnSmall}><Ico.more /></button>
-        </div>
+        <div style={{ width: 36 }} />
       </div>
 
-      <div style={SCROLL_BODY}>
-        {/* Player area — real video element with HLS support, mounted on demand.
-            key=v.id so navigating between videos forces a fresh player. */}
-        <window.VideoPlayer key={v.id} video={v} accent={accent} />
-
-
-        {/* TITLE with prev/next arrows beside */}
-        <div style={{ padding: '14px 14px 8px' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-            <button style={navBtn}><Ico.chevL /></button>
-            <div style={{ flex: 1, fontSize: 16, fontWeight: 700, lineHeight: 1.3 }}>{v.title}</div>
-            <button style={navBtn}><Ico.chevR /></button>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 11, color: C.muted, flexWrap: 'wrap' }}>
-            <span style={{ color: accent, fontWeight: 600 }}>{v.artist.handle}</span>
-            <span>·</span>
-            <span>{v.views} views</span>
-            <span>·</span>
-            <span>{v.age}</span>
-            <span style={{
-              marginLeft: 6,
-              fontSize: 9, padding: '2px 6px', background: `${accent}22`, color: accent, borderRadius: 4, fontWeight: 700, letterSpacing: 0.5,
-            }}>2/47 LATEST</span>
-          </div>
-        </div>
-
-        {/* Action row */}
-        <div style={{ padding: '6px 12px 4px', display: 'flex', gap: 6, overflowX: 'auto' }}>
-          {[
-            { icon: <Ico.heartFilled />, label: '150K', active: true },
-            { icon: <Ico.bookmark />, label: 'Save' },
-            { icon: <Ico.share />, label: 'Share' },
-            { icon: <Ico.plus />, label: 'Follow' },
-          ].map((b, i) => (
-            <button key={i} style={{
-              background: b.active ? `${accent}22` : C.dark3,
-              border: b.active ? `1px solid ${accent}` : `1px solid ${C.border}`,
-              color: b.active ? accent : C.text,
-              padding: '8px 12px', borderRadius: 999,
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              fontSize: 12, fontWeight: 700,
-              whiteSpace: 'nowrap', cursor: 'pointer',
-            }}>{b.icon}<span>{b.label}</span></button>
-          ))}
-        </div>
-
-        {/* Artist card */}
-        <div style={{ padding: '12px 14px 6px' }}>
-          <div onClick={() => nav.go('artist', { id: v.artist.id })} style={{
-            background: C.dark2, border: `1px solid ${C.border}`,
-            borderRadius: 16, padding: 12,
-            display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
-          }}>
-            <Avatar artist={v.artist} size={48} ring={accent} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                {v.artist.name}
-                {v.artist.fresh && <span style={{ color: accent }}><Ico.sparkle /></span>}
-              </div>
-              <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{v.artist.videos} videos · {v.artist.photos.toLocaleString()} photos</div>
-            </div>
-            <button style={{
-              background: accent, color: '#000', border: 'none',
-              padding: '8px 14px', borderRadius: 999,
-              fontSize: 12, fontWeight: 700, cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}>Follow</button>
-          </div>
-        </div>
-
-        {/* "Up next" header */}
-        <div style={{ padding: '14px 14px 4px' }}>
-          <SectionHeader title="Up next" accent={accent} action="Autoplay ON" />
-        </div>
-
-        {/* Next videos list */}
-        <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {nextUp.map((nv) => (
-            <CompactRow key={nv.id} v={nv} accent={accent} />
-          ))}
-        </div>
-      </div>
+      <VideoPageBody v={v} nextUp={nextUp} accent={accent} />
     </Phone>
+  );
+}
+
+// Body extracted so it can use hooks on `v.id` cleanly without making the
+// outer fallback resolution noisy. Re-mounts when v.id changes via key.
+function VideoPageBody({ v, nextUp, accent }) {
+  const nav = window.useNav();
+  // Pull the live artist record so we get the real photo + counts (not the
+  // bare {name, handle, 0, 0} stub embedded on each video row).
+  const artistsState = window.useArtists();
+  const liveArtist = (artistsState.data || []).find(a => a.name === v.artist?.name) || v.artist;
+
+  const contentId = v.raw?.id ?? v.raw?.content_id ?? v.id;
+  const reactionsState = window.useReactions(contentId);
+  const reactions = reactionsState.data || { counts: {}, user_reactions: [] };
+  const serverHearted = (reactions.user_reactions || []).includes('❤️');
+  const serverHeartCount = reactions.counts?.['❤️'] || 0;
+  const favStatus = window.useFavoriteStatus(contentId);
+  const followStatus = window.useFollowStatus(liveArtist?.name);
+
+  // Optimistic state for the three actions.
+  const [localLike, setLocalLike] = React.useState(null);
+  const [localSave, setLocalSave] = React.useState(null);
+  const [localFollow, setLocalFollow] = React.useState(null);
+  const [replay, setReplay] = React.useState(false);
+  const [showPlaylistPicker, setShowPlaylistPicker] = React.useState(false);
+
+  const isLiked = localLike != null ? localLike : (favStatus.favorited || serverHearted);
+  const heartCount = serverHeartCount + (
+    localLike == null ? 0 :
+    localLike && !serverHearted ? 1 :
+    !localLike && serverHearted ? -1 : 0
+  );
+  const isSaved = localSave != null ? localSave : favStatus.favorited;
+  const isFollowing = localFollow != null ? localFollow : followStatus.following;
+
+  const onLike = () => {
+    const next = !isLiked;
+    setLocalLike(next);
+    Promise.all([
+      window.actionReact(contentId, '❤️'),
+      window.actionFavoriteToggle(contentId),
+    ]).then(([r1, r2]) => {
+      if (!r1.ok && !r2.ok) {
+        setLocalLike(!next);
+        console.warn('[like]', { react: r1, fav: r2 });
+      }
+    });
+  };
+  const onFollow = () => {
+    const next = !isFollowing;
+    setLocalFollow(next);
+    window.actionFollow(liveArtist.name).then(r => {
+      if (!r.ok) { setLocalFollow(!next); console.warn('[follow]', r); }
+    });
+  };
+  const onReplay = () => setReplay(r => !r);
+
+  return (
+    <div style={SCROLL_BODY}>
+      {/* Player. loop prop drives Replay toggle. */}
+      <window.VideoPlayer key={v.id} video={v} accent={accent} loop={replay} />
+
+      {/* Title row — kept clean: just the title, no prev/next arrows. */}
+      <div style={{ padding: '14px 14px 6px' }}>
+        <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.3 }}>{v.title}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: 11, color: C.muted }}>
+          <span>{v.views || '0'} views</span>
+          <span>·</span>
+          <span>{v.age || 'recent'}</span>
+        </div>
+      </div>
+
+      {/* Action row — Like + Save + Replay. */}
+      <div style={{ padding: '6px 12px 4px', display: 'flex', gap: 6, overflowX: 'auto' }}>
+        <ActionPill
+          active={isLiked} accent={accent}
+          icon={isLiked ? <Ico.heartFilled /> : <Ico.heart />}
+          label={compactNum(Math.max(0, heartCount))}
+          onClick={onLike}
+        />
+        <ActionPill
+          active={isSaved} accent={accent}
+          icon={<Ico.bookmark />}
+          label="Save"
+          onClick={() => setShowPlaylistPicker(true)}
+        />
+        <ActionPill
+          active={replay} accent={accent}
+          icon={<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-15.5 6.3L3 16" /><path d="M3 21v-5h5" /></svg>}
+          label={replay ? 'Replay on' : 'Replay'}
+          onClick={onReplay}
+        />
+      </div>
+
+      {/* Artist card — real photo + counts + working Follow */}
+      <div style={{ padding: '12px 14px 6px' }}>
+        <div style={{
+          background: C.dark2, border: `1px solid ${C.border}`,
+          borderRadius: 16, padding: 12,
+          display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <div onClick={() => nav.go('artist', { id: liveArtist.id })} style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0, cursor: 'pointer' }}>
+            <Avatar artist={liveArtist} size={48} ring={accent} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{liveArtist.name}</div>
+              <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+                {(liveArtist.videos || 0)} videos · {(liveArtist.photos || 0).toLocaleString()} photos
+              </div>
+            </div>
+          </div>
+          <button onClick={onFollow} style={{
+            background: isFollowing ? 'transparent' : accent,
+            color: isFollowing ? accent : '#000',
+            border: isFollowing ? `1px solid ${accent}` : 'none',
+            padding: '8px 14px', borderRadius: 999,
+            fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            whiteSpace: 'nowrap', fontFamily: 'inherit',
+          }}>{isFollowing ? '✓ Following' : '+ Follow'}</button>
+        </div>
+      </div>
+
+      {/* "Up next" header */}
+      <div style={{ padding: '14px 14px 4px' }}>
+        <SectionHeader title="Up next" accent={accent} action="" />
+      </div>
+
+      {/* Next videos list */}
+      <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {nextUp.map((nv) => (
+          <CompactRow key={nv.id} v={nv} accent={accent} />
+        ))}
+      </div>
+
+      {/* Playlist picker modal */}
+      {showPlaylistPicker && (
+        <PlaylistPicker
+          contentId={contentId}
+          accent={accent}
+          onClose={() => setShowPlaylistPicker(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Compact action pill used in the VideoPage action row.
+function ActionPill({ icon, label, active, accent, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      background: active ? `${accent}22` : C.dark3,
+      border: active ? `1px solid ${accent}` : `1px solid ${C.border}`,
+      color: active ? accent : C.text,
+      padding: '8px 12px', borderRadius: 999,
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      fontSize: 12, fontWeight: 700,
+      whiteSpace: 'nowrap', cursor: 'pointer',
+      fontFamily: 'inherit',
+    }}>{icon}<span>{label}</span></button>
+  );
+}
+
+// Modal picker: pick an existing playlist OR create a new one for this video.
+function PlaylistPicker({ contentId, accent, onClose }) {
+  const state = window.useUserPlaylists();
+  const playlists = state.data?.playlists || [];
+  const [busy, setBusy] = React.useState(false);
+  const [creating, setCreating] = React.useState(false);
+  const [newName, setNewName] = React.useState('');
+
+  const add = async (playlistId) => {
+    setBusy(true);
+    const r = await window.actionAddToPlaylist(playlistId, contentId);
+    setBusy(false);
+    if (!r.ok) alert(r.error || 'Could not add to playlist');
+    else onClose();
+  };
+  const create = async () => {
+    const name = newName.trim();
+    if (!name) return;
+    setBusy(true);
+    const r = await window.actionCreatePlaylist(name, contentId);
+    setBusy(false);
+    if (!r.ok) alert(r.error || 'Could not create playlist');
+    else onClose();
+  };
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 9500,
+      background: 'rgba(0,0,0,0.6)',
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 480,
+        background: C.dark2,
+        borderTopLeftRadius: 22, borderTopRightRadius: 22,
+        padding: '16px 16px calc(20px + env(safe-area-inset-bottom, 0px))',
+        maxHeight: '70vh', display: 'flex', flexDirection: 'column',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, letterSpacing: 1 }}>Add to playlist</div>
+          <button onClick={onClose} style={{
+            background: 'transparent', border: 'none', color: C.muted,
+            fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: 4,
+          }}>×</button>
+        </div>
+
+        {/* Existing playlists */}
+        <div style={{ overflowY: 'auto', flex: 1, marginBottom: 12 }}>
+          {playlists.length === 0 && !state.loading && (
+            <div style={{ padding: '20px 4px', color: C.muted, fontSize: 13, textAlign: 'center' }}>
+              You don't have any playlists yet.
+            </div>
+          )}
+          {playlists.map(p => (
+            <button key={p.id} disabled={busy} onClick={() => add(p.id)} style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+              background: 'rgba(255,255,255,0.04)',
+              border: `1px solid ${C.border}`,
+              borderRadius: 12, padding: '10px 12px',
+              marginBottom: 8, cursor: 'pointer',
+              fontFamily: 'inherit', color: C.text, textAlign: 'left',
+            }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: C.dark3, display: 'flex', alignItems: 'center', justifyContent: 'center', color: accent }}>
+                <Ico.play />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>{p.name}</div>
+                <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>{p.item_count || 0} videos</div>
+              </div>
+              <span style={{ color: C.muted, fontSize: 16 }}>+</span>
+            </button>
+          ))}
+        </div>
+
+        {/* New playlist row */}
+        {!creating ? (
+          <button onClick={() => setCreating(true)} disabled={busy} style={{
+            width: '100%', background: 'transparent', color: accent,
+            border: `1px dashed ${accent}55`, borderRadius: 12, padding: '12px',
+            fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}><Ico.plus /> New playlist</button>
+        ) : (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              autoFocus
+              placeholder="Playlist name"
+              style={{
+                flex: 1, background: C.dark3, border: `1px solid ${C.border}`,
+                borderRadius: 12, padding: '10px 12px', color: C.text,
+                fontSize: 13, fontFamily: 'inherit', outline: 'none',
+              }}
+            />
+            <button onClick={create} disabled={busy || !newName.trim()} style={{
+              background: accent, color: '#000', border: 'none',
+              padding: '10px 16px', borderRadius: 12,
+              fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              opacity: busy || !newName.trim() ? 0.5 : 1,
+            }}>Create</button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

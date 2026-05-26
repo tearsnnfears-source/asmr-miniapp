@@ -73,7 +73,7 @@ async function prefetchPlayable(ids, concurrency = 3) {
   await Promise.all(workers);
 }
 
-function VideoPlayer({ video, accent, fillParent = false, vertical = false, autoStart = false }) {
+function VideoPlayer({ video, accent, fillParent = false, vertical = false, autoStart = false, loop = false }) {
   const v = video;
   const [phase, setPhase] = React.useState('idle'); // 'idle' | 'loading' | 'playing' | 'error'
   const [errorMsg, setErrorMsg] = React.useState('');
@@ -271,7 +271,7 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
           playsInline
           webkit-playsinline="true"
           autoPlay={vertical || autoStart}
-          loop={vertical}
+          loop={vertical || loop}
           style={{
             position: 'absolute', inset: 0,
             width: '100%', height: '100%',
