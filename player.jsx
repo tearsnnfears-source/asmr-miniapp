@@ -274,4 +274,108 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
   );
 }
 
-Object.assign(window, { VideoPlayer, fetchPlayableContent });
+// ShortsThumbVideo — muted, looping <video> that previews the actual short.
+// Ports hydrateShortVideoThumbs() from the live miniapp: lazy-loads via
+// IntersectionObserver so we don't hit /content/play for 20 tiles upfront,
+// uses HLS.js for .m3u8 streams. Falls back to s.thumb.bg poster on error.
+function ShortsThumbVideo({ short }) {
+  const s = short;
+  const containerRef = React.useRef(null);
+  const videoRef = React.useRef(null);
+  const hlsRef = React.useRef(null);
+  const [state, setState] = React.useState('idle'); // idle | loading | ready | error
+
+  React.useEffect(() => () => {
+    if (hlsRef.current) { try { hlsRef.current.destroy(); } catch (_) {} hlsRef.current = null; }
+  }, []);
+
+  // Start loading once the tile scrolls near the viewport.
+  React.useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (!('IntersectionObserver' in window)) {
+      // SSR / very old browser — just load on mount.
+      load();
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          io.disconnect();
+          load();
+        }
+      });
+    }, { rootMargin: '160px' });
+    io.observe(el);
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.id]);
+
+  async function load() {
+    if (state !== 'idle') return;
+    setState('loading');
+    const contentId = s.raw?.id ?? s.raw?.content_id ?? s.id;
+    if (contentId == null) { setState('error'); return; }
+    let url = '';
+    try {
+      const data = await fetchPlayableContent(contentId);
+      url = data.url || '';
+      if (!url) throw new Error('no url');
+    } catch (e) {
+      console.warn('[short-thumb]', e.message);
+      setState('error');
+      return;
+    }
+    const vEl = videoRef.current;
+    if (!vEl) return;
+    vEl.muted = true; vEl.loop = true; vEl.playsInline = true; vEl.preload = 'metadata';
+    vEl.setAttribute('playsinline', '');
+    vEl.setAttribute('webkit-playsinline', '');
+    const markReady = () => { setState('ready'); vEl.play().catch(() => {}); };
+    vEl.addEventListener('loadeddata', markReady, { once: true });
+    vEl.addEventListener('canplay', markReady, { once: true });
+    vEl.addEventListener('error', () => setState('error'), { once: true });
+
+    const isM3U8 = url.includes('.m3u8') || url.includes('/hls/');
+    if (isM3U8 && window.Hls && window.Hls.isSupported()) {
+      const Hls = window.Hls;
+      const hls = new Hls({ enableWorker: false, maxBufferLength: 4, startLevel: -1 });
+      hlsRef.current = hls;
+      hls.attachMedia(vEl);
+      hls.on(Hls.Events.MEDIA_ATTACHED, () => hls.loadSource(url));
+      hls.on(Hls.Events.MANIFEST_PARSED, () => vEl.play().catch(() => {}));
+      hls.on(Hls.Events.ERROR, (_ev, data) => {
+        if (data.fatal) {
+          try { hls.destroy(); } catch (_) {}
+          hlsRef.current = null;
+          setState('error');
+        }
+      });
+    } else {
+      vEl.src = url;
+      vEl.load();
+    }
+  }
+
+  return (
+    <div ref={containerRef} style={{ position: 'absolute', inset: 0 }}>
+      {/* Always render <video> so the ref is wired up even before load() fires */}
+      <video ref={videoRef} style={{
+        position: 'absolute', inset: 0,
+        width: '100%', height: '100%',
+        objectFit: 'cover',
+        opacity: state === 'ready' ? 1 : 0,
+        transition: 'opacity 200ms',
+      }} />
+      {/* Poster behind, fades out when ready */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: short.thumb?.bg || '#161617',
+        opacity: state === 'ready' ? 0 : 1,
+        transition: 'opacity 200ms',
+      }} />
+    </div>
+  );
+}
+
+Object.assign(window, { VideoPlayer, ShortsThumbVideo, fetchPlayableContent });

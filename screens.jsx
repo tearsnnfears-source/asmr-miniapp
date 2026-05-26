@@ -115,9 +115,12 @@ function ShortsTile({ s, accent, fresh }) {
   return (
     <div onClick={() => nav.go('shorts-player', { id: s.id })} style={{
       position: 'relative', aspectRatio: '9/16', borderRadius: 14,
-      overflow: 'hidden', background: s.thumb.bg, cursor: 'pointer',
+      overflow: 'hidden', background: '#161617', cursor: 'pointer',
     }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.75) 100%)' }} />
+      {/* Real video preview (lazy-loaded, muted, looping). Falls back to
+          static thumb if /content/play fails. */}
+      <window.ShortsThumbVideo short={s} />
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.75) 100%)', pointerEvents: 'none' }} />
       {/* duration top-right (hide if backend didn't ship one) */}
       {s.duration && (
         <span style={{ position: 'absolute', right: 7, top: 7, background: 'rgba(0,0,0,0.78)', padding: '2px 6px', borderRadius: 6, fontSize: 10, fontWeight: 600 }}>{s.duration}</span>

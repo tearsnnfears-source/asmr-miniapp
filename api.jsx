@@ -191,12 +191,23 @@ function compactViews(n) {
   return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
 }
 
+// Coerce backend id into a clean integer. Some payloads ship the id as
+// "12345" string, others as 12345 number. We need an integer for the
+// /miniapp/content/play call — the backend does int(content_id) and will
+// throw "invalid literal for int" on anything non-numeric.
+function coerceId(...candidates) {
+  for (const c of candidates) {
+    if (c == null) continue;
+    if (typeof c === 'number' && Number.isFinite(c)) return c;
+    if (typeof c === 'string' && /^\d+$/.test(c)) return parseInt(c, 10);
+  }
+  return null;
+}
+
 function normalizeVideo(v, idx = 0) {
   const artistName = v.artist_name || v.artistName || 'Unknown';
   const artistId = 'a-' + (v.artist_id || artistName.toLowerCase().replace(/\W+/g, ''));
-  // Real backend id (numeric). If missing — return null id so the UI can
-  // skip the row rather than show a broken thumb that opens the wrong video.
-  const rawId = (v.id ?? v.content_id) != null ? (v.id ?? v.content_id) : null;
+  const rawId = coerceId(v.id, v.content_id);
   return {
     id: rawId,
     title: v.title || 'Untitled',
@@ -217,7 +228,7 @@ function normalizeVideo(v, idx = 0) {
 }
 function normalizeShort(s, idx = 0) {
   const artistName = s.artist_name || s.artistName || s.artist || 'Unknown';
-  const rawId = (s.id ?? s.content_id) != null ? (s.id ?? s.content_id) : null;
+  const rawId = coerceId(s.id, s.content_id);
   return {
     id: rawId,
     label: s.title || s.label || '',
