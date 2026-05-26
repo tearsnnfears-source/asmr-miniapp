@@ -98,16 +98,6 @@ function Thumb({ thumb, duration, height = 'auto', aspect = 16/9, badge, childre
       background: thumb.bg,
       flexShrink: 0,
     }}>
-      {/* fake "scene" silhouettes — abstract, no real imagery */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: `radial-gradient(circle at 30% 60%, rgba(255,255,255,0.18) 0%, transparent 40%),
-                     radial-gradient(circle at 75% 40%, rgba(0,0,0,0.35) 0%, transparent 55%)`,
-        mixBlendMode: 'overlay',
-      }} />
-      {/* mic stand suggestion */}
-      <div style={{ position: 'absolute', left: '50%', bottom: 0, transform: 'translateX(-50%)', width: 2, height: '40%', background: 'rgba(0,0,0,0.5)' }} />
-      <div style={{ position: 'absolute', left: '50%', top: '32%', transform: 'translateX(-50%)', width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: `2px solid ${thumb.dot}` }} />
       {duration && (
         <span style={{
           position: 'absolute', right: 8, bottom: 8,
@@ -164,13 +154,24 @@ function Avatar({ artist, size = 36, ring }) {
   );
 }
 
-// App Header — avatar + name + VIP, clickable area on left → profile.
-// Pulls user data from nav context (live API or mock fallback).
+// Tier color palette — matches the live miniapp.
+const TIER_COLORS = {
+  plus: '#FF7EC8',   // pink
+  pro: '#00E5FF',    // cyan
+  elite: '#FFD700',  // gold
+  vip: '#C86BFF',    // purple
+  founder: '#FF9F44', // orange
+};
+
+// App Header — avatar + name + tier, clickable area on left → profile.
+// Pulls user data from nav context (live API or Telegram fallback).
 function AppHeader({ user: userProp, accent = C.pink }) {
   const nav = useNav();
   const user = userProp || nav.user || { name: 'You', daysLeft: 0, isPro: false };
-  const vipLabel = user.isPro ? (user.tier === 'pro' ? 'PRO' : 'PLUS') : 'FREE';
-  const days = user.daysLeft != null ? user.daysLeft : 0;
+  const tier = (user.tier || 'free').toLowerCase();
+  const tierColor = TIER_COLORS[tier] || accent;
+  const daysLabel = user.isInfinite ? '∞' : (user.daysLeft || 0);
+  const showTier = user.isPro || (tier && tier !== 'free');
   return (
     <div style={{
       padding: '8px 14px 10px',
@@ -181,19 +182,28 @@ function AppHeader({ user: userProp, accent = C.pink }) {
     }}>
       {/* clickable cluster → profile */}
       <div onClick={() => nav.go('profile')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-        <Avatar artist={{ id: 'u1', name: user.name }} size={40} ring={accent} />
+        <Avatar artist={{ id: 'u-' + (user.telegramId || 0), name: user.name, photo: user.photo }} size={40} ring={showTier ? tierColor : accent} />
         <div>
           <div style={{ fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
             {user.name}
-            <span style={{
-              fontFamily: "'Bebas Neue', sans-serif",
-              fontSize: 12, letterSpacing: 1, padding: '2px 6px', borderRadius: 4,
-              background: user.isPro ? accent : 'rgba(255,255,255,0.15)',
-              color: user.isPro ? '#000' : C.muted2, lineHeight: 1, fontWeight: 700,
-            }}>{vipLabel}{user.isPro ? ' ∞' : ''}</span>
+            {showTier ? (
+              <span style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 12, letterSpacing: 1, padding: '2px 6px', borderRadius: 4,
+                background: tierColor, color: '#000', lineHeight: 1, fontWeight: 700,
+              }}>{tier.toUpperCase()}{user.isInfinite ? ' ∞' : ''}</span>
+            ) : (
+              <span style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 12, letterSpacing: 1, padding: '2px 6px', borderRadius: 4,
+                background: 'rgba(255,255,255,0.15)', color: C.muted2, lineHeight: 1, fontWeight: 700,
+              }}>FREE</span>
+            )}
           </div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>
-            {user.isPro ? `${days} days left · view profile ›` : 'view profile ›'}
+            {user.isPro
+              ? (user.isInfinite ? 'lifetime · view profile ›' : `${daysLabel} days left · view profile ›`)
+              : 'view profile ›'}
           </div>
         </div>
       </div>
@@ -570,4 +580,4 @@ const TickerSlides = {
   ),
 };
 
-Object.assign(window, { C, tagColor, Phone, Ico, Thumb, Avatar, AppHeader, BottomNav, StatsStrip, PromoBanner, Chip, SectionHeader, TickerBanner, TickerSlides });
+Object.assign(window, { C, tagColor, Phone, Ico, Thumb, Avatar, AppHeader, BottomNav, StatsStrip, PromoBanner, Chip, SectionHeader, TickerBanner, TickerSlides, TIER_COLORS });

@@ -118,7 +118,6 @@ function ShortsTile({ s, accent, fresh }) {
       overflow: 'hidden', background: s.thumb.bg, cursor: 'pointer',
     }}>
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.75) 100%)' }} />
-      <div style={{ position: 'absolute', left: '50%', top: '35%', transform: 'translate(-50%, -50%)', width: 38, height: 38, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: `2px solid ${s.thumb.dot}` }} />
       {/* duration top-right */}
       <span style={{ position: 'absolute', right: 7, top: 7, background: 'rgba(0,0,0,0.78)', padding: '2px 6px', borderRadius: 6, fontSize: 10, fontWeight: 600 }}>{s.duration}</span>
       {fresh && (
@@ -150,7 +149,6 @@ function ShortsPlayer({ accent = C.pink }) {
         {/* current short — full bleed */}
         <div style={{ position: 'absolute', inset: 0, background: s.thumb.bg }}>
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, transparent 30%, transparent 60%, rgba(0,0,0,0.85) 100%)' }} />
-          <div style={{ position: 'absolute', left: '50%', top: '40%', transform: 'translate(-50%, -50%)', width: 60, height: 60, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: `3px solid ${s.thumb.dot}` }} />
         </div>
 
         {/* top row: back + counter */}
@@ -246,26 +244,9 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
       </div>
 
       <div style={SCROLL_BODY}>
-        {/* Player area — custom player kept; we just stub the surface */}
-        <div style={{
-          position: 'relative', aspectRatio: '16/9',
-          background: v.thumb.bg, overflow: 'hidden',
-        }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.7) 100%)' }} />
-          <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 56, height: 56, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: `2px solid ${v.thumb.dot}` }} />
-          {/* fake player chrome */}
-          <div style={{ position: 'absolute', left: 10, right: 10, bottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ flex: 1, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.18)' }}>
-              <div style={{ width: '38%', height: '100%', background: accent, borderRadius: 2 }} />
-            </div>
-            <div style={{ fontSize: 10, fontWeight: 600, fontVariantNumeric: 'tabular-nums', minWidth: 70, textAlign: 'right' }}>08:24 / {v.duration}</div>
-          </div>
-          <span style={{
-            position: 'absolute', left: 10, top: 10,
-            background: 'rgba(0,0,0,0.55)', padding: '3px 8px', borderRadius: 6,
-            fontSize: 10, fontWeight: 700, letterSpacing: 0.4,
-          }}>CUSTOM PLAYER</span>
-        </div>
+        {/* Player area — real video element with HLS support, mounted on demand */}
+        <window.VideoPlayer video={v} accent={accent} />
+
 
         {/* TITLE with prev/next arrows beside */}
         <div style={{ padding: '14px 14px 8px' }}>

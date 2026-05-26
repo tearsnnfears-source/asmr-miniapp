@@ -314,8 +314,8 @@ function userFromTelegram() {
   const tgUser = getTelegramUser();
   if (!tgUser) {
     return {
-      name: 'You', username: '', telegramId: 0,
-      daysLeft: 0, isPro: false, trialUsed: false, tier: 'free',
+      name: 'You', username: '', telegramId: 0, photo: '',
+      daysLeft: 0, isPro: false, isInfinite: false, trialUsed: false, tier: 'free',
       badges: [], tributeProUrl: '', tributePlusUrl: '',
       raw: null,
     };
@@ -325,8 +325,11 @@ function userFromTelegram() {
     name: fullName || tgUser.username || 'You',
     username: (tgUser.username || '').replace(/^@/, ''),
     telegramId: tgUser.id || 0,
+    // photo_url is provided by Telegram when the user has a public profile photo
+    photo: tgUser.photo_url || '',
     daysLeft: 0,
     isPro: false,
+    isInfinite: false,
     trialUsed: false,
     tier: 'free',
     badges: [],
@@ -345,15 +348,19 @@ function useUser() {
       if (!initData) throw new Error('no initData');
       const p = await apiPost('/miniapp/profile', { initData });
       const tgFallback = userFromTelegram();
+      const days = typeof p.days_left === 'number' ? p.days_left : 0;
+      const INFINITE_THRESHOLD = 9000;
       return {
         name: p.full_name || tgFallback.name,
         username: (p.username || tgFallback.username || '').replace(/^@/, ''),
         telegramId: p.telegram_id || tgFallback.telegramId,
-        daysLeft: typeof p.days_left === 'number' ? p.days_left : 0,
-        isPro: typeof p.days_left === 'number' ? p.days_left > 0 : false,
+        photo: tgFallback.photo, // server doesn't ship it; use Telegram's
+        daysLeft: days,
+        isPro: days > 0,
+        isInfinite: days > INFINITE_THRESHOLD,
         trialUsed: !!p.trial_used,
-        tier: p.tier || 'free',
-        badges: Array.isArray(p.badges) ? p.badges : (p.badge ? p.badge.split(',') : []),
+        tier: (p.tier || 'free').toLowerCase(),
+        badges: Array.isArray(p.badges) ? p.badges : (p.badge ? p.badge.split(',').map(s => s.trim()).filter(Boolean) : []),
         tributeProUrl: p.tribute_pro_url || '',
         tributePlusUrl: p.tribute_plus_url || '',
         raw: p,

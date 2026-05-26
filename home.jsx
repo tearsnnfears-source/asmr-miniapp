@@ -96,7 +96,6 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
             aspectRatio: '16/10', background: hero.thumb.bg, cursor: 'pointer',
           }}>
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.85) 100%)' }} />
-            <div style={{ position: 'absolute', left: '50%', top: '40%', transform: 'translate(-50%, -50%)', width: 50, height: 50, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: `2px solid ${hero.thumb.dot}` }} />
             <span style={{
               position: 'absolute', left: 12, top: 12,
               background: accent, color: '#000', fontWeight: 700,

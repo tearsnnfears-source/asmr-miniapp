@@ -5,6 +5,8 @@ function ProfilePage({ accent = C.pink }) {
   const nav = window.useNav();
   const user = nav.user || { name: 'You', daysLeft: 0, isPro: false };
   const initials = (user.name || 'U').trim().split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase();
+  const tier = (user.tier || 'free').toLowerCase();
+  const tierColor = window.TIER_COLORS?.[tier] || C.lime;
   const stats = [
     user.isPro
       ? { val: String(user.daysLeft || 0), unit: 'd', label: 'Days left' }
@@ -28,16 +30,46 @@ function ProfilePage({ accent = C.pink }) {
         </div>
         <div style={{ padding: '0 14px', marginTop: -48, position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
-            <div style={{ width: 84, height: 84, borderRadius: '50%', background: `linear-gradient(135deg, ${accent}, ${C.purple})`, border: `4px solid ${C.dark}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: 800, fontSize: 32 }}>{initials}</div>
+            <div style={{
+              width: 84, height: 84, borderRadius: '50%',
+              border: `4px solid ${C.dark}`,
+              background: user.photo
+                ? `url('${user.photo.replace(/'/g, "\\'")}') center/cover, linear-gradient(135deg, ${accent}, ${C.purple})`
+                : `linear-gradient(135deg, ${accent}, ${C.purple})`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#000', fontWeight: 800, fontSize: 32,
+              overflow: 'hidden',
+            }}>{user.photo ? '' : initials}</div>
             <div style={{ paddingBottom: 8, flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <div style={{ fontSize: 18, fontWeight: 700 }}>{user.name}</div>
-                {user.isPro && <span style={{ background: C.lime, color: '#000', fontFamily: "'Bebas Neue',sans-serif", fontSize: 12, padding: '2px 7px', borderRadius: 4, letterSpacing: 1 }}>{(user.tier || 'PRO').toUpperCase()} ∞</span>}
+                {user.isPro && (
+                  <span style={{ background: tierColor, color: '#000', fontFamily: "'Bebas Neue',sans-serif", fontSize: 12, padding: '2px 7px', borderRadius: 4, letterSpacing: 1 }}>
+                    {tier.toUpperCase()}{user.isInfinite ? ' ∞' : ''}
+                  </span>
+                )}
               </div>
               <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
                 {user.username ? `@${user.username}` : 'No username'}
                 {user.telegramId ? ` · ID ${user.telegramId}` : ''}
               </div>
+              {/* User badges from /miniapp/profile (FOUNDER / OLD / VIP / ELITE etc) */}
+              {Array.isArray(user.badges) && user.badges.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                  {user.badges.map((b, i) => {
+                    const bk = b.toLowerCase();
+                    const col = window.TIER_COLORS?.[bk] || accent;
+                    return (
+                      <span key={i} style={{
+                        background: col, color: '#000',
+                        fontFamily: "'Bebas Neue',sans-serif",
+                        fontSize: 9.5, fontWeight: 800, letterSpacing: 0.6,
+                        padding: '2px 6px', borderRadius: 3,
+                      }}>{b.toUpperCase()}</span>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -58,21 +90,25 @@ function ProfilePage({ accent = C.pink }) {
         {user.isPro ? (
         <div style={{ padding: '12px 14px 6px' }}>
           <div style={{
-            background: `linear-gradient(135deg, ${C.lime}22, transparent 70%)`,
-            border: `1px solid ${C.lime}55`,
+            background: `linear-gradient(135deg, ${tierColor}22, transparent 70%)`,
+            border: `1px solid ${tierColor}55`,
             borderRadius: 16, padding: 14,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <div style={{ fontSize: 10, color: C.lime, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' }}>Active plan</div>
-                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, color: C.lime, letterSpacing: 1, lineHeight: 1, marginTop: 4 }}>{(user.tier || 'PLUS').toUpperCase()} · {user.daysLeft} days</div>
-                <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>Renews soon · Tribute</div>
+                <div style={{ fontSize: 10, color: tierColor, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' }}>Active plan</div>
+                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, color: tierColor, letterSpacing: 1, lineHeight: 1, marginTop: 4 }}>
+                  {tier.toUpperCase()} · {user.isInfinite ? 'lifetime' : `${user.daysLeft} days`}
+                </div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{user.isInfinite ? 'Permanent access' : 'Renews soon · Tribute'}</div>
               </div>
-              <button onClick={() => nav.go('subscription')} style={{ background: 'transparent', border: `1px solid ${C.lime}`, color: C.lime, padding: '7px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>Manage</button>
+              <button onClick={() => nav.go('subscription')} style={{ background: 'transparent', border: `1px solid ${tierColor}`, color: tierColor, padding: '7px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>Manage</button>
             </div>
-            <div style={{ height: 4, marginTop: 12, background: 'rgba(255,255,255,0.08)', borderRadius: 2 }}>
-              <div style={{ width: `${Math.min(100, (user.daysLeft || 0) * 3)}%`, height: '100%', background: C.lime, borderRadius: 2 }} />
-            </div>
+            {!user.isInfinite && (
+              <div style={{ height: 4, marginTop: 12, background: 'rgba(255,255,255,0.08)', borderRadius: 2 }}>
+                <div style={{ width: `${Math.min(100, (user.daysLeft || 0) * 3)}%`, height: '100%', background: tierColor, borderRadius: 2 }} />
+              </div>
+            )}
           </div>
         </div>
         ) : (
