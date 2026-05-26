@@ -7,14 +7,38 @@
 const SHORTS_LIMIT = 50;
 
 // ── SHORTS TAB ────────────────────────────────────────────────
-function ShortsTab({ accent = C.pink, mode = 'grid' /* 'grid' | 'player' */ }) {
-  if (mode === 'player') return <ShortsPlayer accent={accent} />;
-
+// The grid and the immersive player live in one component now so the grid
+// stays mounted while the player is open — preview videos don't have to
+// reload when the user dismisses the player.
+function ShortsTab({ accent = C.pink }) {
   const nav = window.useNav();
   const shortsState = window.useShorts(SHORTS_LIMIT);
   const allShorts = shortsState.data || [];
   const favState = window.useFavorites();
   const savedIds = new Set((favState.data?.items || []).map(it => Number(it.raw?.content_id ?? it.id)));
+
+  // Player overlay state — null = grid only, number = open at that idx.
+  const [playingIdx, setPlayingIdx] = React.useState(null);
+
+  // While the overlay is open, swap the Telegram BackButton + history entry
+  // so back/swipe closes the player instead of leaving the Shorts tab.
+  React.useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    if (playingIdx == null) {
+      tg?.enableVerticalSwipes?.();
+      return undefined;
+    }
+    tg?.disableVerticalSwipes?.();
+    tg?.expand?.();
+    // Push a history entry so hardware back is intercepted by popstate.
+    try { history.pushState({ shortsOverlay: true }, ''); } catch (_) {}
+    const onPop = (e) => { setPlayingIdx(null); };
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      tg?.enableVerticalSwipes?.();
+    };
+  }, [playingIdx != null]);
 
   // Static filter set; artist pills are appended dynamically below.
   const [filter, setFilter] = React.useState('latest');
@@ -58,21 +82,9 @@ function ShortsTab({ accent = C.pink, mode = 'grid' /* 'grid' | 'player' */ }) {
   }, [allShorts]);
 
   const onPlayAll = () => {
-    // Shuffled index list, opens first shuffled idx. The shuffled order is
-    // passed through nav.params.order so ShortsPlayer can render it.
-    const order = Array.from({ length: filteredShorts.length }, (_, i) => i);
-    for (let i = order.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [order[i], order[j]] = [order[j], order[i]];
-    }
-    if (!order.length) return;
-    // Map shuffled positions back to global useShorts indices so the player
-    // can find the right entry in the same cached array.
-    const globalIndexFor = (i) => {
-      const s = filteredShorts[i];
-      return allShorts.indexOf(s);
-    };
-    nav.go('shorts-player', { idx: globalIndexFor(order[0]), shuffleOrder: order.map(globalIndexFor) });
+    if (!filteredShorts.length) return;
+    const pick = filteredShorts[Math.floor(Math.random() * filteredShorts.length)];
+    setPlayingIdx(allShorts.indexOf(pick));
   };
 
   return (
@@ -126,7 +138,8 @@ function ShortsTab({ accent = C.pink, mode = 'grid' /* 'grid' | 'player' */ }) {
           {filteredShorts.slice(0, visible).map((s) => {
             const globalIdx = allShorts.indexOf(s);
             return (
-              <ShortsTile key={s.id} s={s} idx={globalIdx} accent={accent} fresh={globalIdx < 2} />
+              <ShortsTile key={s.id} s={s} idx={globalIdx} accent={accent} fresh={globalIdx < 2}
+                onOpen={(i) => setPlayingIdx(i)} />
             );
           })}
         </div>
@@ -152,16 +165,24 @@ function ShortsTab({ accent = C.pink, mode = 'grid' /* 'grid' | 'player' */ }) {
         )}
       </div>
       <BottomNav active="shorts" accent={accent} />
+      {/* Overlay player. Grid stays mounted behind, so preview videos keep
+          their loaded URLs / video elements between open and close. */}
+      {playingIdx != null && (
+        <ShortsPlayer
+          accent={accent}
+          allShorts={allShorts}
+          idx={playingIdx}
+          setIdx={setPlayingIdx}
+          onClose={() => setPlayingIdx(null)}
+        />
+      )}
     </Phone>
   );
 }
 
-function ShortsTile({ s, idx, accent, fresh }) {
-  const nav = window.useNav();
-  // Pass the index, not the id — ShortsPlayer reads the same useShorts list
-  // and opens by index, so we never mismatch on string-vs-number id quirks.
+function ShortsTile({ s, idx, accent, fresh, onOpen }) {
   return (
-    <div onClick={() => nav.go('shorts-player', { idx })} style={{
+    <div onClick={() => onOpen && onOpen(idx)} style={{
       position: 'relative', aspectRatio: '9/16', borderRadius: 14,
       overflow: 'hidden', background: '#161617', cursor: 'pointer',
     }}>
@@ -187,15 +208,16 @@ function ShortsTile({ s, idx, accent, fresh }) {
   );
 }
 
-// Swipe player (fullscreen vertical feed)
-function ShortsPlayer({ accent = C.pink }) {
-  const nav = window.useNav();
-  // Same cache key as ShortsTab so we share one list — open by index to
-  // guarantee we hit the exact short the user tapped.
-  const shortsState = window.useShorts(SHORTS_LIMIT);
-  const list = shortsState.data || [];
-  const idx = Math.max(0, Math.min(list.length - 1, nav.params?.idx ?? 0));
+// Swipe player (fullscreen vertical feed). Rendered as a sibling overlay
+// inside ShortsTab so the grid stays mounted behind it.
+function ShortsPlayer({ accent = C.pink, allShorts, idx: extIdx, setIdx, onClose }) {
+  const list = allShorts || [];
+  const idx = Math.max(0, Math.min(list.length - 1, extIdx ?? 0));
   const s = list[idx];
+  const goIdx = (newIdx) => {
+    if (newIdx < 0 || newIdx >= list.length) return;
+    setIdx && setIdx(newIdx);
+  };
   // Enrich artist with photo from useArtists (same matching by name as other screens).
   const artistsState = window.useArtists();
   const liveArtist = (artistsState.data || []).find(a => a.name === s?.artist?.name);
@@ -301,11 +323,8 @@ function ShortsPlayer({ accent = C.pink }) {
       const dy = endY - swipeStartY.current;
       swipeStartY.current = null;
       if (Math.abs(dy) < 60) return;
-      if (dy < 0 && idx < list.length - 1) {
-        nav.replace('shorts-player', { idx: idx + 1 });
-      } else if (dy > 0 && idx > 0) {
-        nav.replace('shorts-player', { idx: idx - 1 });
-      }
+      if (dy < 0) goIdx(idx + 1);
+      else if (dy > 0) goIdx(idx - 1);
     };
     // passive:false required so preventDefault works.
     el.addEventListener('touchstart', onStart, { passive: true });
@@ -319,22 +338,27 @@ function ShortsPlayer({ accent = C.pink }) {
   }, [idx, list.length]);
 
   return (
-    <Phone>
-      {/* No header - immersive */}
-      <div
-        ref={swipeContainerRef}
-        style={{ flex: 1, position: 'relative', background: '#000', touchAction: 'pan-y', overscrollBehavior: 'contain' }}
-      >
-        {/* Real player fills the whole bleed; thumb is its poster. */}
+    <div
+      ref={swipeContainerRef}
+      style={{
+        position: 'absolute', inset: 0, zIndex: 50,
+        background: '#000',
+        display: 'flex', flexDirection: 'column',
+        touchAction: 'pan-y', overscrollBehavior: 'contain',
+      }}
+    >
+      <div style={{ flex: 1, position: 'relative', background: '#000' }}>
+        {/* Real player fills the whole bleed; key on video.id forces a fresh
+            instance per short so swiping actually changes what plays. */}
         <div style={{ position: 'absolute', inset: 0 }}>
-          <window.VideoPlayer video={s} accent={accent} fillParent vertical />
+          <window.VideoPlayer key={s.id} video={s} accent={accent} fillParent vertical />
         </div>
         {/* Bottom scrim for readable overlay text */}
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, transparent 25%, transparent 55%, rgba(0,0,0,0.85) 100%)', pointerEvents: 'none' }} />
 
         {/* top row: back + counter */}
         <div style={{ position: 'absolute', top: 'calc(12px + env(safe-area-inset-top, 0px))', left: 12, right: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <button onClick={() => nav.back()} style={{
+          <button onClick={() => onClose && onClose()} style={{
             width: 36, height: 36, borderRadius: '50%',
             background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
@@ -388,7 +412,7 @@ function ShortsPlayer({ accent = C.pink }) {
           </div>
         </div>
       </div>
-    </Phone>
+    </div>
   );
 }
 
@@ -436,8 +460,9 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
       </div>
 
       <div style={SCROLL_BODY}>
-        {/* Player area — real video element with HLS support, mounted on demand */}
-        <window.VideoPlayer video={v} accent={accent} />
+        {/* Player area — real video element with HLS support, mounted on demand.
+            key=v.id so navigating between videos forces a fresh player. */}
+        <window.VideoPlayer key={v.id} video={v} accent={accent} />
 
 
         {/* TITLE with prev/next arrows beside */}

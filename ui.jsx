@@ -168,10 +168,14 @@ const TIER_COLORS = {
 function AppHeader({ user: userProp, accent = C.pink }) {
   const nav = useNav();
   const user = userProp || nav.user || { name: 'You', daysLeft: 0, isPro: false };
+  // While /miniapp/profile is in flight we don't yet know the user's tier.
+  // Skip the badge entirely so we don't flash FREE → ELITE.
+  const userLoading = nav.userLoading;
   const tier = (user.tier || 'free').toLowerCase();
   const tierColor = TIER_COLORS[tier] || accent;
   const daysLabel = user.isInfinite ? '∞' : (user.daysLeft || 0);
-  const showTier = user.isPro || (tier && tier !== 'free');
+  const showTier = !userLoading && (user.isPro || (tier && tier !== 'free'));
+  const showFree = !userLoading && !user.isPro && tier === 'free';
   return (
     <div style={{
       padding: '8px 14px 10px',
@@ -192,12 +196,19 @@ function AppHeader({ user: userProp, accent = C.pink }) {
                 fontSize: 12, letterSpacing: 1, padding: '2px 6px', borderRadius: 4,
                 background: tierColor, color: '#000', lineHeight: 1, fontWeight: 700,
               }}>{tier.toUpperCase()}{user.isInfinite ? ' ∞' : ''}</span>
-            ) : (
+            ) : showFree ? (
               <span style={{
                 fontFamily: "'Bebas Neue', sans-serif",
                 fontSize: 12, letterSpacing: 1, padding: '2px 6px', borderRadius: 4,
                 background: 'rgba(255,255,255,0.15)', color: C.muted2, lineHeight: 1, fontWeight: 700,
               }}>FREE</span>
+            ) : (
+              // userLoading: show a neutral placeholder so we don't flash FREE.
+              <span style={{
+                width: 40, height: 14, borderRadius: 4,
+                background: 'rgba(255,255,255,0.08)',
+                display: 'inline-block',
+              }} />
             )}
           </div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>

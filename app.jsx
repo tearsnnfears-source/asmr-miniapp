@@ -12,8 +12,7 @@ const NavContext = window.NavContext;
 // Names match what callers pass to go(name, params).
 const SCREENS = {
   home:           ({ accent, density })           => <window.HomeV2 accent={accent} density={density} />,
-  shorts:         ({ accent })                    => <window.ShortsTab accent={accent} mode="grid" />,
-  'shorts-player':({ accent })                    => <window.ShortsTab accent={accent} mode="player" />,
+  shorts:         ({ accent })                    => <window.ShortsTab accent={accent} />,
   artists:        ({ accent })                    => <window.ArtistsPage accent={accent} />,
   saved:          ({ accent, params })            => <window.SavedPage accent={accent} initialTab={params.tab || 'videos'} />,
   video:          ({ accent, density })           => <window.VideoPage accent={accent} density={density} />,
@@ -30,7 +29,6 @@ const SCREENS = {
 const SCREEN_TO_TAB = {
   home: 'home',
   shorts: 'shorts',
-  'shorts-player': 'shorts',
   artists: 'artists',
   artist: 'artists',
   saved: 'favorites',
@@ -152,10 +150,12 @@ function AppShell() {
     const e = window._apiCache?.get(key);
     return e?.data !== undefined && !e.error;
   };
-  // Splash hides when the lightweight Home payload is in. The 500-row
-  // version keeps loading in the background — VideoPage will pick it up
-  // when it's ready.
-  const dataReady = hasReal('artists') && hasReal('videos:30');
+  // Splash hides when the lightweight Home payload is in *and* the user
+  // profile has resolved (so AppHeader doesn't flash "FREE" before the real
+  // tier badge appears). Outside Telegram there's no /profile to wait on.
+  const isTg = !!(window.isInsideTelegram && window.isInsideTelegram());
+  const userReady = !isTg || hasReal('user');
+  const dataReady = hasReal('artists') && hasReal('videos:30') && userReady;
   React.useEffect(() => {
     if (!dataReady) return;
     // Give the screens one paint to render real data, then hide.
@@ -212,17 +212,6 @@ function AppShell() {
     try { history.pushState({ stackLen: 1 }, ''); } catch (_) {}
   }, []);
 
-  // Disable Telegram's native vertical swipe-to-close inside shorts player
-  // so our swipe gesture works without the WebView eating it.
-  React.useEffect(() => {
-    const tg = window.Telegram?.WebApp;
-    if (current.screen === 'shorts-player') {
-      tg?.disableVerticalSwipes?.();
-      tg?.expand?.();
-    } else {
-      tg?.enableVerticalSwipes?.();
-    }
-  }, [current.screen]);
 
   return (
     <NavContext.Provider value={nav}>
