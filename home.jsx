@@ -81,7 +81,11 @@ function FeedCard({ v, accent, density, featured }) {
 // Hero promo on top, category tiles, mixed feed
 function HomeV2({ accent = C.pink, density = 'comfortable' }) {
   const nav = window.useNav();
-  const videosState = window.useVideos(500);
+  // Home uses a small batch so the first paint isn't blocked on the giant
+  // 500-row response (which takes ~12s on Railway). The full list is kept
+  // warm in the background by AppShell so VideoPage / ArtistPage still
+  // open instantly.
+  const videosState = window.useVideos(30);
   const videos = videosState.data || [];
   const hero = videos[0];
   return (

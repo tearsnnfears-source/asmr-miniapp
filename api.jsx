@@ -124,7 +124,17 @@ function useFetch(key, fetcher, fallback, deps = []) {
     let alive = true;
     // Subscribe so a fetch finishing elsewhere wakes us.
     if (!_apiSubs.has(key)) _apiSubs.set(key, new Set());
-    const sub = (s) => { if (alive) setState(s); };
+    const sub = (s) => {
+      if (!alive) return;
+      // Invalidation signal: cache was cleared, kick off a fresh fetch
+      // for this hook instance and surface a loading state in the UI.
+      if (s.data === undefined && s.loading) {
+        setState({ data: fallback, loading: true, error: null });
+        _getOrFetch(key, fetcher, fallback);
+        return;
+      }
+      setState(s);
+    };
     _apiSubs.get(key).add(sub);
 
     const entry = _getOrFetch(key, fetcher, fallback);

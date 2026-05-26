@@ -271,35 +271,59 @@ function ShortsPlayer({ accent = C.pink }) {
   ];
 
   // Vertical swipe between shorts — TikTok-style. Up = next, down = prev.
-  // Uses pointer events so it works on desktop drag too.
+  // We attach a native touch listener (not React's synthetic one) so we can
+  // call preventDefault — needed in Telegram WebView to stop the gesture
+  // from triggering the host's vertical pull-to-close.
   const swipeStartY = React.useRef(null);
-  const onPointerDown = (e) => {
-    // Ignore touches on buttons / interactive overlays.
-    if (e.target.closest && e.target.closest('button, video, a, input')) return;
-    swipeStartY.current = e.clientY ?? e.touches?.[0]?.clientY ?? null;
-  };
-  const onPointerUp = (e) => {
-    if (swipeStartY.current == null) return;
-    const endY = e.clientY ?? e.changedTouches?.[0]?.clientY ?? swipeStartY.current;
-    const dy = endY - swipeStartY.current;
-    swipeStartY.current = null;
-    if (Math.abs(dy) < 60) return;
-    if (dy < 0 && idx < list.length - 1) {
-      nav.replace('shorts-player', { idx: idx + 1 });
-    } else if (dy > 0 && idx > 0) {
-      nav.replace('shorts-player', { idx: idx - 1 });
-    }
-  };
+  const swipeContainerRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const el = swipeContainerRef.current;
+    if (!el) return;
+    const onStart = (e) => {
+      const t = e.touches?.[0];
+      if (!t) return;
+      // Ignore touches on overlay buttons so they keep working.
+      if (e.target.closest && e.target.closest('button, a, input, .vp-controls')) return;
+      swipeStartY.current = t.clientY;
+    };
+    const onMove = (e) => {
+      if (swipeStartY.current == null) return;
+      const dy = (e.touches?.[0]?.clientY ?? swipeStartY.current) - swipeStartY.current;
+      // After we've started a vertical drag, claim the gesture exclusively.
+      if (Math.abs(dy) > 8) {
+        try { e.preventDefault(); } catch (_) {}
+      }
+    };
+    const onEnd = (e) => {
+      if (swipeStartY.current == null) return;
+      const endY = e.changedTouches?.[0]?.clientY ?? swipeStartY.current;
+      const dy = endY - swipeStartY.current;
+      swipeStartY.current = null;
+      if (Math.abs(dy) < 60) return;
+      if (dy < 0 && idx < list.length - 1) {
+        nav.replace('shorts-player', { idx: idx + 1 });
+      } else if (dy > 0 && idx > 0) {
+        nav.replace('shorts-player', { idx: idx - 1 });
+      }
+    };
+    // passive:false required so preventDefault works.
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+    };
+  }, [idx, list.length]);
 
   return (
     <Phone>
       {/* No header - immersive */}
       <div
-        onPointerDown={onPointerDown}
-        onPointerUp={onPointerUp}
-        onTouchStart={onPointerDown}
-        onTouchEnd={onPointerUp}
-        style={{ flex: 1, position: 'relative', background: '#000', touchAction: 'none' }}
+        ref={swipeContainerRef}
+        style={{ flex: 1, position: 'relative', background: '#000', touchAction: 'pan-y', overscrollBehavior: 'contain' }}
       >
         {/* Real player fills the whole bleed; thumb is its poster. */}
         <div style={{ position: 'absolute', inset: 0 }}>
@@ -381,8 +405,12 @@ function compactNum(n) {
 // ── VIDEO PAGE ────────────────────────────────────────────────
 function VideoPage({ accent = C.pink, density = 'comfortable' }) {
   const nav = window.useNav();
-  const videosState = window.useVideos(500);
-  const list = videosState.data || [];
+  const fullState = window.useVideos(500);
+  const liteState = window.useVideos(30);
+  // Prefer the full list (so "Up next" has enough rows) but fall back to the
+  // 30-item Home list when 500 is still in flight — otherwise tapping a tile
+  // would block on the slow request before showing anything.
+  const list = (fullState.data?.length ? fullState.data : liteState.data) || [];
   const requestedId = nav.params?.id;
   const idx = Math.max(0, list.findIndex(x => String(x.id) === String(requestedId)));
   const v = list[idx] || list[0] || VIDEOS[0];

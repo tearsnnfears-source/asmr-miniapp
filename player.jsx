@@ -11,25 +11,66 @@
 //   - tryPlay() starts muted to dodge Android's autoplay block, then unmutes
 //     on the play promise resolve.
 
+// Module-level cache of resolved playable URLs. The /miniapp/content/play
+// endpoint takes ~300-600ms and the URLs themselves last several minutes,
+// so reusing the cached one when the user navigates back-and-forth is a
+// huge UX win (shorts grid → player → back → grid no longer re-fetches).
+const _playableCache = new Map(); // contentId → { url, ts, promise? }
+const PLAYABLE_TTL_MS = 5 * 60 * 1000;
+
 async function fetchPlayableContent(contentId) {
-  const initData = window.getInitData();
-  if (!initData || !contentId) {
+  if (contentId == null) {
     const err = new Error('Open from Telegram to watch');
     err.status = 403;
     throw err;
   }
-  const res = await fetch(`${window.API_BASE}/miniapp/content/play`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData, content_id: contentId }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.url) {
-    const err = new Error(data.error || 'Video unavailable');
-    err.status = res.status;
+  // Cache hit: hand back the URL without a round-trip.
+  const cached = _playableCache.get(contentId);
+  if (cached?.url && Date.now() - cached.ts < PLAYABLE_TTL_MS) {
+    return { url: cached.url, cached: true };
+  }
+  // De-dup parallel calls for the same id.
+  if (cached?.promise) return cached.promise;
+
+  const initData = window.getInitData();
+  if (!initData) {
+    const err = new Error('Open from Telegram to watch');
+    err.status = 403;
     throw err;
   }
-  return data;
+  const p = (async () => {
+    const res = await fetch(`${window.API_BASE}/miniapp/content/play`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData, content_id: contentId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.url) {
+      _playableCache.delete(contentId);
+      const err = new Error(data.error || 'Video unavailable');
+      err.status = res.status;
+      throw err;
+    }
+    _playableCache.set(contentId, { url: data.url, ts: Date.now() });
+    return data;
+  })();
+  _playableCache.set(contentId, { promise: p });
+  return p;
+}
+
+// Prefetch a list of content_ids in the background. Used to warm shorts
+// previews before the user opens the tab — concurrency capped so we don't
+// hammer the backend with 50 parallel requests.
+async function prefetchPlayable(ids, concurrency = 3) {
+  const queue = ids.slice();
+  const workers = Array.from({ length: concurrency }, async () => {
+    while (queue.length) {
+      const id = queue.shift();
+      if (id == null) continue;
+      try { await fetchPlayableContent(id); } catch (_) {}
+    }
+  });
+  await Promise.all(workers);
 }
 
 function VideoPlayer({ video, accent, fillParent = false, vertical = false, autoStart = false }) {
@@ -392,4 +433,4 @@ function ShortsThumbVideo({ short }) {
   );
 }
 
-Object.assign(window, { VideoPlayer, ShortsThumbVideo, fetchPlayableContent });
+Object.assign(window, { VideoPlayer, ShortsThumbVideo, fetchPlayableContent, prefetchPlayable });

@@ -72,13 +72,27 @@ function AppShell() {
   // Warm the cache for videos + shorts + artists at app start so tab-switching
   // is instant. Hooks return state but we don't use it here — the goal is to
   // populate the module-level cache before screens mount their own consumers.
+  // Warm both batches: small one for Home (fast), full 500 for detail
+  // screens (in the background). Splash gates on the small one.
+  window.useVideos(30);
   window.useVideos(500);
   // Must match SHORTS_LIMIT in screens.jsx — otherwise ShortsTab and the warm
   // cache would have different keys and the player would index into the wrong
   // array.
-  window.useShorts(50);
+  const shortsState = window.useShorts(50);
   const artistsState = window.useArtists();
   window.useFavorites();
+
+  // Prefetch playable URLs for the first batch of shorts so tile previews
+  // come up almost instantly when the user opens the Shorts tab.
+  React.useEffect(() => {
+    const list = shortsState.data || [];
+    if (!list.length) return;
+    const ids = list.slice(0, 12).map(s => s.raw?.id ?? s.id).filter(x => x != null);
+    if (ids.length && window.prefetchPlayable) {
+      window.prefetchPlayable(ids, 3);
+    }
+  }, [shortsState.data]);
   // Tweak toggle still wins for local testing.
   const [proOverride, setProOverride] = React.useState(null);
   const isPro = proOverride != null ? proOverride : (t.startPro ? true : user.isPro);
@@ -138,13 +152,77 @@ function AppShell() {
     const e = window._apiCache?.get(key);
     return e?.data !== undefined && !e.error;
   };
-  const dataReady = hasReal('artists') && hasReal('videos:500');
+  // Splash hides when the lightweight Home payload is in. The 500-row
+  // version keeps loading in the background — VideoPage will pick it up
+  // when it's ready.
+  const dataReady = hasReal('artists') && hasReal('videos:30');
   React.useEffect(() => {
     if (!dataReady) return;
     // Give the screens one paint to render real data, then hide.
     const t = setTimeout(() => window.__hideSplash && window.__hideSplash(), 100);
     return () => clearTimeout(t);
   }, [dataReady]);
+
+  // Telegram BackButton — the chrome-level Back arrow at the top-left of
+  // the WebView. Show on any non-home screen so the user always has an
+  // explicit way back. Single handler registered once on mount.
+  React.useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    if (!tg?.BackButton) return;
+    const handler = () => nav.back();
+    tg.BackButton.onClick(handler);
+    return () => { try { tg.BackButton.offClick(handler); } catch (_) {} };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  React.useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    if (!tg?.BackButton) return;
+    if (stack.length > 1) tg.BackButton.show();
+    else tg.BackButton.hide();
+  }, [stack.length]);
+
+  // Hardware/gesture back on Android — intercept popstate so we navigate
+  // within the app instead of closing the miniapp.  We push a history
+  // entry every time the stack grows; popstate then pops our stack first.
+  const prevStackLengthRef = React.useRef(stack.length);
+  React.useEffect(() => {
+    if (stack.length > prevStackLengthRef.current) {
+      // New screen pushed — record a matching browser history entry.
+      try { history.pushState({ stackLen: stack.length }, ''); } catch (_) {}
+    }
+    prevStackLengthRef.current = stack.length;
+  }, [stack.length]);
+  React.useEffect(() => {
+    const onPop = (e) => {
+      // If we still have screens to pop, intercept and consume the back.
+      // Re-push so the browser doesn't drift past zero (which would close
+      // the miniapp on the next hardware back).
+      if (prevStackLengthRef.current > 1) {
+        e.preventDefault?.();
+        nav.back();
+        try { history.pushState({ stackLen: prevStackLengthRef.current - 1 }, ''); } catch (_) {}
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Initial history entry so the first popstate doesn't fall off the stack.
+  React.useEffect(() => {
+    try { history.pushState({ stackLen: 1 }, ''); } catch (_) {}
+  }, []);
+
+  // Disable Telegram's native vertical swipe-to-close inside shorts player
+  // so our swipe gesture works without the WebView eating it.
+  React.useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    if (current.screen === 'shorts-player') {
+      tg?.disableVerticalSwipes?.();
+      tg?.expand?.();
+    } else {
+      tg?.enableVerticalSwipes?.();
+    }
+  }, [current.screen]);
 
   return (
     <NavContext.Provider value={nav}>
