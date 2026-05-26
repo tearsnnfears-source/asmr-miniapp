@@ -488,6 +488,55 @@ function useUser() {
   );
 }
 
+// ── Reactions (❤️ likes etc) ─────────────────────────────────
+// Backend: GET /miniapp/video/{id}/reactions → { counts, user_reactions, allowed, max_per_user }
+// Backend: POST /miniapp/video/{id}/react { initData, emoji } → { counts, user_reactions }
+function useReactions(contentId) {
+  return useFetch(
+    `reactions:${contentId}`,
+    async () => {
+      if (contentId == null) throw new Error('no contentId');
+      const initData = getInitData();
+      const qs = initData ? `?initData=${encodeURIComponent(initData)}` : '';
+      const res = await fetch(`${API_BASE}/miniapp/video/${contentId}/reactions${qs}`);
+      if (!res.ok) throw new Error(`reactions → ${res.status}`);
+      return await res.json();
+    },
+    { counts: {}, user_reactions: [], allowed: [], max_per_user: 3 },
+    [contentId],
+  );
+}
+
+async function actionReact(contentId, emoji = '❤️') {
+  const initData = getInitData();
+  if (!initData || contentId == null) return { ok: false, reason: 'no-tg' };
+  try {
+    const data = await apiPost(`/miniapp/video/${contentId}/react`, { initData, emoji });
+    // Optimistic cache update so the UI flips before refetch.
+    const key = `reactions:${contentId}`;
+    const entry = _apiCache.get(key);
+    if (entry?.data) {
+      _apiCache.set(key, { data: { ...entry.data, counts: data.counts || {}, user_reactions: data.user_reactions || [] } });
+      _emit(key, { data: _apiCache.get(key).data, loading: false, error: null });
+    }
+    return { ok: true, ...data };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+// ── Favorite status (is this content already saved?) ──────────
+// We reuse the favorites list (cache key 'favorites') instead of hitting
+// /favorites/check per item — one round-trip, instant UI for any tile.
+function useFavoriteStatus(contentId) {
+  const favState = useFavorites();
+  const isFav = React.useMemo(() => {
+    if (contentId == null) return false;
+    const items = favState.data?.items || [];
+    return items.some(it => Number(it.raw?.content_id ?? it.id) === Number(contentId)
+                          || Number(it.id) === Number(contentId));
+  }, [favState.data, contentId]);
+  return { favorited: isFav, loading: favState.loading };
+}
+
 // ── Actions (no React state — fire-and-forget POSTs) ──────────
 
 async function actionFavoriteToggle(contentId) {
@@ -495,6 +544,8 @@ async function actionFavoriteToggle(contentId) {
   if (!initData) return { ok: false, reason: 'no-tg' };
   try {
     const res = await apiPost('/miniapp/favorites/toggle', { initData, content_id: contentId });
+    // Refresh favorites cache so all subscribed UIs (Saved tab, heart icons) update.
+    invalidate('favorites');
     return { ok: true, ...res };
   } catch (e) { return { ok: false, error: e.message }; }
 }
@@ -541,8 +592,8 @@ initTelegram();
 Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
-  useVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, userFromTelegram,
-  actionFavoriteToggle, actionFollow, actionStartCryptoCheckout, actionStartFreeTrial,
+  useVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, userFromTelegram,
+  actionFavoriteToggle, actionFollow, actionReact, actionStartCryptoCheckout, actionStartFreeTrial,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded
   _apiCache,
