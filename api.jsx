@@ -32,7 +32,13 @@ async function apiGet(path, query = {}) {
   const qs = new URLSearchParams(query).toString();
   const url = `${API_BASE}${path}${qs ? '?' + qs : ''}`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`GET ${path} → ${res.status}`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    const err = new Error(`GET ${path} → ${res.status}: ${text.slice(0, 240)}`);
+    err.status = res.status;
+    err.body = text;
+    throw err;
+  }
   return await res.json();
 }
 async function apiPost(path, body = {}) {
@@ -41,7 +47,13 @@ async function apiPost(path, body = {}) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`POST ${path} → ${res.status}`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    const err = new Error(`POST ${path} → ${res.status}: ${text.slice(0, 240)}`);
+    err.status = res.status;
+    err.body = text;
+    throw err;
+  }
   return await res.json();
 }
 
@@ -393,12 +405,28 @@ function useFavorites() {
   );
 }
 
+// Read mock override from URL: ?mock=pro / ?mock=elite / ?mock=vip.
+// Lets us preview the PRO-side UI without a working backend session.
+function getMockTier() {
+  try {
+    const m = (new URLSearchParams(location.search).get('mock') || '').toLowerCase();
+    if (['plus', 'pro', 'elite', 'vip', 'founder'].includes(m)) return m;
+    return '';
+  } catch (_) { return ''; }
+}
+
 // User profile drives isPro / centerMode / days-left in the header.
 function useUser() {
   return useFetch(
     'user',
     async () => {
       const initData = getInitData();
+      const mockTier = getMockTier();
+      if (mockTier) {
+        // Force-PRO preview without hitting the backend.
+        const tg = userFromTelegram();
+        return { ...tg, tier: mockTier, isPro: true, isInfinite: true, daysLeft: 99999, badges: [mockTier, 'preview'] };
+      }
       if (!initData) throw new Error('no initData');
       const p = await apiPost('/miniapp/profile', { initData });
       const tgFallback = userFromTelegram();
