@@ -45,23 +45,75 @@ async function apiPost(path, body = {}) {
   return await res.json();
 }
 
+// ── Module-level cache ────────────────────────────────────────
+// Survives screen remounts: once a key is fetched, subsequent useFetch(key)
+// calls return the cached value synchronously without a loading flash.
+// Pending promises are deduped so simultaneous mounts don't hit the API twice.
+const _apiCache = new Map(); // key → { data?: any, promise?: Promise, ts?: number }
+// Subscribers per key — so a late-arriving fetch wakes all mounted hooks.
+const _apiSubs = new Map(); // key → Set<(state) => void>
+
+function _emit(key, state) {
+  const subs = _apiSubs.get(key);
+  if (subs) subs.forEach(fn => fn(state));
+}
+
+function _getOrFetch(key, fetcher, fallback) {
+  const entry = _apiCache.get(key);
+  if (entry?.data !== undefined) return entry; // hit
+  if (entry?.promise) return entry; // in flight
+  const promise = fetcher()
+    .then(data => {
+      _apiCache.set(key, { data, ts: Date.now() });
+      _emit(key, { data, loading: false, error: null });
+      return data;
+    })
+    .catch(err => {
+      console.warn('[api]', key, err.message);
+      // Cache the fallback so we don't refetch on every screen mount; the user
+      // can still refresh by reload. Mark error so callers can detect it.
+      _apiCache.set(key, { data: fallback, ts: Date.now(), error: err });
+      _emit(key, { data: fallback, loading: false, error: err });
+      throw err;
+    });
+  const inflight = { promise };
+  _apiCache.set(key, inflight);
+  return inflight;
+}
+
+// Invalidate a key — next useFetch refetches.
+function invalidate(key) {
+  _apiCache.delete(key);
+  _emit(key, { data: undefined, loading: true, error: null });
+}
+
 // ── Generic data hook ─────────────────────────────────────────
-// fetcher: async () => apiData
-// fallback: data to return on error (e.g. mock)
-function useFetch(fetcher, fallback, deps = []) {
-  const [state, setState] = React.useState({ data: fallback, loading: true, error: null });
+function useFetch(key, fetcher, fallback, deps = []) {
+  // Seed synchronously from cache if available — no flicker.
+  const cached = _apiCache.get(key);
+  const initial = cached?.data !== undefined
+    ? { data: cached.data, loading: false, error: cached.error || null }
+    : { data: fallback, loading: true, error: null };
+  const [state, setState] = React.useState(initial);
+
   React.useEffect(() => {
     let alive = true;
-    setState(s => ({ ...s, loading: true }));
-    fetcher()
-      .then(data => { if (alive) setState({ data, loading: false, error: null }); })
-      .catch(error => {
-        console.warn('[api]', error.message);
-        if (alive) setState({ data: fallback, loading: false, error });
-      });
-    return () => { alive = false; };
+    // Subscribe so a fetch finishing elsewhere wakes us.
+    if (!_apiSubs.has(key)) _apiSubs.set(key, new Set());
+    const sub = (s) => { if (alive) setState(s); };
+    _apiSubs.get(key).add(sub);
+
+    const entry = _getOrFetch(key, fetcher, fallback);
+    if (entry.data !== undefined && state.data !== entry.data) {
+      setState({ data: entry.data, loading: false, error: entry.error || null });
+    }
+    return () => {
+      alive = false;
+      _apiSubs.get(key)?.delete(sub);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
+
   return state;
 }
 
@@ -157,6 +209,7 @@ function normalizeShort(s, idx = 0) {
 
 function useVideos(limit = 500) {
   return useFetch(
+    `videos:${limit}`,
     async () => {
       const data = await apiGet('/miniapp/videos', { limit });
       const list = (data.videos || []).map(normalizeVideo);
@@ -170,6 +223,7 @@ function useVideos(limit = 500) {
 
 function useShorts(limit = 10) {
   return useFetch(
+    `shorts:${limit}`,
     async () => {
       const data = await apiGet('/miniapp/shorts', { limit });
       const list = (data.shorts || []).map(normalizeShort);
@@ -183,11 +237,11 @@ function useShorts(limit = 10) {
 
 function useTags() {
   return useFetch(
+    'tags',
     async () => {
       const data = await apiGet('/miniapp/tags');
       const tags = data.tags || data || [];
       if (!Array.isArray(tags) || !tags.length) throw new Error('empty tags');
-      // Map server tag names to our CATEGORIES shape.
       const icons = ['◐','◑','◒','◓','◔','◕','◗','◘'];
       return tags.slice(0, 8).map((t, i) => ({
         id: (t.id || t.name || t).toString().toLowerCase(),
@@ -203,6 +257,7 @@ function useTags() {
 // User profile drives isPro / centerMode / days-left in the header.
 function useUser() {
   return useFetch(
+    'user',
     async () => {
       const initData = getInitData();
       if (!initData) throw new Error('no initData');
@@ -284,8 +339,10 @@ initTelegram();
 // per-file imports (this codebase uses globals).
 Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
-  apiGet, apiPost, useFetch,
+  apiGet, apiPost, useFetch, invalidate,
   useVideos, useShorts, useTags, useUser,
   actionFavoriteToggle, actionFollow, actionStartCryptoCheckout, actionStartFreeTrial,
   normalizeVideo, normalizeShort, thumbFor, paletteThumb,
+  // For SplashScreen to peek at whether everything is loaded
+  _apiCache,
 });

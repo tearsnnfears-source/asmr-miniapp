@@ -69,6 +69,11 @@ function AppShell() {
   // Falls back to mock when not in Telegram (preview-URL browser testing).
   const userState = window.useUser();
   const user = userState.data;
+  // Warm the cache for videos + shorts at app start so tab-switching is instant.
+  // Hooks return state but we don't use it here — the goal is just to populate
+  // the module-level cache before screens mount their own consumer hooks.
+  window.useVideos(500);
+  window.useShorts(40);
   // Tweak toggle still wins for local testing.
   const [proOverride, setProOverride] = React.useState(null);
   const isPro = proOverride != null ? proOverride : (t.startPro ? true : user.isPro);
@@ -121,9 +126,34 @@ function AppShell() {
     catch (e) { return false; }
   }, []);
 
+  // Splash: shown until core data (user + videos) lands, with a minimum
+  // display time to avoid flicker and a hard timeout so mock fallback isn't
+  // hidden forever if the API is dead.
+  const videosCached = window._apiCache?.get('videos:500')?.data !== undefined;
+  const userCached = window._apiCache?.get('user')?.data !== undefined || !userState.loading;
+  const dataReady = userCached && videosCached;
+  const [splashVisible, setSplashVisible] = React.useState(true);
+  React.useEffect(() => {
+    // Min 500ms so the splash never flashes; max 4s so we never block on API.
+    const minHide = setTimeout(() => {
+      if (dataReady || window._apiCache?.get('videos:500')) setSplashVisible(false);
+    }, 500);
+    const maxHide = setTimeout(() => setSplashVisible(false), 4000);
+    return () => { clearTimeout(minHide); clearTimeout(maxHide); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  React.useEffect(() => {
+    if (dataReady) {
+      // Already past min-time? hide immediately; otherwise wait it out.
+      const t = setTimeout(() => setSplashVisible(false), 250);
+      return () => clearTimeout(t);
+    }
+  }, [dataReady]);
+
   return (
     <NavContext.Provider value={nav}>
       <PhoneStage>{view}</PhoneStage>
+      {splashVisible && <SplashScreen accent={accent} />}
       {showTweaks && (
         <window.TweaksPanel>
           <window.TweakSection label="Theme">
@@ -150,6 +180,40 @@ function AppShell() {
         </window.TweaksPanel>
       )}
     </NavContext.Provider>
+  );
+}
+
+// ── SplashScreen ────────────────────────────────────────────────
+// Covers the UI during initial data load so the mock fallback never flashes.
+function SplashScreen({ accent = '#FF7EC8' }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: '#0E0E0F',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      gap: 28,
+      animation: 'splash-fade 250ms ease-out',
+    }}>
+      <div style={{
+        fontFamily: "'Bebas Neue', sans-serif",
+        fontSize: 42, letterSpacing: 3, lineHeight: 1,
+        color: '#fff',
+      }}>
+        ASMR<span style={{ color: accent }}>.LEAKS</span>
+      </div>
+      <div style={{
+        width: 36, height: 36,
+        border: '3px solid rgba(255,255,255,0.08)',
+        borderTopColor: accent,
+        borderRadius: '50%',
+        animation: 'splash-spin 0.7s linear infinite',
+      }} />
+      <style>{`
+        @keyframes splash-spin { to { transform: rotate(360deg); } }
+        @keyframes splash-fade { from { opacity: 0; } to { opacity: 1; } }
+      `}</style>
+    </div>
   );
 }
 

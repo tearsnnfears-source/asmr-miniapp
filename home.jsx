@@ -81,7 +81,7 @@ function FeedCard({ v, accent, density, featured }) {
 // Hero promo on top, category tiles, mixed feed
 function HomeV2({ accent = C.pink, density = 'comfortable' }) {
   const nav = window.useNav();
-  const videosState = window.useVideos(50);
+  const videosState = window.useVideos(500);
   const videos = videosState.data || [];
   const hero = videos[0];
   return (
