@@ -52,7 +52,7 @@ function HomeV1({ accent = C.pink, density = 'comfortable' }) {
 function FeedCard({ v, accent, density, featured }) {
   const nav = window.useNav();
   return (
-    <div onClick={() => nav.go('video', { id: v.id })} style={{ cursor: 'pointer' }}>
+    <div onClick={() => nav.go('video', { id: v.id, video: v })} style={{ cursor: 'pointer' }}>
       <Thumb thumb={v.thumb} duration={v.duration} badge={featured ? { label: 'Just dropped', bg: accent } : null} />
       <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
         <Avatar artist={v.artist} size={36} ring={v.artist.fresh ? accent : null} />
@@ -95,7 +95,7 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
         {/* Hero — large featured drop */}
         {hero && (
         <div style={{ padding: '12px 14px 4px' }}>
-          <div onClick={() => nav.go('video', { id: hero.id })} style={{
+          <div onClick={() => nav.go('video', { id: hero.id, video: hero })} style={{
             position: 'relative', borderRadius: 18, overflow: 'hidden',
             aspectRatio: '16/10', background: hero.thumb.bg, cursor: 'pointer',
           }}>
@@ -171,8 +171,11 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
 // Compact horizontal row — thumbnail-left
 function CompactRow({ v, accent }) {
   const nav = window.useNav();
+  // Pass the full video object too — needed for artist pages where the
+  // video isn't in the global useVideos(500) cache (otherwise VideoPage
+  // would fall back to the Home feed's first item).
   return (
-    <div onClick={() => nav.go('video', { id: v.id })} style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
+    <div onClick={() => nav.go('video', { id: v.id, video: v })} style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
       <div style={{ width: 140, flexShrink: 0 }}>
         <Thumb thumb={v.thumb} duration={v.duration} />
       </div>
@@ -239,7 +242,7 @@ function HomeV3({ accent = C.pink, density = 'comfortable' }) {
 function MosaicCard({ v, accent, wide }) {
   const nav = window.useNav();
   return (
-    <div onClick={() => nav.go('video', { id: v.id })} style={{ cursor: 'pointer' }}>
+    <div onClick={() => nav.go('video', { id: v.id, video: v })} style={{ cursor: 'pointer' }}>
       <Thumb thumb={v.thumb} duration={v.duration} aspect={wide ? 16/9 : 4/3} />
       <div style={{ marginTop: 7 }}>
         <div style={{

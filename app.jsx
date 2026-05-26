@@ -100,6 +100,10 @@ function AppShell() {
   const isPro = proOverride != null ? proOverride : (t.startPro ? true : user.isPro);
   const setPro = (v) => setProOverride(v);
 
+  // Global shorts player overlay state. Any screen can call
+  // nav.openShorts(items, idx) to pop the immersive player.
+  const [shortsPlayer, setShortsPlayer] = React.useState(null); // { items, order, pos } | null
+
   const nav = React.useMemo(() => ({
     go: (screen, params = {}) => {
       if (!SCREENS[screen]) {
@@ -136,7 +140,16 @@ function AppShell() {
       if (!target) return;
       setStack([{ screen: target, params: {} }]);
     },
-  }), [current.screen, current.params, stack.length, isPro, user, userState.loading]);
+    // Open the immersive shorts overlay over the current screen.
+    // items = array of normalized shorts; idx = starting position.
+    openShorts: (items, idx = 0) => {
+      if (!items || !items.length) return;
+      setShortsPlayer({ items, pos: idx });
+    },
+    closeShorts: () => setShortsPlayer(null),
+    shortsPlayer,
+    setShortsPlayer,
+  }), [current.screen, current.params, stack.length, isPro, user, userState.loading, shortsPlayer]);
 
   const renderScreen = SCREENS[current.screen] || SCREENS.home;
   const view = renderScreen({ accent, density, params: current.params });
@@ -253,6 +266,22 @@ function AppShell() {
           )}
         </div>
       </PhoneStage>
+      {/* Global shorts overlay — opened from artist pages, search, etc.
+          Lives above the BottomNav so it covers the whole viewport. */}
+      {shortsPlayer && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: '#000',
+        }}>
+          <window.ShortsPlayerOverlay
+            items={shortsPlayer.items}
+            pos={shortsPlayer.pos}
+            setPos={(p) => setShortsPlayer(s => s ? { ...s, pos: p } : s)}
+            onClose={() => setShortsPlayer(null)}
+            accent={accent}
+          />
+        </div>
+      )}
       <window.DebugFab />
 
       {showTweaks && (

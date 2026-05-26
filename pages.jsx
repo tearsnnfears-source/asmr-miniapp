@@ -730,7 +730,7 @@ function ArtistPage({ accent = C.pink }) {
               <div>
                 <div style={{ padding: '12px 14px 4px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                   {shorts.items.map((s, i) => (
-                    <div key={s.id || i} style={{ aspectRatio: '9/16', borderRadius: 10, overflow: 'hidden', position: 'relative', background: '#161617' }}>
+                    <div key={s.id || i} onClick={() => nav.openShorts(shorts.items, i)} style={{ aspectRatio: '9/16', borderRadius: 10, overflow: 'hidden', position: 'relative', background: '#161617', cursor: 'pointer' }}>
                       <window.ShortsThumbVideo short={s} />
                       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.6) 100%)', pointerEvents: 'none' }} />
                       {s.duration && <span style={{ position: 'absolute', right: 5, bottom: 5, fontSize: 9, fontWeight: 700, color: '#fff' }}>{s.duration}</span>}

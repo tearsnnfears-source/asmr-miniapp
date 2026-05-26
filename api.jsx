@@ -788,6 +788,17 @@ async function actionStartCryptoCheckout(plan = 'year') {
   } catch (e) { return { ok: false, error: e.message }; }
 }
 
+// View counter — fired after the user has watched at least 10s of content.
+// Backend dedupes per (user, content) so re-fires are harmless.
+async function actionRegisterView(contentId) {
+  const initData = getInitData();
+  if (!initData || contentId == null) return { ok: false, reason: 'no-tg' };
+  try {
+    const res = await apiPost('/miniapp/view', { initData, content_id: contentId });
+    return { ok: true, ...res };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
 async function actionStartFreeTrial() {
   const initData = getInitData();
   if (!initData) return { ok: false, reason: 'no-tg' };
@@ -806,7 +817,7 @@ Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
   useVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useSearch, userFromTelegram,
-  actionFavoriteToggle, actionFollow, actionReact, actionStartCryptoCheckout, actionStartFreeTrial,
+  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionStartCryptoCheckout, actionStartFreeTrial,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded
   _apiCache,

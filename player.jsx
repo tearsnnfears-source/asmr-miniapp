@@ -79,6 +79,7 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
   const [errorMsg, setErrorMsg] = React.useState('');
   const videoRef = React.useRef(null);
   const hlsRef = React.useRef(null);
+  const viewFiredRef = React.useRef(false);
   const posterUrl = v.thumb?.src || '';
 
   // Cleanup on unmount
@@ -139,6 +140,18 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
       return;
     }
     if (posterUrl) vEl.setAttribute('poster', posterUrl);
+
+    // View counter: fire once after the user has watched ≥10s.
+    const onTime = () => {
+      if (viewFiredRef.current) return;
+      if ((vEl.currentTime || 0) >= 10) {
+        viewFiredRef.current = true;
+        const contentId = v.raw?.id ?? v.raw?.content_id ?? v.id;
+        if (contentId != null) window.actionRegisterView?.(contentId);
+        vEl.removeEventListener('timeupdate', onTime);
+      }
+    };
+    vEl.addEventListener('timeupdate', onTime);
 
     const isM3U8 = url.includes('.m3u8') || url.includes('/hls/');
     const nativeHls = vEl.canPlayType('application/vnd.apple.mpegurl') !== '';

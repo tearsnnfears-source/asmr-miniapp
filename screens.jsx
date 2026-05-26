@@ -254,21 +254,21 @@ function ShortsTile({ s, idx, accent, fresh, onOpen }) {
 // Swipe player (fullscreen vertical feed). Rendered as a sibling overlay
 // inside ShortsTab so the grid stays mounted behind it.
 //
-// order  — array of indices into allShorts that define the playback sequence
-//          (e.g. shuffled for Play All, filtered list for tile taps).
-// pos    — current position *within* `order` (0..order.length-1).
-function ShortsPlayer({ accent = C.pink, allShorts, order, pos, setPos, onClose }) {
-  const total = order?.length || 0;
+// Two call shapes are supported so the same component drives both the
+// ShortsTab overlay (uses `allShorts + order + pos`) and the global
+// AppShell overlay (uses a self-contained `items + pos`).
+function ShortsPlayer({ accent = C.pink, allShorts, order, items, pos, setPos, onClose }) {
+  // Resolve a single `list` array regardless of call shape.
+  const list = items || (order ? order.map(i => (allShorts || [])[i]) : (allShorts || []));
+  const total = list.length;
   const safePos = Math.max(0, Math.min(total - 1, pos ?? 0));
-  const realIdx = order ? order[safePos] : safePos;
-  const s = (allShorts || [])[realIdx];
+  const s = list[safePos];
   const goIdx = (newPos) => {
     if (newPos < 0 || newPos >= total) return;
     setPos && setPos(newPos);
   };
   // Aliases so the rest of the function still reads naturally.
   const idx = safePos;
-  const list = { length: total };
   // Enrich artist with photo from useArtists (same matching by name as other screens).
   const artistsState = window.useArtists();
   const liveArtist = (artistsState.data || []).find(a => a.name === s?.artist?.name);
@@ -471,14 +471,19 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
   const nav = window.useNav();
   const fullState = window.useVideos(500);
   const liteState = window.useVideos(30);
-  // Prefer the full list (so "Up next" has enough rows) but fall back to the
-  // 30-item Home list when 500 is still in flight — otherwise tapping a tile
-  // would block on the slow request before showing anything.
   const list = (fullState.data?.length ? fullState.data : liteState.data) || [];
+  // 1) Prefer the video object passed through nav params (e.g. tapped from
+  //    ArtistPage where the video doesn't exist in useVideos(500) at all).
+  // 2) Fall back to looking up by id in the shared list.
+  // 3) Last resort: first video so we don't crash.
+  const passed = nav.params?.video;
   const requestedId = nav.params?.id;
-  const idx = Math.max(0, list.findIndex(x => String(x.id) === String(requestedId)));
-  const v = list[idx] || list[0] || VIDEOS[0];
-  const nextUp = list.slice(idx + 1, idx + 5);
+  const matched = list.find(x => String(x.id) === String(requestedId));
+  const v = passed || matched || list[0] || VIDEOS[0];
+  // "Up next" comes from the shared list, starting after this video if it's
+  // there; otherwise just the head of the list.
+  const matchedIdx = matched ? list.indexOf(matched) : -1;
+  const nextUp = matchedIdx >= 0 ? list.slice(matchedIdx + 1, matchedIdx + 5) : list.slice(0, 4);
   if (!v) return null;
   return (
     <Phone>
@@ -602,4 +607,4 @@ const iconBtnSmall = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
 };
 
-Object.assign(window, { ShortsTab, ShortsPlayer, VideoPage });
+Object.assign(window, { ShortsTab, ShortsPlayer, ShortsPlayerOverlay: ShortsPlayer, VideoPage });

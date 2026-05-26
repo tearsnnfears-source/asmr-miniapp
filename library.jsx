@@ -300,7 +300,7 @@ function LikedVideos({ accent }) {
   return (
     <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       {items.map(v => (
-        <div key={v.id} onClick={() => nav.go('video', { id: v.id })} style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
+        <div key={v.id} onClick={() => nav.go('video', { id: v.id, video: v })} style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
           <div style={{ width: 130, flexShrink: 0 }}>
             <Thumb thumb={v.thumb} duration={v.duration} />
           </div>
