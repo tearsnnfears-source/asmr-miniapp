@@ -426,7 +426,18 @@ function useFavorites() {
       if (!initData) throw new Error('no initData');
       const data = await apiPost('/miniapp/favorites', { initData });
       const raw = data.items || data.favorites || [];
-      const all = raw.map((it, i) => {
+      // Dedupe by content_id — the backend has historical duplicates in some
+      // users' favorites (race where a double-tap created two rows). Keep
+      // the most recently saved one (raw is already newest-first).
+      const seen = new Set();
+      const unique = [];
+      for (const it of raw) {
+        const cid = String(it.content_id ?? it.id ?? '');
+        if (!cid || seen.has(cid)) continue;
+        seen.add(cid);
+        unique.push(it);
+      }
+      const all = unique.map((it, i) => {
         const norm = normalizeVideo({
           id: it.content_id || it.id,
           title: it.title,
@@ -562,15 +573,29 @@ function useFavoriteStatus(contentId) {
 
 // ── Actions (no React state — fire-and-forget POSTs) ──────────
 
+// Per-content lock so a fast double-tap doesn't fire two toggle POSTs
+// (which the backend currently turns into duplicate Favorite rows).
+const _favToggleLocks = new Map();
 async function actionFavoriteToggle(contentId) {
   const initData = getInitData();
   if (!initData) return { ok: false, reason: 'no-tg' };
-  try {
-    const res = await apiPost('/miniapp/favorites/toggle', { initData, content_id: contentId });
-    // Refresh favorites cache so all subscribed UIs (Saved tab, heart icons) update.
-    invalidate('favorites');
-    return { ok: true, ...res };
-  } catch (e) { return { ok: false, error: e.message }; }
+  // If a toggle for this content is already in flight, await it instead of
+  // launching a second one.
+  const inflight = _favToggleLocks.get(contentId);
+  if (inflight) return inflight;
+  const p = (async () => {
+    try {
+      const res = await apiPost('/miniapp/favorites/toggle', { initData, content_id: contentId });
+      invalidate('favorites');
+      return { ok: true, ...res };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    } finally {
+      _favToggleLocks.delete(contentId);
+    }
+  })();
+  _favToggleLocks.set(contentId, p);
+  return p;
 }
 
 async function actionFollow(artistName) {
