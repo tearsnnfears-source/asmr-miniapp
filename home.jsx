@@ -81,32 +81,37 @@ function FeedCard({ v, accent, density, featured }) {
 // Hero promo on top, category tiles, mixed feed
 function HomeV2({ accent = C.pink, density = 'comfortable' }) {
   const nav = window.useNav();
+  const videosState = window.useVideos(50);
+  const videos = videosState.data || [];
+  const hero = videos[0];
   return (
     <Phone>
       <AppHeader accent={accent} />
       <div style={SCROLL_BODY}>
         {/* Hero — large featured drop */}
+        {hero && (
         <div style={{ padding: '12px 14px 4px' }}>
-          <div onClick={() => nav.go('video', { id: VIDEOS[0].id })} style={{
+          <div onClick={() => nav.go('video', { id: hero.id })} style={{
             position: 'relative', borderRadius: 18, overflow: 'hidden',
-            aspectRatio: '16/10', background: VIDEOS[0].thumb.bg, cursor: 'pointer',
+            aspectRatio: '16/10', background: hero.thumb.bg, cursor: 'pointer',
           }}>
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.85) 100%)' }} />
-            <div style={{ position: 'absolute', left: '50%', top: '40%', transform: 'translate(-50%, -50%)', width: 50, height: 50, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: `2px solid ${VIDEOS[0].thumb.dot}` }} />
+            <div style={{ position: 'absolute', left: '50%', top: '40%', transform: 'translate(-50%, -50%)', width: 50, height: 50, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: `2px solid ${hero.thumb.dot}` }} />
             <span style={{
               position: 'absolute', left: 12, top: 12,
               background: accent, color: '#000', fontWeight: 700,
               fontSize: 10, padding: '4px 8px', borderRadius: 999, letterSpacing: 0.6, textTransform: 'uppercase',
             }}>Featured drop</span>
             <div style={{ position: 'absolute', left: 14, right: 14, bottom: 12 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25, marginBottom: 6 }}>{VIDEOS[0].title}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25, marginBottom: 6 }}>{hero.title}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Avatar artist={VIDEOS[0].artist} size={24} />
-                <span style={{ fontSize: 11, color: C.muted2 }}>{VIDEOS[0].artist.name} · {VIDEOS[0].views} views · {VIDEOS[0].age}</span>
+                <Avatar artist={hero.artist} size={24} />
+                <span style={{ fontSize: 11, color: C.muted2 }}>{hero.artist.name} · {hero.views} views · {hero.age}</span>
               </div>
             </div>
           </div>
         </div>
+        )}
 
         {/* Auto-ticker: free trial → stats → ads, every 5s */}
         <div style={{ padding: '10px 14px 4px' }}>
@@ -148,11 +153,11 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
 
         {/* Mixed feed: big card + 2x compact rows */}
         <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <FeedCard v={VIDEOS[1]} accent={accent} density={density} />
-          {VIDEOS.slice(2, 6).map(v => (
+          {videos[1] && <FeedCard v={videos[1]} accent={accent} density={density} />}
+          {videos.slice(2, 6).map(v => (
             <CompactRow key={v.id} v={v} accent={accent} />
           ))}
-          <FeedCard v={VIDEOS[6]} accent={accent} density={density} />
+          {videos[6] && <FeedCard v={videos[6]} accent={accent} density={density} />}
         </div>
       </div>
       <BottomNav active="home" accent={accent} />

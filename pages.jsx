@@ -3,10 +3,14 @@
 // ── PROFILE PAGE ──────────────────────────────────────────────
 function ProfilePage({ accent = C.pink }) {
   const nav = window.useNav();
+  const user = nav.user || { name: 'You', daysLeft: 0, isPro: false };
+  const initials = (user.name || 'U').trim().split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase();
   const stats = [
-    { val: '27', unit: 'd', label: 'Days left' },
-    { val: '142', label: 'Saved' },
-    { val: '38', label: 'Following' },
+    user.isPro
+      ? { val: String(user.daysLeft || 0), unit: 'd', label: 'Days left' }
+      : { val: 'Free', label: 'Plan' },
+    { val: '0', label: 'Saved' },
+    { val: '0', label: 'Following' },
   ];
   return (
     <Phone>
@@ -24,13 +28,16 @@ function ProfilePage({ accent = C.pink }) {
         </div>
         <div style={{ padding: '0 14px', marginTop: -48, position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
-            <div style={{ width: 84, height: 84, borderRadius: '50%', background: `linear-gradient(135deg, ${accent}, ${C.purple})`, border: `4px solid ${C.dark}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: 800, fontSize: 32 }}>S</div>
+            <div style={{ width: 84, height: 84, borderRadius: '50%', background: `linear-gradient(135deg, ${accent}, ${C.purple})`, border: `4px solid ${C.dark}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: 800, fontSize: 32 }}>{initials}</div>
             <div style={{ paddingBottom: 8, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ fontSize: 18, fontWeight: 700 }}>Sofia Reinholt</div>
-                <span style={{ background: C.lime, color: '#000', fontFamily: "'Bebas Neue',sans-serif", fontSize: 12, padding: '2px 7px', borderRadius: 4, letterSpacing: 1 }}>PRO ∞</span>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>{user.name}</div>
+                {user.isPro && <span style={{ background: C.lime, color: '#000', fontFamily: "'Bebas Neue',sans-serif", fontSize: 12, padding: '2px 7px', borderRadius: 4, letterSpacing: 1 }}>{(user.tier || 'PRO').toUpperCase()} ∞</span>}
               </div>
-              <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>@sofiareinholt · ID 84291</div>
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                {user.username ? `@${user.username}` : 'No username'}
+                {user.telegramId ? ` · ID ${user.telegramId}` : ''}
+              </div>
             </div>
           </div>
         </div>
@@ -48,6 +55,7 @@ function ProfilePage({ accent = C.pink }) {
         </div>
 
         {/* Subscription card */}
+        {user.isPro ? (
         <div style={{ padding: '12px 14px 6px' }}>
           <div style={{
             background: `linear-gradient(135deg, ${C.lime}22, transparent 70%)`,
@@ -57,16 +65,32 @@ function ProfilePage({ accent = C.pink }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ fontSize: 10, color: C.lime, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' }}>Active plan</div>
-                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, color: C.lime, letterSpacing: 1, lineHeight: 1, marginTop: 4 }}>PLUS · 27 days</div>
-                <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>Renews 7 Jun 2026 · Tribute</div>
+                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, color: C.lime, letterSpacing: 1, lineHeight: 1, marginTop: 4 }}>{(user.tier || 'PLUS').toUpperCase()} · {user.daysLeft} days</div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>Renews soon · Tribute</div>
               </div>
-              <button style={{ background: 'transparent', border: `1px solid ${C.lime}`, color: C.lime, padding: '7px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>Manage</button>
+              <button onClick={() => nav.go('subscription')} style={{ background: 'transparent', border: `1px solid ${C.lime}`, color: C.lime, padding: '7px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>Manage</button>
             </div>
             <div style={{ height: 4, marginTop: 12, background: 'rgba(255,255,255,0.08)', borderRadius: 2 }}>
-              <div style={{ width: '70%', height: '100%', background: C.lime, borderRadius: 2 }} />
+              <div style={{ width: `${Math.min(100, (user.daysLeft || 0) * 3)}%`, height: '100%', background: C.lime, borderRadius: 2 }} />
             </div>
           </div>
         </div>
+        ) : (
+        <div style={{ padding: '12px 14px 6px' }}>
+          <div onClick={() => nav.go('subscription')} style={{
+            background: `linear-gradient(135deg, ${accent}22, ${C.purple}22, transparent)`,
+            border: `1px solid ${accent}55`,
+            borderRadius: 16, padding: 14, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          }}>
+            <div>
+              <div style={{ fontSize: 10, color: accent, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' }}>Upgrade</div>
+              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: accent, letterSpacing: 1, lineHeight: 1, marginTop: 4 }}>Get PRO →</div>
+              <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>5 days free · cancel anytime</div>
+            </div>
+          </div>
+        </div>
+        )}
 
         {/* Row list */}
         <div style={{ padding: '8px 14px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -216,7 +240,25 @@ function SubscriptionPage({ accent = C.pink }) {
 
         {/* CTA */}
         <div style={{ padding: '14px 14px 8px' }}>
-          <button onClick={() => { nav.setPro(true); nav.reset('home'); }} style={{
+          <button onClick={async () => {
+            // In Telegram → real action; outside Telegram → local toggle.
+            if (!(window.isInsideTelegram && window.isInsideTelegram())) {
+              nav.setPro(true); nav.reset('home'); return;
+            }
+            const res = plan === 'week'
+              ? await window.actionStartFreeTrial()
+              : await window.actionStartCryptoCheckout(plan);
+            if (!res.ok) {
+              console.warn('checkout failed:', res);
+              alert(res.message || 'Checkout unavailable. Try again.');
+              return;
+            }
+            if (plan === 'week') {
+              // Trial activated server-side; reload profile state.
+              nav.reset('home');
+            }
+            // For paid plans Cryptocloud opens external link; user returns and profile refreshes on reload.
+          }} style={{
             width: '100%',
             background: `linear-gradient(135deg, ${accent}, ${C.purple})`,
             border: 'none', color: '#000',
@@ -224,7 +266,7 @@ function SubscriptionPage({ accent = C.pink }) {
             fontFamily: "'Bebas Neue', sans-serif",
             fontSize: 18, letterSpacing: 1.2, cursor: 'pointer',
             boxShadow: `0 8px 24px ${accent}44`,
-          }}>START 5-DAY FREE TRIAL →</button>
+          }}>{plan === 'week' ? 'START 5-DAY FREE TRIAL →' : 'CONTINUE →'}</button>
           <div style={{ textAlign: 'center', fontSize: 10, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>
             Cancel anytime · No charge during trial · Powered by Tribute
           </div>
@@ -443,12 +485,19 @@ function PaywallLock({ accent = C.pink, mode = 'video' /* 'video' | 'artist' */ 
 // ── ARTIST PAGE ───────────────────────────────────────────────
 function ArtistPage({ accent = C.pink }) {
   const nav = window.useNav();
-  const a = window.ARTISTS[0];
+  const requestedId = nav.params?.id;
+  const videosState = window.useVideos(500);
+  const allVideos = videosState.data || [];
+  // Find artist from videos (each video carries .artist with id+name).
+  let a = allVideos.find(v => v.artist?.id === requestedId)?.artist;
+  if (!a) a = window.ARTISTS.find(x => x.id === requestedId) || window.ARTISTS[0];
   const tColor = tagColor(a.tag);
   const [tab, setTab] = React.useState('videos');
-  const vids = window.VIDEOS.slice(0, 6).map(v => ({ ...v, artist: a }));
+  // Filter all videos by this artist's name.
+  const vids = allVideos.filter(v => v.artist?.name === a.name).slice(0, 12);
   const photos = Array.from({ length: 12 }, (_, i) => window.makeThumb(i + 1));
-  const shorts = window.SHORTS.slice(0, 4).map(s => ({ ...s, artist: a }));
+  const shortsState = window.useShorts(40);
+  const shorts = (shortsState.data || []).filter(s => s.artist?.name === a.name).slice(0, 6);
 
   return (
     <Phone>

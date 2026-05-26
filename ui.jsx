@@ -158,9 +158,13 @@ function Avatar({ artist, size = 36, ring }) {
   );
 }
 
-// App Header — avatar + name + VIP, clickable area on left → profile
-function AppHeader({ user = { name: 'Sofia R.', vip: 'PLUS', days: 27 }, accent = C.pink }) {
+// App Header — avatar + name + VIP, clickable area on left → profile.
+// Pulls user data from nav context (live API or mock fallback).
+function AppHeader({ user: userProp, accent = C.pink }) {
   const nav = useNav();
+  const user = userProp || nav.user || { name: 'You', daysLeft: 0, isPro: false };
+  const vipLabel = user.isPro ? (user.tier === 'pro' ? 'PRO' : 'PLUS') : 'FREE';
+  const days = user.daysLeft != null ? user.daysLeft : 0;
   return (
     <div style={{
       padding: '8px 14px 10px',
@@ -178,11 +182,12 @@ function AppHeader({ user = { name: 'Sofia R.', vip: 'PLUS', days: 27 }, accent 
             <span style={{
               fontFamily: "'Bebas Neue', sans-serif",
               fontSize: 12, letterSpacing: 1, padding: '2px 6px', borderRadius: 4,
-              background: accent, color: '#000', lineHeight: 1, fontWeight: 700,
-            }}>{user.vip} ∞</span>
+              background: user.isPro ? accent : 'rgba(255,255,255,0.15)',
+              color: user.isPro ? '#000' : C.muted2, lineHeight: 1, fontWeight: 700,
+            }}>{vipLabel}{user.isPro ? ' ∞' : ''}</span>
           </div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>
-            {user.days} days left · view profile ›
+            {user.isPro ? `${days} days left · view profile ›` : 'view profile ›'}
           </div>
         </div>
       </div>

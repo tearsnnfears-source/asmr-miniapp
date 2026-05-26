@@ -65,9 +65,14 @@ function AppShell() {
   const [stack, setStack] = React.useState([{ screen: 'home', params: {} }]);
   const current = stack[stack.length - 1];
 
-  // Pro state — drives BottomNav center button (Subscribe vs Profile avatar).
-  // For now defaults from tweaks; later wired to real user data.
-  const [isPro, setPro] = React.useState(!!t.startPro);
+  // User profile from real API — drives isPro, displayed name, days left.
+  // Falls back to mock when not in Telegram (preview-URL browser testing).
+  const userState = window.useUser();
+  const user = userState.data;
+  // Tweak toggle still wins for local testing.
+  const [proOverride, setProOverride] = React.useState(null);
+  const isPro = proOverride != null ? proOverride : (t.startPro ? true : user.isPro);
+  const setPro = (v) => setProOverride(v);
 
   const nav = React.useMemo(() => ({
     go: (screen, params = {}) => {
@@ -93,6 +98,8 @@ function AppShell() {
     centerMode: isPro ? 'profile' : 'subscribe',
     isPro,
     setPro,
+    user,
+    userLoading: userState.loading,
     // Tab-click handler used by BottomNav.
     onTab: (tabId) => {
       if (tabId === 'center') {
@@ -103,7 +110,7 @@ function AppShell() {
       if (!target) return;
       setStack([{ screen: target, params: {} }]);
     },
-  }), [current.screen, current.params, stack.length, isPro]);
+  }), [current.screen, current.params, stack.length, isPro, user, userState.loading]);
 
   const renderScreen = SCREENS[current.screen] || SCREENS.home;
   const view = renderScreen({ accent, density, params: current.params });

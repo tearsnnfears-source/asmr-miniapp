@@ -5,6 +5,9 @@
 function ShortsTab({ accent = C.pink, mode = 'grid' /* 'grid' | 'player' */ }) {
   if (mode === 'player') return <ShortsPlayer accent={accent} />;
 
+  const shortsState = window.useShorts(40);
+  const shorts = shortsState.data || [];
+
   return (
     <Phone>
       <AppHeader accent={accent} />
@@ -15,7 +18,7 @@ function ShortsTab({ accent = C.pink, mode = 'grid' /* 'grid' | 'player' */ }) {
             <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, letterSpacing: 1.4, lineHeight: 1 }}>
               <span style={{ color: accent }}>Shorts</span>
             </div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{SHORTS.length * 41} clips · all artists</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{shorts.length} clips · all artists</div>
           </div>
           <button style={{
             background: C.dark3, border: `1px solid ${C.border2}`,
@@ -61,7 +64,7 @@ function ShortsTab({ accent = C.pink, mode = 'grid' /* 'grid' | 'player' */ }) {
 
         {/* 2-column grid of shorts */}
         <div style={{ padding: '12px 14px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {SHORTS.map((s, i) => (
+          {shorts.map((s, i) => (
             <ShortsTile key={s.id} s={s} accent={accent} fresh={i < 2} />
           ))}
         </div>
@@ -99,7 +102,11 @@ function ShortsTile({ s, accent, fresh }) {
 // Swipe player (fullscreen vertical feed)
 function ShortsPlayer({ accent = C.pink }) {
   const nav = window.useNav();
-  const s = SHORTS[0];
+  const shortsState = window.useShorts(40);
+  const list = shortsState.data || [];
+  const requestedId = nav.params?.id;
+  const s = list.find(x => String(x.id) === String(requestedId)) || list[0] || SHORTS[0];
+  if (!s) return null;
   return (
     <Phone>
       {/* No header - immersive */}
@@ -176,7 +183,13 @@ function ShortsPlayer({ accent = C.pink }) {
 // ── VIDEO PAGE ────────────────────────────────────────────────
 function VideoPage({ accent = C.pink, density = 'comfortable' }) {
   const nav = window.useNav();
-  const v = VIDEOS[0];
+  const videosState = window.useVideos(500);
+  const list = videosState.data || [];
+  const requestedId = nav.params?.id;
+  const idx = Math.max(0, list.findIndex(x => String(x.id) === String(requestedId)));
+  const v = list[idx] || list[0] || VIDEOS[0];
+  const nextUp = list.slice(idx + 1, idx + 5);
+  if (!v) return null;
   return (
     <Phone>
       {/* Slim back bar (replaces header on watch screen) */}
@@ -289,7 +302,7 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
 
         {/* Next videos list */}
         <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {VIDEOS.slice(1, 5).map((nv, i) => (
+          {nextUp.map((nv) => (
             <CompactRow key={nv.id} v={nv} accent={accent} />
           ))}
         </div>
