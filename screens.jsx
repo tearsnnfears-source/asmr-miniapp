@@ -9,22 +9,26 @@ const SHORTS_LIMIT = 300;
 // ── SHORTS TAB ────────────────────────────────────────────────
 // The grid and the immersive player live in one component now so the grid
 // stays mounted while the player is open — preview videos don't have to
-// reload when the user dismisses the player.
+// reload when the user dismisses the player. AppShell additionally keeps
+// the whole ShortsTab mounted across tab switches (via visibility:hidden)
+// so the loaded video elements aren't blown away by Home/Saved tab clicks.
 function ShortsTab({ accent = C.pink }) {
-  const nav = window.useNav();
   const shortsState = window.useShorts(SHORTS_LIMIT);
   const allShorts = shortsState.data || [];
   const favState = window.useFavorites();
-  const savedIds = new Set((favState.data?.items || []).map(it => Number(it.raw?.content_id ?? it.id)));
+  const likedIds = new Set((favState.data?.items || []).map(it => Number(it.raw?.content_id ?? it.id)));
 
-  // Player overlay state — null = grid only, number = open at that idx.
-  const [playingIdx, setPlayingIdx] = React.useState(null);
+  // Player overlay state.
+  // playingPos = position in the currently active list (allShorts or shuffled).
+  // playOrder  = array of allShorts indices to walk through. null = use sequential.
+  const [playingPos, setPlayingPos] = React.useState(null);
+  const [playOrder, setPlayOrder] = React.useState(null);
 
   // While the overlay is open, swap the Telegram BackButton + history entry
   // so back/swipe closes the player instead of leaving the Shorts tab.
   React.useEffect(() => {
     const tg = window.Telegram?.WebApp;
-    if (playingIdx == null) {
+    if (playingPos == null) {
       tg?.enableVerticalSwipes?.();
       return undefined;
     }
@@ -32,40 +36,64 @@ function ShortsTab({ accent = C.pink }) {
     tg?.expand?.();
     // Push a history entry so hardware back is intercepted by popstate.
     try { history.pushState({ shortsOverlay: true }, ''); } catch (_) {}
-    const onPop = (e) => { setPlayingIdx(null); };
+    const onPop = (e) => { setPlayingPos(null); setPlayOrder(null); };
     window.addEventListener('popstate', onPop);
     return () => {
       window.removeEventListener('popstate', onPop);
       tg?.enableVerticalSwipes?.();
     };
-  }, [playingIdx != null]);
+  }, [playingPos != null]);
 
-  // Static filter set; artist pills are appended dynamically below.
-  const [filter, setFilter] = React.useState('latest');
+  // Filter state — null = default (random shuffle), or one of the named
+  // filters: 'newest' | 'best' | 'liked' | 'artist:<name>'.
+  const [filter, setFilter] = React.useState(null);
   const [visible, setVisible] = React.useState(20);
 
   // Reset visible count when the filter changes (otherwise "Load more" leaks
   // state across filter changes and shows confusing tile counts).
   React.useEffect(() => { setVisible(20); }, [filter]);
 
+  // Stable random ordering for the default view. Reshuffled only when the
+  // underlying shorts list itself changes (new fetch).
+  const randomShorts = React.useMemo(() => {
+    const arr = [...allShorts];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }, [allShorts]);
+
   // Apply the active filter to produce the rendered list.
   const filteredShorts = React.useMemo(() => {
-    if (filter === 'latest') return allShorts;
-    if (filter === 'most-liked') {
-      // No reaction-count field on /miniapp/shorts response yet, so this is
-      // a best-effort: sort by views which usually correlates. Once the
-      // backend exposes per-content reaction totals we can switch to that.
-      return [...allShorts].sort((a, b) => (b.raw?.views || 0) - (a.raw?.views || 0));
+    if (filter == null) return randomShorts;
+    if (filter === 'newest') {
+      // Latest first by created_at (raw.created_at), falling back to id.
+      return [...allShorts].sort((a, b) => {
+        const ta = new Date(a.raw?.created_at || 0).getTime();
+        const tb = new Date(b.raw?.created_at || 0).getTime();
+        if (ta !== tb) return tb - ta;
+        return (b.raw?.id || 0) - (a.raw?.id || 0);
+      });
     }
-    if (filter === 'saved') {
-      return allShorts.filter(s => savedIds.has(Number(s.raw?.id ?? s.id)));
+    if (filter === 'best') {
+      // Best-effort sort by reaction/like count if backend ever ships it,
+      // otherwise by views (proxy for popularity).
+      return [...allShorts].sort((a, b) => {
+        const la = a.raw?.reaction_count ?? a.raw?.likes ?? a.raw?.views ?? 0;
+        const lb = b.raw?.reaction_count ?? b.raw?.likes ?? b.raw?.views ?? 0;
+        return lb - la;
+      });
+    }
+    if (filter === 'liked') {
+      return allShorts.filter(s => likedIds.has(Number(s.raw?.id ?? s.id)));
     }
     if (filter.startsWith('artist:')) {
       const name = filter.slice('artist:'.length);
       return allShorts.filter(s => s.artist?.name === name);
     }
     return allShorts;
-  }, [allShorts, filter, savedIds]);
+  }, [allShorts, randomShorts, filter, likedIds]);
 
   // Unique artist names appearing in the loaded shorts list — for dynamic
   // artist pills. Capped to keep the chip row short.
@@ -81,10 +109,18 @@ function ShortsTab({ accent = C.pink }) {
     return out;
   }, [allShorts]);
 
+  // Play All — build a shuffled index list spanning all shorts (not filtered),
+  // start at position 0. Swiping inside the player walks through the order
+  // top-to-bottom, so the counter reads "1/N" and goes to "N/N".
   const onPlayAll = () => {
-    if (!filteredShorts.length) return;
-    const pick = filteredShorts[Math.floor(Math.random() * filteredShorts.length)];
-    setPlayingIdx(allShorts.indexOf(pick));
+    if (!allShorts.length) return;
+    const order = Array.from({ length: allShorts.length }, (_, i) => i);
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    setPlayOrder(order);
+    setPlayingPos(0);
   };
 
   return (
@@ -99,13 +135,14 @@ function ShortsTab({ accent = C.pink }) {
           <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{allShorts.length} clips · all artists</div>
         </div>
 
-        {/* Filter chips: Latest / Most Liked / Saved / <artists…> */}
+        {/* Filter chips: Newest / Best / Liked / <artists…>.
+            No chip is active by default — tab opens with a random shuffle. */}
         <div style={{ display: 'flex', gap: 6, padding: '10px 14px 6px', overflowX: 'auto' }}>
-          <Chip active={filter === 'latest'} accent={accent} onClick={() => setFilter('latest')}>Latest</Chip>
-          <Chip active={filter === 'most-liked'} accent={accent} onClick={() => setFilter('most-liked')}>Most Liked</Chip>
-          <Chip active={filter === 'saved'} accent={accent} onClick={() => setFilter('saved')}>Saved</Chip>
+          <Chip active={filter === 'newest'} accent={accent} onClick={() => setFilter(filter === 'newest' ? null : 'newest')}>Newest</Chip>
+          <Chip active={filter === 'best'} accent={accent} onClick={() => setFilter(filter === 'best' ? null : 'best')}>Best</Chip>
+          <Chip active={filter === 'liked'} accent={accent} onClick={() => setFilter(filter === 'liked' ? null : 'liked')}>Liked</Chip>
           {artistNames.map(name => (
-            <Chip key={name} active={filter === `artist:${name}`} accent={accent} onClick={() => setFilter(`artist:${name}`)}>{name}</Chip>
+            <Chip key={name} active={filter === `artist:${name}`} accent={accent} onClick={() => setFilter(filter === `artist:${name}` ? null : `artist:${name}`)}>{name}</Chip>
           ))}
         </div>
 
@@ -133,15 +170,20 @@ function ShortsTab({ accent = C.pink }) {
           </div>
         </div>
 
-        {/* 2-column grid of shorts (capped to `visible`) */}
+        {/* 2-column grid of shorts (capped to `visible`).
+            Tap on a tile opens the player in sequential mode over the
+            *filtered* list, so swiping continues through the user's current
+            filter (Newest, by-artist, etc.). */}
         <div style={{ padding: '12px 14px 12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {filteredShorts.slice(0, visible).map((s) => {
-            const globalIdx = allShorts.indexOf(s);
-            return (
-              <ShortsTile key={s.id} s={s} idx={globalIdx} accent={accent} fresh={globalIdx < 2}
-                onOpen={(i) => setPlayingIdx(i)} />
-            );
-          })}
+          {filteredShorts.slice(0, visible).map((s, i) => (
+            <ShortsTile key={s.id} s={s} idx={i} accent={accent} fresh={false}
+              onOpen={(pos) => {
+                // Use the filtered list as the playback order.
+                const order = filteredShorts.map(x => allShorts.indexOf(x));
+                setPlayOrder(order);
+                setPlayingPos(pos);
+              }} />
+          ))}
         </div>
         {visible < filteredShorts.length && (
           <div style={{ padding: '4px 14px 18px' }}>
@@ -157,23 +199,24 @@ function ShortsTab({ accent = C.pink }) {
             }}>Load more ({filteredShorts.length - visible} left)</button>
           </div>
         )}
-        {filter === 'saved' && filteredShorts.length === 0 && (
+        {filter === 'liked' && filteredShorts.length === 0 && (
           <div style={{ padding: '40px 14px', textAlign: 'center', color: C.muted, fontSize: 13 }}>
-            <div style={{ fontSize: 32, marginBottom: 10 }}>⭐</div>
-            No saved shorts yet — tap the bookmark icon on any short to save.
+            <div style={{ fontSize: 32, marginBottom: 10 }}>❤️</div>
+            No liked shorts yet — tap the heart on any short to like it.
           </div>
         )}
       </div>
       <BottomNav active="shorts" accent={accent} />
       {/* Overlay player. Grid stays mounted behind, so preview videos keep
           their loaded URLs / video elements between open and close. */}
-      {playingIdx != null && (
+      {playingPos != null && playOrder && (
         <ShortsPlayer
           accent={accent}
           allShorts={allShorts}
-          idx={playingIdx}
-          setIdx={setPlayingIdx}
-          onClose={() => setPlayingIdx(null)}
+          order={playOrder}
+          pos={playingPos}
+          setPos={setPlayingPos}
+          onClose={() => { setPlayingPos(null); setPlayOrder(null); }}
         />
       )}
     </Phone>
@@ -210,14 +253,22 @@ function ShortsTile({ s, idx, accent, fresh, onOpen }) {
 
 // Swipe player (fullscreen vertical feed). Rendered as a sibling overlay
 // inside ShortsTab so the grid stays mounted behind it.
-function ShortsPlayer({ accent = C.pink, allShorts, idx: extIdx, setIdx, onClose }) {
-  const list = allShorts || [];
-  const idx = Math.max(0, Math.min(list.length - 1, extIdx ?? 0));
-  const s = list[idx];
-  const goIdx = (newIdx) => {
-    if (newIdx < 0 || newIdx >= list.length) return;
-    setIdx && setIdx(newIdx);
+//
+// order  — array of indices into allShorts that define the playback sequence
+//          (e.g. shuffled for Play All, filtered list for tile taps).
+// pos    — current position *within* `order` (0..order.length-1).
+function ShortsPlayer({ accent = C.pink, allShorts, order, pos, setPos, onClose }) {
+  const total = order?.length || 0;
+  const safePos = Math.max(0, Math.min(total - 1, pos ?? 0));
+  const realIdx = order ? order[safePos] : safePos;
+  const s = (allShorts || [])[realIdx];
+  const goIdx = (newPos) => {
+    if (newPos < 0 || newPos >= total) return;
+    setPos && setPos(newPos);
   };
+  // Aliases so the rest of the function still reads naturally.
+  const idx = safePos;
+  const list = { length: total };
   // Enrich artist with photo from useArtists (same matching by name as other screens).
   const artistsState = window.useArtists();
   const liveArtist = (artistsState.data || []).find(a => a.name === s?.artist?.name);
@@ -231,42 +282,37 @@ function ShortsPlayer({ accent = C.pink, allShorts, idx: extIdx, setIdx, onClose
   const serverHeartCount = reactions.counts?.['❤️'] || 0;
   const favStatus = window.useFavoriteStatus(contentId);
 
-  // Local optimistic overrides per content. Keyed by contentId so swiping
-  // to another short resets them. Set to null = use server state.
-  const [heartOverride, setHeartOverride] = React.useState({});
-  const [saveOverride, setSaveOverride] = React.useState({});
+  // One source of truth: a tap on the heart toggles BOTH the public reaction
+  // (so the count updates for everyone) AND the user's personal favorites
+  // (so the short shows up under Saved → Liked shorts). The button's filled
+  // state follows the favorite, since that's the user-personal side; the
+  // count tracks public reactions.
+  const [likeOverride, setLikeOverride] = React.useState({});
   const [followed, setFollowed] = React.useState(false);
 
-  const heartLocal = heartOverride[contentId];
-  const userHearted = heartLocal != null ? heartLocal : serverHearted;
+  const localLiked = likeOverride[contentId];
+  const isLiked = localLiked != null ? localLiked : (favStatus.favorited || serverHearted);
+  // Heart counter: server total, adjusted by ±1 while the optimistic flip
+  // hasn't yet been confirmed.
   const heartCount = serverHeartCount + (
-    heartLocal == null ? 0 :
-    heartLocal && !serverHearted ? 1 :
-    !heartLocal && serverHearted ? -1 : 0
+    localLiked == null ? 0 :
+    localLiked && !serverHearted ? 1 :
+    !localLiked && serverHearted ? -1 : 0
   );
-
-  const saveLocal = saveOverride[contentId];
-  const isSaved = saveLocal != null ? saveLocal : favStatus.favorited;
 
   if (!s) return null;
 
-  const onHeart = () => {
-    const next = !userHearted;
-    setHeartOverride(o => ({ ...o, [contentId]: next }));
-    window.actionReact(contentId, '❤️').then(r => {
-      if (!r.ok) {
-        setHeartOverride(o => ({ ...o, [contentId]: !next }));
-        console.warn('[react]', r);
-      }
-    });
-  };
-  const onSave = () => {
-    const next = !isSaved;
-    setSaveOverride(o => ({ ...o, [contentId]: next }));
-    window.actionFavoriteToggle(contentId).then(r => {
-      if (!r.ok) {
-        setSaveOverride(o => ({ ...o, [contentId]: !next }));
-        console.warn('[fav]', r);
+  const onLike = () => {
+    const next = !isLiked;
+    setLikeOverride(o => ({ ...o, [contentId]: next }));
+    // Fire both in parallel — independent endpoints, rollback only if both fail.
+    Promise.all([
+      window.actionReact(contentId, '❤️'),
+      window.actionFavoriteToggle(contentId),
+    ]).then(([r1, r2]) => {
+      if (!r1.ok && !r2.ok) {
+        setLikeOverride(o => ({ ...o, [contentId]: !next }));
+        console.warn('[like]', { react: r1, fav: r2 });
       }
     });
   };
@@ -279,16 +325,10 @@ function ShortsPlayer({ accent = C.pink, allShorts, idx: extIdx, setIdx, onClose
 
   const actionButtons = [
     {
-      icon: userHearted ? <Ico.heartFilled /> : <Ico.heart />,
+      icon: isLiked ? <Ico.heartFilled /> : <Ico.heart />,
       label: compactNum(Math.max(0, heartCount)),
-      color: userHearted ? accent : '#fff',
-      onClick: onHeart,
-    },
-    {
-      icon: <Ico.bookmark />,
-      label: isSaved ? 'Saved' : 'Save',
-      color: isSaved ? accent : '#fff',
-      onClick: onSave,
+      color: isLiked ? accent : '#fff',
+      onClick: onLike,
     },
   ];
 

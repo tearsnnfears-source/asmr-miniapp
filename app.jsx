@@ -86,9 +86,12 @@ function AppShell() {
   React.useEffect(() => {
     const list = shortsState.data || [];
     if (!list.length) return;
-    const ids = list.slice(0, 12).map(s => s.raw?.id ?? s.id).filter(x => x != null);
+    // First 24 covers the initial 2-col grid of 12 rows that the user sees
+    // without scrolling — they'll all have warm /content/play URLs by the
+    // time they open the tab.
+    const ids = list.slice(0, 24).map(s => s.raw?.id ?? s.id).filter(x => x != null);
     if (ids.length && window.prefetchPlayable) {
-      window.prefetchPlayable(ids, 3);
+      window.prefetchPlayable(ids, 4);
     }
   }, [shortsState.data]);
   // Tweak toggle still wins for local testing.
@@ -227,7 +230,28 @@ function AppShell() {
 
   return (
     <NavContext.Provider value={nav}>
-      <PhoneStage>{view}</PhoneStage>
+      <PhoneStage>
+        {/* Layered stage: ShortsTab is always mounted so the 200+ short-tile
+            preview videos stay loaded across tab switches. The other screens
+            are mounted on demand. visibility:hidden + position:absolute keep
+            ShortsTab out of layout while still keeping its <video> elements
+            alive in the DOM (no reload on return). */}
+        <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', flexDirection: 'column',
+            visibility: current.screen === 'shorts' ? 'visible' : 'hidden',
+            pointerEvents: current.screen === 'shorts' ? 'auto' : 'none',
+          }}>
+            <window.ShortsTab accent={accent} />
+          </div>
+          {current.screen !== 'shorts' && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
+              {view}
+            </div>
+          )}
+        </div>
+      </PhoneStage>
       <window.DebugFab />
 
       {showTweaks && (
