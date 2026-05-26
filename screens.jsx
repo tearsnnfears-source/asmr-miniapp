@@ -4,7 +4,7 @@
 // Single cache key for every consumer of the shorts list — anything that
 // uses useShorts must pass this constant so ShortsTab grid and ShortsPlayer
 // see the exact same array (preventing index/id mismatch on tap-through).
-const SHORTS_LIMIT = 50;
+const SHORTS_LIMIT = 300;
 
 // ── SHORTS TAB ────────────────────────────────────────────────
 // The grid and the immersive player live in one component now so the grid

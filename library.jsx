@@ -258,7 +258,7 @@ function LikedShorts({ accent }) {
   // To open in ShortsPlayer the player needs an index into useShorts(SHORTS_LIMIT).
   // For now we just open the saved short by content id — same matching as on the
   // Shorts grid (idx based). Map favorites → indices in the shorts cache.
-  const shortsCache = window._apiCache?.get('shorts:50')?.data || [];
+  const shortsCache = window._apiCache?.get('shorts:300')?.data || [];
   if (favState.loading && !items.length) {
     return <div style={{ padding: '40px 14px', textAlign: 'center', color: C.muted, fontSize: 13 }}>Loading your saved shorts…</div>;
   }

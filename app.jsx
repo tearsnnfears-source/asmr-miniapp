@@ -77,7 +77,7 @@ function AppShell() {
   // Must match SHORTS_LIMIT in screens.jsx — otherwise ShortsTab and the warm
   // cache would have different keys and the player would index into the wrong
   // array.
-  const shortsState = window.useShorts(50);
+  const shortsState = window.useShorts(300);
   const artistsState = window.useArtists();
   window.useFavorites();
 
@@ -211,6 +211,18 @@ function AppShell() {
   React.useEffect(() => {
     try { history.pushState({ stackLen: 1 }, ''); } catch (_) {}
   }, []);
+
+  // Telegram fires this when the user tries to close the app via swipe-down
+  // or the OS back gesture. On non-Home screens, intercept and nav.back().
+  React.useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    if (!tg) return;
+    if (stack.length > 1) {
+      tg.enableClosingConfirmation?.();
+    } else {
+      tg.disableClosingConfirmation?.();
+    }
+  }, [stack.length]);
 
 
   return (
@@ -346,7 +358,59 @@ if (typeof document !== 'undefined' && !document.getElementById('phone-fill-styl
   document.head.appendChild(s);
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<AppShell />);
+// Error boundary so a crashed screen doesn't leave the user staring at
+// black. Shows the error + a back-to-home button. Catches errors from any
+// screen below it.
+class AppErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { err: null, info: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  componentDidCatch(err, info) {
+    console.error('[boundary]', err, info);
+    this.setState({ err, info });
+    // Make sure the static splash is gone so the user can see the error.
+    try { window.__hideSplash && window.__hideSplash(); } catch (_) {}
+    // Also feed it into the debug log so the 🐛 panel shows it.
+    try {
+      window.__debugLog?.push({
+        kind: 'POST', path: '(react crash)', ok: false, ms: 0,
+        error: String(err && err.message || err),
+        data: { stack: (err && err.stack || '').slice(0, 1200), componentStack: (info && info.componentStack || '').slice(0, 1200) },
+      });
+    } catch (_) {}
+  }
+  render() {
+    if (this.state.err) {
+      return (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 99999,
+          background: '#0E0E0F', color: '#fff',
+          padding: 24, overflowY: 'auto',
+          fontFamily: "'DM Sans', system-ui, sans-serif",
+          paddingTop: 'calc(24px + env(safe-area-inset-top, 0px))',
+        }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#FF6B4A', marginBottom: 8 }}>UI crashed</div>
+          <div style={{ fontSize: 13, marginBottom: 12 }}>{String(this.state.err && this.state.err.message || this.state.err)}</div>
+          <pre style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.04)', padding: 10, borderRadius: 8, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
+            {String((this.state.err && this.state.err.stack) || '').slice(0, 1500)}
+          </pre>
+          <pre style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.04)', padding: 10, borderRadius: 8, marginTop: 8, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
+            {String((this.state.info && this.state.info.componentStack) || '').slice(0, 1500)}
+          </pre>
+          <button onClick={() => { this.setState({ err: null, info: null }); try { location.reload(); } catch (_) {} }} style={{
+            marginTop: 16, padding: '10px 20px',
+            background: '#FF7EC8', color: '#000', border: 'none',
+            borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+          }}>Reload</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <AppErrorBoundary><AppShell /></AppErrorBoundary>
+);
 
 window.AppShell = AppShell;
 window.NavContext = NavContext;
