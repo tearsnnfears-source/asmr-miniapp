@@ -194,9 +194,9 @@ function compactViews(n) {
 function normalizeVideo(v, idx = 0) {
   const artistName = v.artist_name || v.artistName || 'Unknown';
   const artistId = 'a-' + (v.artist_id || artistName.toLowerCase().replace(/\W+/g, ''));
-  // Keep id in its native shape (server gives numeric IDs); FeedCard onClick
-  // routes through this id and VideoPage's /miniapp/content/play needs it numeric.
-  const rawId = v.id != null ? v.id : `v${idx}`;
+  // Real backend id (numeric). If missing — return null id so the UI can
+  // skip the row rather than show a broken thumb that opens the wrong video.
+  const rawId = (v.id ?? v.content_id) != null ? (v.id ?? v.content_id) : null;
   return {
     id: rawId,
     title: v.title || 'Untitled',
@@ -217,10 +217,11 @@ function normalizeVideo(v, idx = 0) {
 }
 function normalizeShort(s, idx = 0) {
   const artistName = s.artist_name || s.artistName || s.artist || 'Unknown';
+  const rawId = (s.id ?? s.content_id) != null ? (s.id ?? s.content_id) : null;
   return {
-    id: s.id != null ? String(s.id) : `s${idx}`,
-    label: s.title || s.label || 'Short',
-    duration: s.duration || '0:30',
+    id: rawId,
+    label: s.title || s.label || '',
+    duration: s.duration || '',         // no '0:30' fallback — UI hides empty
     views: compactViews(s.views || 0),
     thumb: thumbFor(s),
     raw: s,
@@ -239,7 +240,9 @@ function useVideos(limit = 500) {
     `videos:${limit}`,
     async () => {
       const data = await apiGet('/miniapp/videos', { limit });
-      const list = (data.videos || []).map(normalizeVideo);
+      // Drop entries without a real backend id — they'd open the wrong video
+      // when tapped (mismatch on content_id during /content/play lookup).
+      const list = (data.videos || []).map(normalizeVideo).filter(v => v.id != null);
       if (!list.length) throw new Error('empty videos');
       return list;
     },
@@ -253,7 +256,7 @@ function useShorts(limit = 10) {
     `shorts:${limit}`,
     async () => {
       const data = await apiGet('/miniapp/shorts', { limit });
-      const list = (data.shorts || []).map(normalizeShort);
+      const list = (data.shorts || []).map(normalizeShort).filter(s => s.id != null);
       if (!list.length) throw new Error('empty shorts');
       return list;
     },

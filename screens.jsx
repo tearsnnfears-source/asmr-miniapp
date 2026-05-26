@@ -118,8 +118,10 @@ function ShortsTile({ s, accent, fresh }) {
       overflow: 'hidden', background: s.thumb.bg, cursor: 'pointer',
     }}>
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.75) 100%)' }} />
-      {/* duration top-right */}
-      <span style={{ position: 'absolute', right: 7, top: 7, background: 'rgba(0,0,0,0.78)', padding: '2px 6px', borderRadius: 6, fontSize: 10, fontWeight: 600 }}>{s.duration}</span>
+      {/* duration top-right (hide if backend didn't ship one) */}
+      {s.duration && (
+        <span style={{ position: 'absolute', right: 7, top: 7, background: 'rgba(0,0,0,0.78)', padding: '2px 6px', borderRadius: 6, fontSize: 10, fontWeight: 600 }}>{s.duration}</span>
+      )}
       {fresh && (
         <span style={{ position: 'absolute', left: 7, top: 7, background: accent, color: '#000', padding: '3px 7px', borderRadius: 999, fontSize: 9, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase' }}>NEW</span>
       )}
@@ -154,7 +156,7 @@ function ShortsPlayer({ accent = C.pink }) {
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, transparent 25%, transparent 55%, rgba(0,0,0,0.85) 100%)', pointerEvents: 'none' }} />
 
         {/* top row: back + counter */}
-        <div style={{ position: 'absolute', top: 50, left: 12, right: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ position: 'absolute', top: 'calc(12px + env(safe-area-inset-top, 0px))', left: 12, right: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <button onClick={() => nav.back()} style={{
             width: 36, height: 36, borderRadius: '50%',
             background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
@@ -203,8 +205,12 @@ function ShortsPlayer({ accent = C.pink }) {
               padding: '5px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: 'pointer',
             }}>Follow</button>
           </div>
-          <div style={{ fontSize: 13, lineHeight: 1.35, marginBottom: 6 }}>{s.label} · slow trigger sounds for late-night winding down</div>
-          <div style={{ fontSize: 10, color: C.muted, fontWeight: 600, letterSpacing: 0.5 }}>{s.views} views · {s.duration}</div>
+          {s.label && (
+            <div style={{ fontSize: 13, lineHeight: 1.35, marginBottom: 6 }}>{s.label}</div>
+          )}
+          <div style={{ fontSize: 10, color: C.muted, fontWeight: 600, letterSpacing: 0.5 }}>
+            {s.views} views{s.duration ? ` · ${s.duration}` : ''}
+          </div>
         </div>
 
         {/* progress bar */}

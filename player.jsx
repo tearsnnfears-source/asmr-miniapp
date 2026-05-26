@@ -59,9 +59,14 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
     setPhase('loading');
     setErrorMsg('');
 
-    // Resolve a numeric backend content_id. Prefer raw.id (from /miniapp/videos).
-    // Falls back to v.id but strips any 'v' prefix we added in normalizeVideo.
-    const contentId = v.raw?.id ?? (typeof v.id === 'string' ? v.id.replace(/^v/, '') : v.id);
+    // Resolve a numeric backend content_id. Prefer raw.id / raw.content_id
+    // (the unmodified server value); fall back to the normalized v.id.
+    const contentId = v.raw?.id ?? v.raw?.content_id ?? v.id;
+    if (contentId == null) {
+      setPhase('error');
+      setErrorMsg('No content id');
+      return;
+    }
 
     let url = '';
     try {
