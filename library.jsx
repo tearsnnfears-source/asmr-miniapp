@@ -280,6 +280,7 @@ function LikedVideos({ accent }) {
   const nav = window.useNav();
   const favState = window.useFavorites();
   const items = favState.data?.videos || [];
+  const [visible, setVisible] = React.useState(8);
   if (favState.loading && !items.length) {
     return (
       <div style={{ padding: '40px 14px', textAlign: 'center', color: C.muted, fontSize: 13 }}>
@@ -299,22 +300,33 @@ function LikedVideos({ accent }) {
     );
   }
   return (
-    <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {items.map(v => (
-        <div key={v.id} onClick={() => nav.go('video', { id: v.id, video: v })} style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
-          <div style={{ width: 130, flexShrink: 0 }}>
-            <Thumb thumb={v.thumb} duration={v.duration} />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{v.title}</div>
-            <div style={{ fontSize: 10.5, color: C.muted, marginTop: 4 }}>{v.artist.name}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-              <span style={{ color: accent }}><Ico.heartFilled /></span>
-              <span style={{ fontSize: 10, color: C.muted }}>{v.age || 'Saved'}</span>
+    <div>
+      <div style={{ padding: '6px 14px 8px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {items.slice(0, visible).map(v => (
+          <div key={v.id} onClick={() => nav.go('video', { id: v.id, video: v })} style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
+            <div style={{ width: 130, flexShrink: 0 }}>
+              <Thumb thumb={v.thumb} duration={v.duration} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{v.title}</div>
+              <div style={{ fontSize: 10.5, color: C.muted, marginTop: 4 }}>{v.artist.name}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                <span style={{ color: accent }}><Ico.heartFilled /></span>
+                <span style={{ fontSize: 10, color: C.muted }}>{v.age || 'Saved'}</span>
+              </div>
             </div>
           </div>
+        ))}
+      </div>
+      {visible < items.length && (
+        <div style={{ padding: '4px 14px 18px' }}>
+          <button onClick={() => setVisible(v => v + 8)} style={{
+            width: '100%', background: 'transparent', color: accent,
+            border: `1px solid ${accent}55`, borderRadius: 12, padding: '12px',
+            fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+          }}>Load more ({items.length - visible} left)</button>
         </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -377,21 +389,31 @@ function LikedShorts({ accent }) {
   );
 }
 
-function CollectionTile({ name, count, thumbs, accent, kind = 'playlist', subtitle }) {
-  // 2x2 mosaic of thumbnails + label
+function CollectionTile({ name, count, thumbs, accent, kind = 'playlist', subtitle, onClick }) {
+  // 2x2 mosaic of REAL thumbnails (URL strings). Falls back to a gradient
+  // panel for each slot the backend didn't fill (e.g. brand-new empty playlist).
+  const slots = (thumbs || []).slice(0, 4);
+  while (slots.length < 4) slots.push('');
   return (
-    <div style={{ cursor: 'pointer' }}>
+    <div onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
       <div style={{
         position: 'relative', aspectRatio: '1/1', borderRadius: 14,
         overflow: 'hidden',
         display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 2,
         background: C.dark3,
       }}>
-        {thumbs.slice(0,4).map((tIdx, i) => {
-          const th = window.makeThumb(tIdx);
-          return <div key={i} style={{ background: th.bg, position: 'relative' }}>
-            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.18)' }} />
-          </div>;
+        {slots.map((url, i) => {
+          const fallback = window.makeThumb(i).bg;
+          return (
+            <div key={i} style={{
+              position: 'relative',
+              background: url
+                ? `url('${String(url).replace(/'/g, "\\'")}') center/cover no-repeat`
+                : fallback,
+            }}>
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.18)' }} />
+            </div>
+          );
         })}
         <span style={{
           position: 'absolute', right: 8, bottom: 8,
@@ -410,8 +432,9 @@ function CollectionTile({ name, count, thumbs, accent, kind = 'playlist', subtit
 }
 
 // Live playlists pulled from /miniapp/playlists. The user can create a new
-// playlist with a name prompt; deleting / removing items can be added later.
+// playlist; tapping a tile opens the playlist screen with all items.
 function VideoPlaylists({ accent }) {
+  const nav = window.useNav();
   const state = window.useUserPlaylists();
   const playlists = state.data?.playlists || [];
   const [busy, setBusy] = React.useState(false);
@@ -446,10 +469,11 @@ function VideoPlaylists({ accent }) {
             key={p.id}
             name={p.name}
             count={p.item_count || 0}
-            thumbs={[0, 1, 2, 3]}
+            thumbs={p.thumbs || []}
             accent={accent}
             kind="playlist"
             subtitle={`${p.item_count || 0} videos`}
+            onClick={() => nav.go('playlist', { id: p.id, name: p.name })}
           />
         ))}
       </div>
@@ -462,6 +486,7 @@ function VideoPlaylists({ accent }) {
 function LikedPhotos({ accent }) {
   const favState = window.useFavorites();
   const items = favState.data?.photos || [];
+  const [visible, setVisible] = React.useState(15);
   const [lightboxIdx, setLightboxIdx] = React.useState(null);
   if (favState.loading && !items.length) {
     return <div style={{ padding: '40px 14px', textAlign: 'center', color: C.muted, fontSize: 13 }}>Loading liked photos…</div>;
@@ -478,9 +503,9 @@ function LikedPhotos({ accent }) {
     );
   }
   return (
-    <div style={{ padding: '6px 14px 16px' }}>
+    <div style={{ padding: '6px 14px 8px' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
-        {items.map((p, i) => {
+        {items.slice(0, visible).map((p, i) => {
           const url = p.thumb?.src || p.raw?.thumbnail_url || '';
           return (
             <div key={p.id || i} onClick={() => setLightboxIdx(i)} style={{
@@ -496,6 +521,15 @@ function LikedPhotos({ accent }) {
           );
         })}
       </div>
+      {visible < items.length && (
+        <div style={{ padding: '10px 0 16px' }}>
+          <button onClick={() => setVisible(v => v + 15)} style={{
+            width: '100%', background: 'transparent', color: accent,
+            border: `1px solid ${accent}55`, borderRadius: 12, padding: '12px',
+            fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+          }}>Load more ({items.length - visible} left)</button>
+        </div>
+      )}
       {lightboxIdx != null && (
         <window.PhotoLightbox
           photos={items}
@@ -508,4 +542,67 @@ function LikedPhotos({ accent }) {
   );
 }
 
-Object.assign(window, { ArtistsPage, SavedPage });
+// ── PLAYLIST PAGE ─────────────────────────────────────────────
+// Items of one playlist. Opened from Saved → Playlists tile tap.
+function PlaylistPage({ accent = C.pink }) {
+  const nav = window.useNav();
+  const playlistId = nav.params?.id;
+  const name = nav.params?.name || 'Playlist';
+  const state = window.usePlaylistItems(playlistId);
+  const items = state.data?.items || [];
+  return (
+    <Phone>
+      <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.dark2, borderBottom: `1px solid ${C.border}` }}>
+        <button onClick={() => nav.back()} style={{ ...iconBtn(), border: 'none' }}><Ico.chevL /></button>
+        <span style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'center', padding: '0 12px' }}>{name}</span>
+        <div style={{ width: 38 }} />
+      </div>
+      <div style={SCROLL_BODY}>
+        <div style={{ padding: '12px 14px 8px', fontSize: 12, color: C.muted }}>
+          {items.length} videos
+        </div>
+        {state.loading && !items.length && (
+          <div style={{ padding: '40px 14px', textAlign: 'center', color: C.muted, fontSize: 13 }}>Loading…</div>
+        )}
+        {!state.loading && !items.length && (
+          <div style={{ padding: '40px 14px', textAlign: 'center' }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>📂</div>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Empty playlist</div>
+            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+              Add videos from any video page.
+            </div>
+          </div>
+        )}
+        <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {items.map(v => (
+            <div key={v.id} onClick={() => nav.go('video', { id: v.id, video: v })} style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
+              <div style={{ width: 130, flexShrink: 0 }}>
+                <Thumb thumb={v.thumb} duration={v.duration} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{v.title}</div>
+                <div style={{ fontSize: 10.5, color: C.muted, marginTop: 4 }}>{v.artist.name}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <BottomNav active="favorites" accent={accent} />
+    </Phone>
+  );
+}
+// Inline icon button style — pages.jsx already exports one, but library.jsx
+// is loaded before pages.jsx, so we redeclare locally.
+function iconBtn() {
+  return {
+    position: 'relative',
+    width: 38, height: 38, borderRadius: 12,
+    background: 'transparent',
+    border: `1px solid ${C.border}`,
+    color: C.text, cursor: 'pointer',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    fontFamily: 'inherit',
+  };
+}
+
+Object.assign(window, { ArtistsPage, SavedPage, PlaylistPage });
