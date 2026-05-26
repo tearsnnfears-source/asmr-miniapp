@@ -459,6 +459,24 @@ function PhotoLightbox({ photos, index, onClose, onNav }) {
   const [err, setErr] = React.useState('');
   const [loading, setLoading] = React.useState(true);
 
+  // Like-state for the current photo — uses the same favorites pipeline as
+  // videos/shorts. Optimistic flip, rollback on backend failure.
+  const contentId = photo?.raw?.id ?? photo?.id;
+  const favStatus = window.useFavoriteStatus ? window.useFavoriteStatus(contentId) : { favorited: false };
+  const [override, setOverride] = React.useState({});
+  const isLiked = override[contentId] != null ? override[contentId] : favStatus.favorited;
+  const onLike = () => {
+    if (contentId == null) return;
+    const next = !isLiked;
+    setOverride(o => ({ ...o, [contentId]: next }));
+    window.actionFavoriteToggle?.(contentId).then(r => {
+      if (!r.ok) {
+        setOverride(o => ({ ...o, [contentId]: !next }));
+        console.warn('[photo like]', r);
+      }
+    });
+  };
+
   React.useEffect(() => {
     if (!photo) return;
     let alive = true;
@@ -550,6 +568,27 @@ function PhotoLightbox({ photos, index, onClose, onNav }) {
             userSelect: 'none', pointerEvents: 'none',
           }}
         />
+      )}
+      {/* Heart button — like = add to favorites (Liked photos tab) */}
+      {contentId != null && (
+        <button onClick={onLike} style={{
+          position: 'absolute',
+          bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))',
+          right: 16,
+          width: 52, height: 52, borderRadius: '50%',
+          background: isLiked ? '#FF7EC8' : 'rgba(0,0,0,0.55)',
+          border: 'none',
+          color: isLiked ? '#000' : '#fff',
+          cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: isLiked ? '0 8px 24px rgba(255,126,200,0.5)' : '0 4px 12px rgba(0,0,0,0.4)',
+        }}>
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" stroke="currentColor" strokeWidth="1.8">
+            {isLiked
+              ? <path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z" />
+              : <path fill="none" d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z" />}
+          </svg>
+        </button>
       )}
       {/* Watermark — same SVG path as the live miniapp lightbox. */}
       <div style={{ position: 'absolute', bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))', left: 16, pointerEvents: 'none', userSelect: 'none', opacity: 0.28 }}>

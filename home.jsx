@@ -185,7 +185,7 @@ function CompactRow({ v, accent }) {
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
         }}>{v.title}</div>
         <div style={{ fontSize: 10.5, color: C.muted, marginTop: 4, fontWeight: 500 }}>{v.artist.name}</div>
-        <div style={{ fontSize: 10.5, color: C.muted, marginTop: 2 }}>{v.views} · {v.age}</div>
+        <div style={{ fontSize: 10.5, color: C.muted, marginTop: 2 }}>{v.views} views · {v.age}</div>
         {v.artist.fresh && (
           <span style={{ display: 'inline-block', marginTop: 6, fontSize: 9, padding: '2px 6px', background: `${accent}22`, color: accent, borderRadius: 4, fontWeight: 700, letterSpacing: 0.5 }}>FRESH ARTIST</span>
         )}
@@ -251,7 +251,7 @@ function MosaicCard({ v, accent, wide }) {
         }}>{v.title}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
           <Avatar artist={v.artist} size={16} />
-          <div style={{ fontSize: 10, color: C.muted, fontWeight: 500, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{v.artist.name} · {v.views}</div>
+          <div style={{ fontSize: 10, color: C.muted, fontWeight: 500, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{v.artist.name} · {v.views} views</div>
         </div>
       </div>
     </div>

@@ -565,6 +565,83 @@ function useArtistContentList(artistName, type /* 'video' | 'short' | 'photo' */
   return { items, hasMore, loading: loading || initial.loading, loadMore };
 }
 
+// Playlists — POST /miniapp/playlists with initData
+// Returns { playlists: [{id, name, item_count, created_at}] }
+function useUserPlaylists() {
+  return useFetch(
+    'playlists',
+    async () => {
+      const initData = getInitData();
+      if (!initData) throw new Error('no initData');
+      const data = await apiPost('/miniapp/playlists', { initData });
+      return { playlists: data.playlists || [] };
+    },
+    { playlists: [] },
+    [],
+  );
+}
+
+// Items of one playlist — POST /miniapp/playlists/items { initData, playlist_id }
+function usePlaylistItems(playlistId) {
+  return useFetch(
+    `playlist_items:${playlistId}`,
+    async () => {
+      if (playlistId == null) throw new Error('no playlistId');
+      const initData = getInitData();
+      if (!initData) throw new Error('no initData');
+      const data = await apiPost('/miniapp/playlists/items', { initData, playlist_id: playlistId });
+      return { items: (data.items || []).map((it, i) => normalizeVideo({
+        id: it.content_id || it.id, title: it.title,
+        thumbnail_url: it.thumbnail_url, artist_name: it.artist_name,
+        duration: it.duration, created_at: it.created_at,
+      }, i)) };
+    },
+    { items: [] },
+    [playlistId],
+  );
+}
+
+async function actionCreatePlaylist(name, contentId = null) {
+  const initData = getInitData();
+  if (!initData || !name) return { ok: false, reason: 'bad-input' };
+  try {
+    const res = await apiPost('/miniapp/playlists/create', { initData, name, content_id: contentId });
+    invalidate('playlists');
+    return { ok: true, ...res };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+async function actionAddToPlaylist(playlistId, contentId) {
+  const initData = getInitData();
+  if (!initData) return { ok: false, reason: 'no-tg' };
+  try {
+    const res = await apiPost('/miniapp/playlists/add_item', { initData, playlist_id: playlistId, content_id: contentId });
+    invalidate('playlists');
+    invalidate(`playlist_items:${playlistId}`);
+    return { ok: true, ...res };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+async function actionRemoveFromPlaylist(playlistId, contentId) {
+  const initData = getInitData();
+  if (!initData) return { ok: false, reason: 'no-tg' };
+  try {
+    const res = await apiPost('/miniapp/playlists/remove_item', { initData, playlist_id: playlistId, content_id: contentId });
+    invalidate(`playlist_items:${playlistId}`);
+    return { ok: true, ...res };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+async function actionDeletePlaylist(playlistId) {
+  const initData = getInitData();
+  if (!initData) return { ok: false, reason: 'no-tg' };
+  try {
+    const res = await apiPost('/miniapp/playlists/delete', { initData, playlist_id: playlistId });
+    invalidate('playlists');
+    return { ok: true, ...res };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
 // Search — GET /miniapp/search?q=&limit=
 function useSearch(q, limit = 20) {
   const enabled = q && q.length >= 2;
@@ -618,12 +695,17 @@ function useFavorites() {
         norm.contentType = (it.content_type || '').toLowerCase();
         return norm;
       });
-      const videos = all.filter(it => it.contentType !== 'short');
+      // Split by content_type. Photos are their own tab so they don't show
+      // up in the "Liked videos" list. Anything else (including legacy
+      // entries with no content_type) goes to videos for back-compat.
+      const photos = all.filter(it => it.contentType === 'photo');
       const shorts = all.filter(it => it.contentType === 'short');
+      const videos = all.filter(it => it.contentType !== 'photo' && it.contentType !== 'short');
       return {
         items: all,          // back-compat: full list
-        videos,              // content_type !== 'short'
+        videos,              // neither photo nor short
         shorts,              // content_type === 'short'
+        photos,              // content_type === 'photo'
         count: data.count != null ? data.count : all.length,
       };
     },
@@ -833,8 +915,9 @@ initTelegram();
 Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
-  useVideos, useVideo, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useSearch, userFromTelegram,
+  useVideos, useVideo, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useSearch, userFromTelegram,
   actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionStartCryptoCheckout, actionStartFreeTrial,
+  actionCreatePlaylist, actionAddToPlaylist, actionRemoveFromPlaylist, actionDeletePlaylist,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded
   _apiCache,

@@ -217,14 +217,16 @@ function ArtistCard({ a, accent }) {
 function SavedPage({ accent = C.pink, initialTab = 'videos' }) {
   const [tab, setTab] = React.useState(initialTab);
   const favState = window.useFavorites();
+  const playlistsState = window.useUserPlaylists();
   const favVideos = favState.data?.videos || [];
   const favShorts = favState.data?.shorts || [];
+  const favPhotos = favState.data?.photos || [];
+  const playlists = playlistsState.data?.playlists || [];
   const tabs = [
     { id: 'videos', label: 'Liked videos', count: favVideos.length },
     { id: 'shorts', label: 'Liked shorts', count: favShorts.length },
-    { id: 'playlists', label: 'Playlists', count: VIDEO_PLAYLISTS.length },
-    { id: 'photos', label: 'Liked photos', count: LIKED_PHOTOS.length },
-    { id: 'albums', label: 'Albums', count: PHOTO_ALBUMS.length },
+    { id: 'photos', label: 'Liked photos', count: favPhotos.length },
+    { id: 'playlists', label: 'Playlists', count: playlists.length },
   ];
 
   return (
@@ -237,7 +239,7 @@ function SavedPage({ accent = C.pink, initialTab = 'videos' }) {
             My <span style={{ color: accent }}>library</span>
           </div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>
-            {favVideos.length} videos · {favShorts.length} shorts · {VIDEO_PLAYLISTS.length + PHOTO_ALBUMS.length} collections
+            {favVideos.length} videos · {favShorts.length} shorts · {favPhotos.length} photos · {playlists.length} playlists
           </div>
         </div>
 
@@ -266,9 +268,8 @@ function SavedPage({ accent = C.pink, initialTab = 'videos' }) {
         {/* Tab content */}
         {tab === 'videos' && <LikedVideos accent={accent} />}
         {tab === 'shorts' && <LikedShorts accent={accent} />}
-        {tab === 'playlists' && <VideoPlaylists accent={accent} />}
         {tab === 'photos' && <LikedPhotos accent={accent} />}
-        {tab === 'albums' && <PhotoAlbums accent={accent} />}
+        {tab === 'playlists' && <VideoPlaylists accent={accent} />}
       </div>
       <BottomNav active="favorites" accent={accent} />
     </Phone>
@@ -408,60 +409,101 @@ function CollectionTile({ name, count, thumbs, accent, kind = 'playlist', subtit
   );
 }
 
+// Live playlists pulled from /miniapp/playlists. The user can create a new
+// playlist with a name prompt; deleting / removing items can be added later.
 function VideoPlaylists({ accent }) {
+  const state = window.useUserPlaylists();
+  const playlists = state.data?.playlists || [];
+  const [busy, setBusy] = React.useState(false);
+  const onCreate = async () => {
+    const name = window.prompt('Name your playlist');
+    if (!name || !name.trim()) return;
+    setBusy(true);
+    const r = await window.actionCreatePlaylist(name.trim());
+    setBusy(false);
+    if (!r.ok) alert(r.error || 'Could not create playlist');
+  };
   return (
     <div style={{ padding: '6px 14px 16px' }}>
-      <button style={{
+      <button onClick={onCreate} disabled={busy} style={{
         width: '100%', background: 'transparent', color: accent,
         border: `1px dashed ${accent}55`, borderRadius: 12,
         padding: '12px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        marginBottom: 14,
-      }}><Ico.plus /> New playlist</button>
+        marginBottom: 14, fontFamily: 'inherit',
+      }}><Ico.plus /> {busy ? 'Creating…' : 'New playlist'}</button>
+      {state.loading && !playlists.length && (
+        <div style={{ padding: '24px 6px', textAlign: 'center', color: C.muted, fontSize: 13 }}>Loading playlists…</div>
+      )}
+      {!state.loading && !playlists.length && (
+        <div style={{ padding: '32px 14px', textAlign: 'center', color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
+          No playlists yet — create one to organize your saved videos.
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        {VIDEO_PLAYLISTS.map(p => (
-          <CollectionTile key={p.id} name={p.name} count={p.count} thumbs={p.thumbs} accent={accent} kind="playlist" subtitle={`${p.count} videos`} />
+        {playlists.map(p => (
+          <CollectionTile
+            key={p.id}
+            name={p.name}
+            count={p.item_count || 0}
+            thumbs={[0, 1, 2, 3]}
+            accent={accent}
+            kind="playlist"
+            subtitle={`${p.item_count || 0} videos`}
+          />
         ))}
       </div>
     </div>
   );
 }
 
+// Real liked photos — same shape as Liked videos / Liked shorts, just
+// filtered by content_type='photo'. Tapping a tile opens PhotoLightbox.
 function LikedPhotos({ accent }) {
+  const favState = window.useFavorites();
+  const items = favState.data?.photos || [];
+  const [lightboxIdx, setLightboxIdx] = React.useState(null);
+  if (favState.loading && !items.length) {
+    return <div style={{ padding: '40px 14px', textAlign: 'center', color: C.muted, fontSize: 13 }}>Loading liked photos…</div>;
+  }
+  if (!items.length) {
+    return (
+      <div style={{ padding: '40px 14px', textAlign: 'center' }}>
+        <div style={{ fontSize: 36, marginBottom: 12 }}>📷</div>
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>No liked photos yet</div>
+        <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+          Tap the heart in the photo viewer to like a photo.
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ padding: '6px 14px 16px' }}>
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4,
-      }}>
-        {LIKED_PHOTOS.map(p => (
-          <div key={p.id} style={{
-            aspectRatio: '1/1', borderRadius: 6, overflow: 'hidden',
-            position: 'relative', background: p.thumb.bg,
-          }}>
-            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} />
-            <div style={{ position: 'absolute', right: 4, bottom: 4, color: accent }}><Ico.heartFilled /></div>
-          </div>
-        ))}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
+        {items.map((p, i) => {
+          const url = p.thumb?.src || p.raw?.thumbnail_url || '';
+          return (
+            <div key={p.id || i} onClick={() => setLightboxIdx(i)} style={{
+              aspectRatio: '1/1', borderRadius: 6, overflow: 'hidden',
+              position: 'relative', cursor: 'pointer',
+              background: url
+                ? `url('${url.replace(/'/g, "\\'")}') center/cover no-repeat`
+                : (p.thumb?.bg || '#1a1a1c'),
+            }}>
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.15)' }} />
+              <div style={{ position: 'absolute', right: 4, bottom: 4, color: accent }}><Ico.heartFilled /></div>
+            </div>
+          );
+        })}
       </div>
-    </div>
-  );
-}
-
-function PhotoAlbums({ accent }) {
-  return (
-    <div style={{ padding: '6px 14px 16px' }}>
-      <button style={{
-        width: '100%', background: 'transparent', color: accent,
-        border: `1px dashed ${accent}55`, borderRadius: 12,
-        padding: '12px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        marginBottom: 14,
-      }}><Ico.plus /> New album</button>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        {PHOTO_ALBUMS.map(a => (
-          <CollectionTile key={a.id} name={a.name} count={a.count} thumbs={a.thumbs} accent={accent} kind="album" subtitle={a.artist ? a.artist.name : `${a.count} photos`} />
-        ))}
-      </div>
+      {lightboxIdx != null && (
+        <window.PhotoLightbox
+          photos={items}
+          index={lightboxIdx}
+          onNav={(i) => setLightboxIdx(i)}
+          onClose={() => setLightboxIdx(null)}
+        />
+      )}
     </div>
   );
 }
