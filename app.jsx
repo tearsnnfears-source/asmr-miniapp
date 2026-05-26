@@ -70,10 +70,11 @@ function AppShell() {
   // Warm the cache for videos + shorts + artists at app start so tab-switching
   // is instant. Hooks return state but we don't use it here — the goal is to
   // populate the module-level cache before screens mount their own consumers.
-  // Warm both batches: small one for Home (fast), full 500 for detail
-  // screens (in the background). Splash gates on the small one.
+  // Only the 30-item "latest" list is warmed at start — it powers Home
+  // and the "Up next" tail in VideoPage. Specific videos are fetched on
+  // demand via useVideo(id) (GET /miniapp/video/{id}), so the catalog can
+  // be unlimited without slowing down launch.
   window.useVideos(30);
-  window.useVideos(500);
   // Must match SHORTS_LIMIT in screens.jsx — otherwise ShortsTab and the warm
   // cache would have different keys and the player would index into the wrong
   // array.

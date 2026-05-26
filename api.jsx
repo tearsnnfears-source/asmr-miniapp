@@ -272,6 +272,23 @@ function useVideos(limit = 500) {
   );
 }
 
+// useVideo(id) — fetch a single video by id. Works for ANY id in the DB,
+// independent of how big /miniapp/videos?limit=N gets. Used by VideoPage
+// as the second-choice source (after nav.params.video) so deep-links and
+// catalog-too-big situations all just work.
+function useVideo(contentId) {
+  return useFetch(
+    `video:${contentId}`,
+    async () => {
+      if (contentId == null) throw new Error('no id');
+      const data = await apiGet(`/miniapp/video/${encodeURIComponent(contentId)}`);
+      return normalizeVideo(data, 0);
+    },
+    null,
+    [contentId],
+  );
+}
+
 function useShorts(limit = 10) {
   return useFetch(
     `shorts:${limit}`,
@@ -816,7 +833,7 @@ initTelegram();
 Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
-  useVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useSearch, userFromTelegram,
+  useVideos, useVideo, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useSearch, userFromTelegram,
   actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionStartCryptoCheckout, actionStartFreeTrial,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded

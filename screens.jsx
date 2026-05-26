@@ -469,20 +469,23 @@ function compactNum(n) {
 // ── VIDEO PAGE ────────────────────────────────────────────────
 function VideoPage({ accent = C.pink, density = 'comfortable' }) {
   const nav = window.useNav();
-  const fullState = window.useVideos(500);
-  const liteState = window.useVideos(30);
-  const list = (fullState.data?.length ? fullState.data : liteState.data) || [];
-  // 1) Prefer the video object passed through nav params (e.g. tapped from
-  //    ArtistPage where the video doesn't exist in useVideos(500) at all).
-  // 2) Fall back to looking up by id in the shared list.
-  // 3) Last resort: first video so we don't crash.
   const passed = nav.params?.video;
   const requestedId = nav.params?.id;
-  const matched = list.find(x => String(x.id) === String(requestedId));
-  const v = passed || matched || list[0] || VIDEOS[0];
-  // "Up next" comes from the shared list, starting after this video if it's
+  // Three-tier resolution so any video in the DB opens, no matter how big
+  // the catalog gets:
+  //  1) `nav.params.video` — the object was handed to us by the tile click
+  //     (covers Home / Artist / Saved / Search tiles).
+  //  2) `useVideo(id)` — single-row fetch by id (covers deep-links, push
+  //     notifications, restored sessions, anything-by-id).
+  //  3) Latest list (useVideos(30)) — last-ditch fallback so the screen
+  //     doesn't blank out on weird states.
+  const liteState = window.useVideos(30);
+  const list = liteState.data || [];
+  const fetchedState = window.useVideo(passed ? null : requestedId);
+  const v = passed || fetchedState.data || list.find(x => String(x.id) === String(requestedId)) || list[0] || VIDEOS[0];
+  // "Up next" comes from the lite list, starting after this video if it's
   // there; otherwise just the head of the list.
-  const matchedIdx = matched ? list.indexOf(matched) : -1;
+  const matchedIdx = list.findIndex(x => String(x.id) === String(v?.id));
   const nextUp = matchedIdx >= 0 ? list.slice(matchedIdx + 1, matchedIdx + 5) : list.slice(0, 4);
   if (!v) return null;
   return (
