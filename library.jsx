@@ -168,7 +168,7 @@ function SavedPage({ accent = C.pink, initialTab = 'videos' }) {
             My <span style={{ color: accent }}>library</span>
           </div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>
-            {favCount} videos · {LIKED_PHOTOS.length} photos · {VIDEO_PLAYLISTS.length + PHOTO_ALBUMS.length} collections
+            {favVideos.length} videos · {favShorts.length} shorts · {VIDEO_PLAYLISTS.length + PHOTO_ALBUMS.length} collections
           </div>
         </div>
 
