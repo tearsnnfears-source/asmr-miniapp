@@ -86,12 +86,13 @@ function AppShell() {
   React.useEffect(() => {
     const list = shortsState.data || [];
     if (!list.length) return;
-    // First 24 covers the initial 2-col grid of 12 rows that the user sees
-    // without scrolling — they'll all have warm /content/play URLs by the
-    // time they open the tab.
-    const ids = list.slice(0, 24).map(s => s.raw?.id ?? s.id).filter(x => x != null);
+    // Warm only the first 6 IDs (1.5 rows visible without scrolling) so we
+    // don't hammer Railway with 24 parallel /content/play POSTs — that was
+    // making the backend slow to respond to the very requests we're trying
+    // to speed up. The rest load lazily via IntersectionObserver.
+    const ids = list.slice(0, 6).map(s => s.raw?.id ?? s.id).filter(x => x != null);
     if (ids.length && window.prefetchPlayable) {
-      window.prefetchPlayable(ids, 4);
+      window.prefetchPlayable(ids, 2);
     }
   }, [shortsState.data]);
   // Tweak toggle still wins for local testing.
@@ -366,13 +367,18 @@ function detectMode() {
 
 // .phone-fill overrides <Phone>'s inline 390×844/border-radius/border/shadow
 // so screens stretch to viewport without editing each Phone usage site.
+// Uses [data-phone] attribute (set in ui.jsx Phone) so layering wrappers
+// between .phone-fill and the Phone div don't break the override.
 if (typeof document !== 'undefined' && !document.getElementById('phone-fill-styles')) {
   const s = document.createElement('style');
   s.id = 'phone-fill-styles';
   s.textContent = `
+    .phone-fill [data-phone],
     .phone-fill > div {
       width: 100% !important;
       height: 100% !important;
+      max-width: none !important;
+      max-height: none !important;
       border-radius: 0 !important;
       border: none !important;
       box-shadow: none !important;

@@ -36,10 +36,12 @@ const tagColor = (tag) => ({
 }[tag] || C.pink);
 
 // Phone wrapper — 390x844 on desktop (preview look), full-screen on mobile/Telegram.
-// No fake status bar — Telegram WebView has its own, and on mobile we use safe-area-inset-top.
+// data-phone="true" lets the .phone-fill CSS in app.jsx override the desktop
+// styling regardless of how many layers of wrapper sit between this and the
+// .phone-fill root (needed for the persistent ShortsTab layer).
 function Phone({ children, label, width = 390, height = 844 }) {
   return (
-    <div style={{
+    <div data-phone="true" style={{
       width, height,
       background: C.dark,
       color: C.text,
