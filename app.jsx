@@ -160,6 +160,8 @@ function AppShell() {
     <NavContext.Provider value={nav}>
       <PhoneStage>{view}</PhoneStage>
       {splashVisible && <SplashScreen accent={accent} />}
+      <window.DebugFab />
+
       {showTweaks && (
         <window.TweaksPanel>
           <window.TweakSection label="Theme">
