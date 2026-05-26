@@ -1,33 +1,17 @@
 // Shorts page — Hybrid: grid catalog on top, tap opens swipe-player
 // Video page — Title → action-row → artist card → next videos (no comments)
 
+// Single cache key for every consumer of the shorts list — anything that
+// uses useShorts must pass this constant so ShortsTab grid and ShortsPlayer
+// see the exact same array (preventing index/id mismatch on tap-through).
+const SHORTS_LIMIT = 50;
+
 // ── SHORTS TAB ────────────────────────────────────────────────
 function ShortsTab({ accent = C.pink, mode = 'grid' /* 'grid' | 'player' */ }) {
   if (mode === 'player') return <ShortsPlayer accent={accent} />;
 
-  // Paginated load: start with 20, +20 per "Load more" tap.
-  const [limit, setLimit] = React.useState(20);
-  const shortsState = window.useShorts(limit);
-  // Enrich each short with the artist photo when API didn't ship a thumbnail.
-  const artistsState = window.useArtists();
-  const shorts = React.useMemo(() => {
-    const list = shortsState.data || [];
-    const byName = new Map((artistsState.data || []).map(a => [a.name, a]));
-    return list.map(s => {
-      if (s.thumb?.src) return s; // already has a real thumb URL
-      const artist = byName.get(s.artist?.name);
-      const photo = artist?.profilePhoto || artist?.photo;
-      if (!photo) return s;
-      return {
-        ...s,
-        thumb: {
-          bg: `url('${photo.replace(/'/g, "\\'")}') center/cover no-repeat`,
-          dot: '#FF7EC8',
-          src: photo,
-        },
-      };
-    });
-  }, [shortsState.data, artistsState.data]);
+  const shortsState = window.useShorts(SHORTS_LIMIT);
+  const shorts = shortsState.data || [];
 
   return (
     <Phone>
@@ -84,36 +68,23 @@ function ShortsTab({ accent = C.pink, mode = 'grid' /* 'grid' | 'player' */ }) {
         </div>
 
         {/* 2-column grid of shorts */}
-        <div style={{ padding: '12px 14px 12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={{ padding: '12px 14px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {shorts.map((s, i) => (
-            <ShortsTile key={s.id} s={s} accent={accent} fresh={i < 2} />
+            <ShortsTile key={s.id} s={s} idx={i} accent={accent} fresh={i < 2} />
           ))}
         </div>
-        {/* Load more */}
-        {shorts.length >= limit && (
-          <div style={{ padding: '4px 14px 18px' }}>
-            <button onClick={() => setLimit(l => l + 20)} style={{
-              width: '100%',
-              background: 'transparent',
-              color: accent,
-              border: `1px solid ${accent}55`,
-              borderRadius: 12,
-              padding: '12px',
-              fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}>{shortsState.loading ? 'Loading…' : 'Load more'}</button>
-          </div>
-        )}
       </div>
       <BottomNav active="shorts" accent={accent} />
     </Phone>
   );
 }
 
-function ShortsTile({ s, accent, fresh }) {
+function ShortsTile({ s, idx, accent, fresh }) {
   const nav = window.useNav();
+  // Pass the index, not the id — ShortsPlayer reads the same useShorts list
+  // and opens by index, so we never mismatch on string-vs-number id quirks.
   return (
-    <div onClick={() => nav.go('shorts-player', { id: s.id })} style={{
+    <div onClick={() => nav.go('shorts-player', { idx })} style={{
       position: 'relative', aspectRatio: '9/16', borderRadius: 14,
       overflow: 'hidden', background: '#161617', cursor: 'pointer',
     }}>
@@ -142,10 +113,12 @@ function ShortsTile({ s, accent, fresh }) {
 // Swipe player (fullscreen vertical feed)
 function ShortsPlayer({ accent = C.pink }) {
   const nav = window.useNav();
-  const shortsState = window.useShorts(40);
+  // Same cache key as ShortsTab so we share one list — open by index to
+  // guarantee we hit the exact short the user tapped.
+  const shortsState = window.useShorts(SHORTS_LIMIT);
   const list = shortsState.data || [];
-  const requestedId = nav.params?.id;
-  const s = list.find(x => String(x.id) === String(requestedId)) || list[0] || SHORTS[0];
+  const idx = Math.max(0, Math.min(list.length - 1, nav.params?.idx ?? 0));
+  const s = list[idx];
   if (!s) return null;
   return (
     <Phone>

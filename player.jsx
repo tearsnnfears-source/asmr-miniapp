@@ -367,13 +367,27 @@ function ShortsThumbVideo({ short }) {
         opacity: state === 'ready' ? 1 : 0,
         transition: 'opacity 200ms',
       }} />
-      {/* Poster behind, fades out when ready */}
+      {/* Neutral preloader behind — dark surface + spinner, fades out when ready.
+          We intentionally don't fall back to the artist photo so the tile
+          doesn't mislead the user into thinking that's the short's content. */}
       <div style={{
         position: 'absolute', inset: 0,
-        background: short.thumb?.bg || '#161617',
+        background: '#161617',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
         opacity: state === 'ready' ? 0 : 1,
         transition: 'opacity 200ms',
-      }} />
+        pointerEvents: 'none',
+      }}>
+        {state !== 'error' && (
+          <div style={{
+            width: 28, height: 28,
+            border: '2.5px solid rgba(255,255,255,0.1)',
+            borderTopColor: 'rgba(255,255,255,0.55)',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+        )}
+      </div>
     </div>
   );
 }

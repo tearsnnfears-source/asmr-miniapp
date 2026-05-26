@@ -535,7 +535,7 @@ function ArtistPage({ accent = C.pink }) {
   const [tab, setTab] = React.useState('videos');
   const vids = allVideos.filter(v => v.artist?.name === a.name).slice(0, 12);
   const photos = Array.from({ length: 12 }, (_, i) => window.makeThumb(i + 1));
-  const shortsState = window.useShorts(20);
+  const shortsState = window.useShorts(50);
   const shorts = (shortsState.data || []).filter(s => s.artist?.name === a.name).slice(0, 6);
 
   return (

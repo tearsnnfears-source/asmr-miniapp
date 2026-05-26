@@ -73,7 +73,10 @@ function AppShell() {
   // is instant. Hooks return state but we don't use it here — the goal is to
   // populate the module-level cache before screens mount their own consumers.
   window.useVideos(500);
-  window.useShorts(20);
+  // Must match SHORTS_LIMIT in screens.jsx — otherwise ShortsTab and the warm
+  // cache would have different keys and the player would index into the wrong
+  // array.
+  window.useShorts(50);
   const artistsState = window.useArtists();
   window.useFavorites();
   // Tweak toggle still wins for local testing.
