@@ -205,55 +205,102 @@ function ShortsPlayer({ accent = C.pink }) {
   const contentId = s?.raw?.id ?? s?.id;
   const reactionsState = window.useReactions(contentId);
   const reactions = reactionsState.data || { counts: {}, user_reactions: [] };
-  const heartCount = reactions.counts?.['❤️'] || 0;
-  const userHearted = (reactions.user_reactions || []).includes('❤️');
+  const serverHearted = (reactions.user_reactions || []).includes('❤️');
+  const serverHeartCount = reactions.counts?.['❤️'] || 0;
   const favStatus = window.useFavoriteStatus(contentId);
+
+  // Local optimistic overrides per content. Keyed by contentId so swiping
+  // to another short resets them. Set to null = use server state.
+  const [heartOverride, setHeartOverride] = React.useState({});
+  const [saveOverride, setSaveOverride] = React.useState({});
   const [followed, setFollowed] = React.useState(false);
+
+  const heartLocal = heartOverride[contentId];
+  const userHearted = heartLocal != null ? heartLocal : serverHearted;
+  const heartCount = serverHeartCount + (
+    heartLocal == null ? 0 :
+    heartLocal && !serverHearted ? 1 :
+    !heartLocal && serverHearted ? -1 : 0
+  );
+
+  const saveLocal = saveOverride[contentId];
+  const isSaved = saveLocal != null ? saveLocal : favStatus.favorited;
 
   if (!s) return null;
 
-  const onHeart = async () => {
-    const r = await window.actionReact(contentId, '❤️');
-    if (!r.ok) console.warn('[react]', r);
+  const onHeart = () => {
+    const next = !userHearted;
+    setHeartOverride(o => ({ ...o, [contentId]: next }));
+    window.actionReact(contentId, '❤️').then(r => {
+      if (!r.ok) {
+        setHeartOverride(o => ({ ...o, [contentId]: !next }));
+        console.warn('[react]', r);
+      }
+    });
   };
-  const onSave = async () => {
-    const r = await window.actionFavoriteToggle(contentId);
-    if (!r.ok) console.warn('[fav]', r);
+  const onSave = () => {
+    const next = !isSaved;
+    setSaveOverride(o => ({ ...o, [contentId]: next }));
+    window.actionFavoriteToggle(contentId).then(r => {
+      if (!r.ok) {
+        setSaveOverride(o => ({ ...o, [contentId]: !next }));
+        console.warn('[fav]', r);
+      }
+    });
   };
-  const onFollow = async () => {
+  const onFollow = () => {
     setFollowed(f => !f);
-    const r = await window.actionFollow(s.artist.name);
-    if (!r.ok) { setFollowed(f => !f); console.warn('[follow]', r); }
+    window.actionFollow(s.artist.name).then(r => {
+      if (!r.ok) { setFollowed(f => !f); console.warn('[follow]', r); }
+    });
   };
 
   const actionButtons = [
     {
       icon: userHearted ? <Ico.heartFilled /> : <Ico.heart />,
-      label: compactNum(heartCount) || '0',
+      label: compactNum(Math.max(0, heartCount)),
       color: userHearted ? accent : '#fff',
       onClick: onHeart,
     },
     {
       icon: <Ico.bookmark />,
-      label: favStatus.favorited ? 'Saved' : 'Save',
-      color: favStatus.favorited ? accent : '#fff',
+      label: isSaved ? 'Saved' : 'Save',
+      color: isSaved ? accent : '#fff',
       onClick: onSave,
     },
-    {
-      icon: <Ico.share />,
-      label: 'Share',
-      color: '#fff',
-      onClick: () => {
-        const url = `https://t.me/share/url?url=${encodeURIComponent(window.location.href)}`;
-        window.Telegram?.WebApp?.openLink?.(url) || window.open(url, '_blank');
-      },
-    },
   ];
+
+  // Vertical swipe between shorts — TikTok-style. Up = next, down = prev.
+  // Uses pointer events so it works on desktop drag too.
+  const swipeStartY = React.useRef(null);
+  const onPointerDown = (e) => {
+    // Ignore touches on buttons / interactive overlays.
+    if (e.target.closest && e.target.closest('button, video, a, input')) return;
+    swipeStartY.current = e.clientY ?? e.touches?.[0]?.clientY ?? null;
+  };
+  const onPointerUp = (e) => {
+    if (swipeStartY.current == null) return;
+    const endY = e.clientY ?? e.changedTouches?.[0]?.clientY ?? swipeStartY.current;
+    const dy = endY - swipeStartY.current;
+    swipeStartY.current = null;
+    if (Math.abs(dy) < 60) return;
+    if (dy < 0 && idx < list.length - 1) {
+      nav.replace('shorts-player', { idx: idx + 1 });
+    } else if (dy > 0 && idx > 0) {
+      nav.replace('shorts-player', { idx: idx - 1 });
+    }
+  };
 
   return (
     <Phone>
       {/* No header - immersive */}
-      <div style={{ flex: 1, position: 'relative', background: '#000' }}>
+      <div
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        onTouchStart={onPointerDown}
+        onTouchEnd={onPointerUp}
+        style={{ flex: 1, position: 'relative', background: '#000', touchAction: 'none' }}
+      >
         {/* Real player fills the whole bleed; thumb is its poster. */}
         <div style={{ position: 'absolute', inset: 0 }}>
           <window.VideoPlayer video={s} accent={accent} fillParent vertical />
@@ -269,22 +316,18 @@ function ShortsPlayer({ accent = C.pink }) {
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
           }}><Ico.chevL /></button>
           <div style={{ background: 'rgba(0,0,0,0.55)', padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700 }}>{idx + 1} / {list.length}</div>
-          <button style={{
-            width: 36, height: 36, borderRadius: '50%',
-            background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-          }}><Ico.more /></button>
+          <div style={{ width: 36 }} />
         </div>
 
-        {/* right-side action stack */}
+        {/* right-side action stack (heart + save only) */}
         <div style={{
-          position: 'absolute', right: 12, top: '40%', transform: 'translateY(-50%)',
+          position: 'absolute', right: 12, bottom: 110,
           display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center',
         }}>
           {actionButtons.map((b, i) => (
             <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
               <button onClick={b.onClick} style={{
-                width: 44, height: 44, borderRadius: '50%',
+                width: 46, height: 46, borderRadius: '50%',
                 background: 'rgba(0,0,0,0.55)', border: 'none',
                 color: b.color, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
               }}>{b.icon}</button>
@@ -293,22 +336,25 @@ function ShortsPlayer({ accent = C.pink }) {
           ))}
         </div>
 
-        {/* bottom info card */}
+        {/* bottom info card — Follow sits in the same row as name, tight to handle */}
         <div style={{ position: 'absolute', left: 14, right: 78, bottom: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <Avatar artist={enrichedArtist} size={36} ring={accent} />
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.artist.name}</div>
-              <div style={{ fontSize: 10, color: C.muted2 }}>{s.artist.handle}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <Avatar artist={enrichedArtist} size={40} ring={accent} />
+            <div style={{ minWidth: 0, flex: '0 1 auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140 }}>{s.artist.name}</div>
+                <button onClick={onFollow} style={{
+                  background: followed ? 'transparent' : accent,
+                  color: followed ? accent : '#000',
+                  border: followed ? `1px solid ${accent}` : 'none',
+                  padding: '4px 12px', borderRadius: 999,
+                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  flexShrink: 0,
+                  fontFamily: 'inherit',
+                }}>{followed ? 'Following' : 'Follow'}</button>
+              </div>
+              <div style={{ fontSize: 11, color: C.muted2, marginTop: 2 }}>{s.artist.handle}</div>
             </div>
-            <button onClick={onFollow} style={{
-              background: followed ? 'transparent' : accent,
-              color: followed ? accent : '#000',
-              border: followed ? `1px solid ${accent}` : 'none',
-              padding: '6px 14px', borderRadius: 999,
-              fontSize: 11, fontWeight: 700, cursor: 'pointer',
-              flexShrink: 0,
-            }}>{followed ? 'Following' : 'Follow'}</button>
           </div>
           {s.label && (
             <div style={{ fontSize: 13, lineHeight: 1.35, marginBottom: 6 }}>{s.label}</div>

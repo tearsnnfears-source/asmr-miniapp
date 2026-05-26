@@ -148,9 +148,11 @@ function ArtistCard({ a, accent }) {
 function SavedPage({ accent = C.pink, initialTab = 'videos' }) {
   const [tab, setTab] = React.useState(initialTab);
   const favState = window.useFavorites();
-  const favCount = favState.data?.count || 0;
+  const favVideos = favState.data?.videos || [];
+  const favShorts = favState.data?.shorts || [];
   const tabs = [
-    { id: 'videos', label: 'Liked videos', count: favCount },
+    { id: 'videos', label: 'Liked videos', count: favVideos.length },
+    { id: 'shorts', label: 'Liked shorts', count: favShorts.length },
     { id: 'playlists', label: 'Playlists', count: VIDEO_PLAYLISTS.length },
     { id: 'photos', label: 'Liked photos', count: LIKED_PHOTOS.length },
     { id: 'albums', label: 'Albums', count: PHOTO_ALBUMS.length },
@@ -194,6 +196,7 @@ function SavedPage({ accent = C.pink, initialTab = 'videos' }) {
 
         {/* Tab content */}
         {tab === 'videos' && <LikedVideos accent={accent} />}
+        {tab === 'shorts' && <LikedShorts accent={accent} />}
         {tab === 'playlists' && <VideoPlaylists accent={accent} />}
         {tab === 'photos' && <LikedPhotos accent={accent} />}
         {tab === 'albums' && <PhotoAlbums accent={accent} />}
@@ -206,7 +209,7 @@ function SavedPage({ accent = C.pink, initialTab = 'videos' }) {
 function LikedVideos({ accent }) {
   const nav = window.useNav();
   const favState = window.useFavorites();
-  const items = favState.data?.items || [];
+  const items = favState.data?.videos || [];
   if (favState.loading && !items.length) {
     return (
       <div style={{ padding: '40px 14px', textAlign: 'center', color: C.muted, fontSize: 13 }}>
@@ -242,6 +245,64 @@ function LikedVideos({ accent }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// Liked shorts grid — mirrors the Shorts tab layout (9:16 tiles, live video
+// preview via ShortsThumbVideo) but pulls from useFavorites().shorts.
+function LikedShorts({ accent }) {
+  const nav = window.useNav();
+  const favState = window.useFavorites();
+  const items = favState.data?.shorts || [];
+  // To open in ShortsPlayer the player needs an index into useShorts(SHORTS_LIMIT).
+  // For now we just open the saved short by content id — same matching as on the
+  // Shorts grid (idx based). Map favorites → indices in the shorts cache.
+  const shortsCache = window._apiCache?.get('shorts:50')?.data || [];
+  if (favState.loading && !items.length) {
+    return <div style={{ padding: '40px 14px', textAlign: 'center', color: C.muted, fontSize: 13 }}>Loading your saved shorts…</div>;
+  }
+  if (!items.length) {
+    return (
+      <div style={{ padding: '40px 14px', textAlign: 'center' }}>
+        <div style={{ fontSize: 36, marginBottom: 12 }}>⚡</div>
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>No saved shorts yet</div>
+        <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+          Tap the bookmark on any short to save it for later
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ padding: '12px 14px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      {items.map(s => {
+        // Find the matching index in the live shorts list so the player opens
+        // the right item. Falls back to opening by content id if not loaded.
+        const idx = shortsCache.findIndex(x => Number(x.raw?.id ?? x.id) === Number(s.id));
+        return (
+          <div key={s.id}
+            onClick={() => { if (idx >= 0) nav.go('shorts-player', { idx }); }}
+            style={{
+              position: 'relative', aspectRatio: '9/16', borderRadius: 14,
+              overflow: 'hidden', background: '#161617',
+              cursor: idx >= 0 ? 'pointer' : 'default',
+              opacity: idx >= 0 ? 1 : 0.5,
+            }}>
+            <window.ShortsThumbVideo short={s} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.75) 100%)', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', left: 8, right: 8, bottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <Avatar artist={s.artist} size={20} />
+                <div style={{ fontSize: 10, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.artist.name}</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: C.muted2, fontWeight: 500 }}>
+                <span style={{ color: accent }}><Ico.heartFilled /></span>
+                <span>Saved</span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

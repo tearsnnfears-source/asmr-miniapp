@@ -403,8 +403,11 @@ function userFromTelegram() {
   };
 }
 
-// Favorites — POST /miniapp/favorites with initData → list of saved videos.
-// Server returns { count, items: [{content_id, title, thumbnail_url, artist_name, duration, ...}] }
+// Favorites — POST /miniapp/favorites with initData → list of saved items.
+// Server returns { count, items: [{content_id, title, thumbnail_url, artist_name, content_type, ...}] }
+// We split into videos vs shorts using the new content_type field (backend
+// patch from 2026-05). Items without content_type land in `videos` for
+// backward compat.
 function useFavorites() {
   return useFetch(
     'favorites',
@@ -412,9 +415,9 @@ function useFavorites() {
       const initData = getInitData();
       if (!initData) throw new Error('no initData');
       const data = await apiPost('/miniapp/favorites', { initData });
-      const items = (data.items || data.favorites || []).map((it, i) => {
-        // Items shaped like videos — reuse the same normalizer for thumbs/artist
-        return normalizeVideo({
+      const raw = data.items || data.favorites || [];
+      const all = raw.map((it, i) => {
+        const norm = normalizeVideo({
           id: it.content_id || it.id,
           title: it.title,
           thumbnail_url: it.thumbnail_url,
@@ -423,10 +426,20 @@ function useFavorites() {
           created_at: it.saved_at || it.created_at,
           views: it.views || 0,
         }, i);
+        // Preserve content_type so consumers can split.
+        norm.contentType = (it.content_type || '').toLowerCase();
+        return norm;
       });
-      return { items, count: data.count != null ? data.count : items.length };
+      const videos = all.filter(it => it.contentType !== 'short');
+      const shorts = all.filter(it => it.contentType === 'short');
+      return {
+        items: all,          // back-compat: full list
+        videos,              // content_type !== 'short'
+        shorts,              // content_type === 'short'
+        count: data.count != null ? data.count : all.length,
+      };
     },
-    { items: [], count: 0 },
+    { items: [], videos: [], shorts: [], count: 0 },
     [],
   );
 }

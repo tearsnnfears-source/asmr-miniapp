@@ -40,9 +40,52 @@
   * { scrollbar-width: none; }
   button { font-family: inherit; }
   input { -webkit-appearance: none; appearance: none; }
+
+  /* Static splash. Renders before any React JS — so users never see the
+     mock-data fallback flash. App calls window.__hideSplash() once real
+     data is loaded; the 10s safety timeout below hides it regardless. */
+  #static-splash {
+    position: fixed; inset: 0; z-index: 100000;
+    background: #0E0E0F;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 26px;
+    transition: opacity 250ms ease-out;
+  }
+  #static-splash.is-leaving { opacity: 0; pointer-events: none; }
+  #static-splash .logo {
+    font-family: 'Bebas Neue', system-ui, sans-serif;
+    font-size: 42px; letter-spacing: 3px; line-height: 1;
+    color: #fff;
+  }
+  #static-splash .logo .accent { color: #FF7EC8; }
+  #static-splash .spin {
+    width: 36px; height: 36px;
+    border: 3px solid rgba(255,255,255,0.08);
+    border-top-color: #FF7EC8;
+    border-radius: 50%;
+    animation: spl-spin 0.7s linear infinite;
+  }
+  @keyframes spl-spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
+<div id="static-splash">
+  <div class="logo">ASMR<span class="accent">.LEAKS</span></div>
+  <div class="spin"></div>
+</div>
+<script>
+  // Hide hook that AppShell calls once real data lands.
+  window.__hideSplash = function () {
+    var el = document.getElementById('static-splash');
+    if (!el) return;
+    el.classList.add('is-leaving');
+    setTimeout(function () { el && el.remove && el.remove(); }, 300);
+    window.__hideSplash = function () {}; // idempotent
+  };
+  // Safety net: never let the splash trap the user even if React crashes.
+  setTimeout(function () { window.__hideSplash(); }, 10000);
+</script>
 <div id="root"></div>
 
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>

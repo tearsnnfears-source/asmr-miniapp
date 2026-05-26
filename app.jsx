@@ -131,38 +131,24 @@ function AppShell() {
     catch (e) { return false; }
   }, []);
 
-  // Splash: covers the UI until artists are in. User loads in background — if
-  // /profile is slow we don't want it to block first paint. Header falls back
-  // to tg.initDataUnsafe.user.first_name (always available inside Telegram).
+  // Splash is now a static HTML element (#static-splash in redesign.html)
+  // that's already on screen by the time React mounts — no more mock-flash.
+  // We call window.__hideSplash() once the critical data is in cache.
   const hasReal = (key) => {
     const e = window._apiCache?.get(key);
     return e?.data !== undefined && !e.error;
   };
-  // Wait for both artists *and* videos so the Home hero doesn't flash mock
-  // content while the real list is still loading.
   const dataReady = hasReal('artists') && hasReal('videos:500');
-
-  const [splashVisible, setSplashVisible] = React.useState(true);
-  // Hard timeout: 4s. Matches the live app's typical ready time and avoids
-  // trapping the user when API is unreachable.
-  React.useEffect(() => {
-    const maxHide = setTimeout(() => setSplashVisible(false), 4000);
-    return () => clearTimeout(maxHide);
-  }, []);
-  // Hide once artists are in. Minimum 500ms so it doesn't flicker.
-  const mountTimeRef = React.useRef(Date.now());
   React.useEffect(() => {
     if (!dataReady) return;
-    const elapsed = Date.now() - mountTimeRef.current;
-    const remaining = Math.max(0, 500 - elapsed);
-    const t = setTimeout(() => setSplashVisible(false), remaining);
+    // Give the screens one paint to render real data, then hide.
+    const t = setTimeout(() => window.__hideSplash && window.__hideSplash(), 100);
     return () => clearTimeout(t);
   }, [dataReady]);
 
   return (
     <NavContext.Provider value={nav}>
       <PhoneStage>{view}</PhoneStage>
-      {splashVisible && <SplashScreen accent={accent} />}
       <window.DebugFab />
 
       {showTweaks && (
