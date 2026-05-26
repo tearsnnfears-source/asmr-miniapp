@@ -660,7 +660,7 @@ function ArtistPage({ accent = C.pink }) {
         </div>
 
         {/* Empty state when the artist exists but has nothing uploaded yet */}
-        {!contentState.loading && !hasAnyContent && (
+        {!videos.loading && !shorts.loading && !photos.loading && !hasAnyContent && (
           <div style={{ padding: '32px 18px', textAlign: 'center' }}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>💬</div>
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>
