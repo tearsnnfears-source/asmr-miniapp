@@ -23,22 +23,10 @@ const PHOTO_ALBUMS = [
 // ── ARTISTS PAGE ──────────────────────────────────────────────
 function ArtistsPage({ accent = C.pink }) {
   const [tab, setTab] = React.useState('all');
-  const videosState = window.useVideos(500);
-  // Build artist list by de-duplicating artist refs from videos. Each artist
-  // gets a video count + photo placeholder so cards still render the same.
-  const artists = React.useMemo(() => {
-    const list = videosState.data || [];
-    const byName = new Map();
-    list.forEach(v => {
-      const a = v.artist;
-      if (!a?.name) return;
-      const cur = byName.get(a.name);
-      if (cur) { cur.videos += 1; return; }
-      byName.set(a.name, { ...a, videos: 1, photos: 0 });
-    });
-    const arr = [...byName.values()];
-    return arr.length ? arr : window.ARTISTS;
-  }, [videosState.data]);
+  const artistsState = window.useArtists();
+  const statsState = window.useStats();
+  const artists = artistsState.data || [];
+  const stats = statsState.data || { photos: 0, videos: 0, artists: 0 };
   return (
     <Phone>
       <AppHeader accent={accent} />
@@ -76,7 +64,7 @@ function ArtistsPage({ accent = C.pink }) {
           </div>
         </div>
         <div style={{ padding: '0 14px 12px', fontSize: 12, color: C.lime, fontWeight: 600 }}>
-          {window.STATS.photos.toLocaleString()} photos · {window.STATS.videos.toLocaleString()} videos
+          {stats.photos.toLocaleString()} photos · {stats.videos.toLocaleString()} videos
         </div>
 
         {/* Grid 2-col */}

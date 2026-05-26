@@ -35,7 +35,8 @@ const tagColor = (tag) => ({
   pink: C.pink, lime: C.lime, blue: C.blue, purple: C.purple, orange: C.orange
 }[tag] || C.pink);
 
-// Phone frame — 390x844 iOS-like, but uses our dark scheme
+// Phone wrapper — 390x844 on desktop (preview look), full-screen on mobile/Telegram.
+// No fake status bar — Telegram WebView has its own, and on mobile we use safe-area-inset-top.
 function Phone({ children, label, width = 390, height = 844 }) {
   return (
     <div style={{
@@ -49,20 +50,8 @@ function Phone({ children, label, width = 390, height = 844 }) {
       border: `1px solid ${C.border2}`,
       boxShadow: '0 30px 80px rgba(0,0,0,0.45)',
       display: 'flex', flexDirection: 'column',
+      paddingTop: 'env(safe-area-inset-top, 0px)',
     }}>
-      {/* status bar */}
-      <div style={{
-        height: 44, paddingTop: 14, paddingLeft: 28, paddingRight: 28,
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        fontSize: 14, fontWeight: 600, letterSpacing: 0.3, flexShrink: 0,
-      }}>
-        <span>22:00</span>
-        <span style={{ display: 'inline-flex', gap: 5, alignItems: 'center', opacity: 0.85 }}>
-          <span style={{ width: 16, height: 10, border: `1.5px solid ${C.text}`, borderRadius: 2, position: 'relative' }}>
-            <span style={{ position: 'absolute', inset: 1, background: C.text, width: 8 }}></span>
-          </span>
-        </span>
-      </div>
       {children}
     </div>
   );
@@ -140,17 +129,34 @@ function Thumb({ thumb, duration, height = 'auto', aspect = 16/9, badge, childre
   );
 }
 
-// Round avatar with gradient backing
+// Round avatar — uses real photo when artist has one, falls back to a
+// gradient circle with the first letter.
 function Avatar({ artist, size = 36, ring }) {
   const palette = ['#FF7EC8', '#C86BFF', '#44C8FF', '#CCFF00', '#FF9F44'];
   const idx = (artist?.id?.charCodeAt(1) || 0) % palette.length;
+  // Real artists from /miniapp/artists have .photo; videos.artist may not.
+  // profilePhoto > photo > letter fallback.
+  const photoUrl = artist?.profilePhoto || artist?.photo || '';
+  const baseStyle = {
+    width: size, height: size, borderRadius: '50%',
+    flexShrink: 0,
+    border: ring ? `2px solid ${ring}` : 'none',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  };
+  if (photoUrl) {
+    return (
+      <div style={{
+        ...baseStyle,
+        backgroundImage: `url('${photoUrl.replace(/'/g, "\\'")}')`,
+        backgroundSize: 'cover', backgroundPosition: 'center',
+        background: `linear-gradient(135deg, ${palette[idx]}, ${palette[(idx+1)%palette.length]}) url('${photoUrl.replace(/'/g, "\\'")}') center/cover`,
+      }} />
+    );
+  }
   return (
     <div style={{
-      width: size, height: size, borderRadius: '50%',
+      ...baseStyle,
       background: `linear-gradient(135deg, ${palette[idx]}, ${palette[(idx+1)%palette.length]})`,
-      flexShrink: 0,
-      border: ring ? `2px solid ${ring}` : 'none',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
       color: '#000', fontWeight: 800, fontSize: size * 0.38,
       fontFamily: "'DM Sans', sans-serif",
       letterSpacing: -0.3,
@@ -304,7 +310,9 @@ function BottomNav({ active, centerMode, accent = C.pink, subAccent = C.lime }) 
 }
 
 // Stats strip — compact lime-outlined panel (kept as requested but lighter)
-function StatsStrip({ stats = window.STATS, accent = C.lime, compact = false }) {
+function StatsStrip({ stats, accent = C.lime, compact = false }) {
+  const statsState = window.useStats?.();
+  if (!stats) stats = statsState?.data || window.STATS || { photos: 0, videos: 0, artists: 0 };
   const items = [
     { val: stats.photos.toLocaleString(), label: 'Photos' },
     { val: stats.videos.toLocaleString(), label: 'Videos' },
@@ -514,10 +522,13 @@ const TickerSlides = {
   stats: ({ accent, lime }) => {
     // use spaces in numbers for compactness on phone widths
     const fmt = (n) => n.toLocaleString('en-US').replace(/,/g, ' ');
+    // Pull from API-derived useStats; fallback to mock if nothing yet.
+    const statsState = window.useStats?.();
+    const s = statsState?.data || window.STATS || { photos: 0, videos: 0, artists: 0 };
     const items = [
-      { val: fmt(window.STATS.photos), label: 'Photos' },
-      { val: fmt(window.STATS.videos), label: 'Videos' },
-      { val: String(window.STATS.artists), label: 'Artists' },
+      { val: fmt(s.photos), label: 'Photos' },
+      { val: fmt(s.videos), label: 'Videos' },
+      { val: String(s.artists), label: 'Artists' },
     ];
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', minHeight: 56, alignItems: 'center', gap: 4 }}>

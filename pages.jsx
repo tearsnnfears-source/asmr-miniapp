@@ -488,12 +488,15 @@ function ArtistPage({ accent = C.pink }) {
   const requestedId = nav.params?.id;
   const videosState = window.useVideos(500);
   const allVideos = videosState.data || [];
-  // Find artist from videos (each video carries .artist with id+name).
-  let a = allVideos.find(v => v.artist?.id === requestedId)?.artist;
-  if (!a) a = window.ARTISTS.find(x => x.id === requestedId) || window.ARTISTS[0];
+  const artistsState = window.useArtists();
+  const allArtists = artistsState.data || [];
+  // Prefer real artist record (has photo, stats, tags) over the
+  // bare artist embedded in a video.
+  let a = allArtists.find(x => x.id === requestedId);
+  if (!a) a = allVideos.find(v => v.artist?.id === requestedId)?.artist;
+  if (!a) a = allArtists[0] || window.ARTISTS[0];
   const tColor = tagColor(a.tag);
   const [tab, setTab] = React.useState('videos');
-  // Filter all videos by this artist's name.
   const vids = allVideos.filter(v => v.artist?.name === a.name).slice(0, 12);
   const photos = Array.from({ length: 12 }, (_, i) => window.makeThumb(i + 1));
   const shortsState = window.useShorts(40);

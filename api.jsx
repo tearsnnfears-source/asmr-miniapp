@@ -235,6 +235,59 @@ function useShorts(limit = 10) {
   );
 }
 
+// Normalize an artist record from /miniapp/artists into the UI shape.
+function normalizeArtist(a, idx = 0) {
+  const tags = ['pink', 'lime', 'blue', 'purple', 'orange'];
+  return {
+    id: 'a-' + String(a.name || '').toLowerCase().replace(/\W+/g, ''),
+    name: a.name || 'Unknown',
+    handle: '@' + String(a.name || '').toLowerCase().replace(/\s+/g, ''),
+    tag: tags[idx % tags.length],
+    videos: a.videos || 0,
+    photos: a.photos || 0,
+    photo: a.photo_url && a.photo_url.trim() ? a.photo_url : '',
+    profilePhoto: a.profile_photo_url && a.profile_photo_url.trim() ? a.profile_photo_url : '',
+    fresh: !!a.tag_new,
+    hot: !!a.tag_hot,
+    promoted: !!a.tag_prom,
+    ready: !!a.tag_ready,
+    topicUrl: a.topic_url || '',
+    hasProfile: !!a.has_profile,
+    raw: a,
+  };
+}
+
+function useArtists() {
+  return useFetch(
+    'artists',
+    async () => {
+      const data = await apiGet('/miniapp/artists');
+      const list = (data.artists || []).map(normalizeArtist);
+      if (!list.length) throw new Error('empty artists');
+      return list;
+    },
+    window.ARTISTS || [],
+    [],
+  );
+}
+
+// Aggregate stats (photos / videos / artists) from the artist list, matching
+// what the original miniapp does — no separate /stats endpoint exists.
+function useStats() {
+  const a = useArtists();
+  const data = React.useMemo(() => {
+    const list = a.data || [];
+    let photos = 0, videos = 0;
+    for (const it of list) {
+      photos += +it.photos || 0;
+      videos += +it.videos || 0;
+    }
+    if (!list.length) return window.STATS || { photos: 0, videos: 0, artists: 0 };
+    return { photos, videos, artists: list.length };
+  }, [a.data]);
+  return { data, loading: a.loading, error: a.error };
+}
+
 function useTags() {
   return useFetch(
     'tags',
@@ -340,9 +393,9 @@ initTelegram();
 Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
-  useVideos, useShorts, useTags, useUser,
+  useVideos, useShorts, useTags, useUser, useArtists, useStats,
   actionFavoriteToggle, actionFollow, actionStartCryptoCheckout, actionStartFreeTrial,
-  normalizeVideo, normalizeShort, thumbFor, paletteThumb,
+  normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded
   _apiCache,
 });

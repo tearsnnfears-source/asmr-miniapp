@@ -69,11 +69,12 @@ function AppShell() {
   // Falls back to mock when not in Telegram (preview-URL browser testing).
   const userState = window.useUser();
   const user = userState.data;
-  // Warm the cache for videos + shorts at app start so tab-switching is instant.
-  // Hooks return state but we don't use it here — the goal is just to populate
-  // the module-level cache before screens mount their own consumer hooks.
+  // Warm the cache for videos + shorts + artists at app start so tab-switching
+  // is instant. Hooks return state but we don't use it here — the goal is to
+  // populate the module-level cache before screens mount their own consumers.
   window.useVideos(500);
   window.useShorts(40);
+  const artistsState = window.useArtists();
   // Tweak toggle still wins for local testing.
   const [proOverride, setProOverride] = React.useState(null);
   const isPro = proOverride != null ? proOverride : (t.startPro ? true : user.isPro);
@@ -126,28 +127,33 @@ function AppShell() {
     catch (e) { return false; }
   }, []);
 
-  // Splash: shown until core data (user + videos) lands, with a minimum
-  // display time to avoid flicker and a hard timeout so mock fallback isn't
-  // hidden forever if the API is dead.
-  const videosCached = window._apiCache?.get('videos:500')?.data !== undefined;
-  const userCached = window._apiCache?.get('user')?.data !== undefined || !userState.loading;
-  const dataReady = userCached && videosCached;
+  // Splash: covers the UI until *real* data has landed (artists + user).
+  // A cache entry counts as "real" only if it has no error — fallbacks still
+  // get cached but with an error attached, which we treat as "API failed,
+  // proceed with mock".
+  const hasReal = (key) => {
+    const e = window._apiCache?.get(key);
+    return e?.data !== undefined && !e.error;
+  };
+  // Outside Telegram we can't load real user — treat as ready so preview works.
+  const userReal = hasReal('user') || !(window.isInsideTelegram && window.isInsideTelegram());
+  const artistsReal = hasReal('artists');
+  const dataReady = userReal && artistsReal;
+
   const [splashVisible, setSplashVisible] = React.useState(true);
+  // Hard timeout — never let splash block forever (API could be down).
   React.useEffect(() => {
-    // Min 500ms so the splash never flashes; max 4s so we never block on API.
-    const minHide = setTimeout(() => {
-      if (dataReady || window._apiCache?.get('videos:500')) setSplashVisible(false);
-    }, 500);
-    const maxHide = setTimeout(() => setSplashVisible(false), 4000);
-    return () => { clearTimeout(minHide); clearTimeout(maxHide); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const maxHide = setTimeout(() => setSplashVisible(false), 8000);
+    return () => clearTimeout(maxHide);
   }, []);
+  // Hide once real data is in cache. Minimum on-screen 600ms so it doesn't flash.
+  const mountTimeRef = React.useRef(Date.now());
   React.useEffect(() => {
-    if (dataReady) {
-      // Already past min-time? hide immediately; otherwise wait it out.
-      const t = setTimeout(() => setSplashVisible(false), 250);
-      return () => clearTimeout(t);
-    }
+    if (!dataReady) return;
+    const elapsed = Date.now() - mountTimeRef.current;
+    const remaining = Math.max(0, 600 - elapsed);
+    const t = setTimeout(() => setSplashVisible(false), remaining);
+    return () => clearTimeout(t);
   }, [dataReady]);
 
   return (
