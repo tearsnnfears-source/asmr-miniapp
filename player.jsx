@@ -467,25 +467,34 @@ function CustomVideoChrome({ videoRef, accent, loop }) {
   const hideTimer = React.useRef(null);
   const trackRef = React.useRef(null);
 
-  // Schedule controls to fade out after a short idle period — but never
-  // while paused or scrubbing.
-  const scheduleHide = React.useCallback(() => {
-    clearTimeout(hideTimer.current);
-    if (paused || scrubbing) return;
-    hideTimer.current = setTimeout(() => setControlsVisible(false), 3000);
-  }, [paused, scrubbing]);
+  // Show controls + restart the idle timer. Reads the *live* video state
+  // (not the React `paused` snapshot) so it works correctly inside event
+  // listeners attached before state has propagated.
   const wakeControls = React.useCallback(() => {
     setControlsVisible(true);
-    scheduleHide();
-  }, [scheduleHide]);
+    clearTimeout(hideTimer.current);
+    const el = videoRef.current;
+    // Don't auto-hide while paused, while scrubbing, or before metadata.
+    if (!el || el.paused || scrubbing) return;
+    hideTimer.current = setTimeout(() => setControlsVisible(false), 3000);
+  }, [scrubbing, videoRef]);
+  // Re-evaluate hiding when paused/scrubbing flips.
+  React.useEffect(() => {
+    if (paused || scrubbing) {
+      clearTimeout(hideTimer.current);
+      setControlsVisible(true);
+    } else {
+      wakeControls();
+    }
+  }, [paused, scrubbing, wakeControls]);
 
   // Subscribe to video state on mount (the video element is already in the
   // DOM under us — VideoPlayer.attachStream rendered it before we render).
   React.useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
-    const onPlay = () => { setPaused(false); scheduleHide(); };
-    const onPause = () => { setPaused(true); setControlsVisible(true); };
+    const onPlay = () => setPaused(false);
+    const onPause = () => setPaused(true);
     const onTime = () => setCurrentTime(el.currentTime || 0);
     const onDur = () => setDuration(el.duration || 0);
     const onVol = () => setMuted(el.muted);
@@ -530,15 +539,30 @@ function CustomVideoChrome({ videoRef, accent, loop }) {
   const toggleFullscreen = () => {
     const el = videoRef.current;
     if (!el) return;
-    // iOS Safari: only video.webkitEnterFullscreen works.
+    const tg = window.Telegram?.WebApp;
+    // 1) Telegram WebApp 8.0+ (Dec 2024) — lets the miniapp go fullscreen
+    //    inside Telegram on phones, including iOS where the Fullscreen API
+    //    is otherwise blocked. Best path when available.
+    if (tg && typeof tg.requestFullscreen === 'function') {
+      try {
+        if (tg.isFullscreen) tg.exitFullscreen();
+        else tg.requestFullscreen();
+        return;
+      } catch (_) {}
+    }
+    // 2) iOS Safari outside of new Telegram — webkitEnterFullscreen on the
+    //    video element is the only way to actually fullscreen.
+    if (el.webkitEnterFullscreen) {
+      try { el.webkitEnterFullscreen(); return; } catch (_) {}
+    }
+    // 3) Standard Fullscreen API on the wrapper.
+    const wrap = el.parentElement;
     if (document.fullscreenElement || document.webkitFullscreenElement) {
       (document.exitFullscreen || document.webkitExitFullscreen).call(document);
-    } else if (el.webkitEnterFullscreen) {
-      el.webkitEnterFullscreen();
+    } else if (wrap && wrap.requestFullscreen) {
+      wrap.requestFullscreen().catch(() => {});
     } else if (el.requestFullscreen) {
       el.requestFullscreen().catch(() => {});
-    } else if (el.parentElement?.requestFullscreen) {
-      el.parentElement.requestFullscreen().catch(() => {});
     }
   };
 

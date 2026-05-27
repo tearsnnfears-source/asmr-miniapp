@@ -526,33 +526,40 @@ function VideoPageBody({ v, nextUp, accent }) {
   const favStatus = window.useFavoriteStatus(contentId);
   const followStatus = window.useFollowStatus(liveArtist?.name);
 
-  // Optimistic state for the three actions.
+  // Optimistic state for actions. Like ≠ Save here: Like is the public
+  // reaction (counter goes up for everyone), Save adds to a playlist.
   const [localLike, setLocalLike] = React.useState(null);
-  const [localSave, setLocalSave] = React.useState(null);
   const [localFollow, setLocalFollow] = React.useState(null);
   const [replay, setReplay] = React.useState(false);
   const [showPlaylistPicker, setShowPlaylistPicker] = React.useState(false);
+  // Local +1 bump on views once the registerView fires. Backend dedupes,
+  // so the user only ever pushes the counter once; this just makes the
+  // UI reflect that immediately without waiting for a refetch.
+  const [viewBump, setViewBump] = React.useState(0);
+  React.useEffect(() => {
+    const onView = (e) => {
+      if (e.detail?.contentId == null) return;
+      if (Number(e.detail.contentId) !== Number(contentId)) return;
+      if (e.detail.counted) setViewBump(1);
+    };
+    window.addEventListener('miniapp:view', onView);
+    return () => window.removeEventListener('miniapp:view', onView);
+  }, [contentId]);
+  const viewsDisplay = (Number(v.raw?.views || v.views || 0) || 0) + viewBump;
 
-  const isLiked = localLike != null ? localLike : (favStatus.favorited || serverHearted);
+  const isLiked = localLike != null ? localLike : serverHearted;
   const heartCount = serverHeartCount + (
     localLike == null ? 0 :
     localLike && !serverHearted ? 1 :
     !localLike && serverHearted ? -1 : 0
   );
-  const isSaved = localSave != null ? localSave : favStatus.favorited;
   const isFollowing = localFollow != null ? localFollow : followStatus.following;
 
   const onLike = () => {
     const next = !isLiked;
     setLocalLike(next);
-    Promise.all([
-      window.actionReact(contentId, '❤️'),
-      window.actionFavoriteToggle(contentId),
-    ]).then(([r1, r2]) => {
-      if (!r1.ok && !r2.ok) {
-        setLocalLike(!next);
-        console.warn('[like]', { react: r1, fav: r2 });
-      }
+    window.actionReact(contentId, '❤️').then(r => {
+      if (!r.ok) { setLocalLike(!next); console.warn('[like]', r); }
     });
   };
   const onFollow = () => {
@@ -573,13 +580,13 @@ function VideoPageBody({ v, nextUp, accent }) {
       <div style={{ padding: '14px 14px 6px' }}>
         <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.3 }}>{v.title}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: 11, color: C.muted }}>
-          <span>{v.views || '0'} views</span>
+          <span>{viewsDisplay} views</span>
           <span>·</span>
           <span>{v.age || 'recent'}</span>
         </div>
       </div>
 
-      {/* Action row — Like + Save + Replay. */}
+      {/* Action row — Like (reaction) + Save (playlist picker) + Replay. */}
       <div style={{ padding: '6px 12px 4px', display: 'flex', gap: 6, overflowX: 'auto' }}>
         <ActionPill
           active={isLiked} accent={accent}
@@ -588,7 +595,7 @@ function VideoPageBody({ v, nextUp, accent }) {
           onClick={onLike}
         />
         <ActionPill
-          active={isSaved} accent={accent}
+          active={false} accent={accent}
           icon={<Ico.bookmark />}
           label="Save"
           onClick={() => setShowPlaylistPicker(true)}

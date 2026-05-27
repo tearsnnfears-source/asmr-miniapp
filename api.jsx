@@ -894,6 +894,14 @@ async function actionRegisterView(contentId) {
   if (!initData || contentId == null) return { ok: false, reason: 'no-tg' };
   try {
     const res = await apiPost('/miniapp/view', { initData, content_id: contentId });
+    // Broadcast so the UI for this video can bump its counter immediately
+    // (the cached /miniapp/videos payload still reports the stale number
+    //  until the next refetch).
+    try {
+      window.dispatchEvent(new CustomEvent('miniapp:view', {
+        detail: { contentId, counted: !!res.counted, views: res.views },
+      }));
+    } catch (_) {}
     return { ok: true, ...res };
   } catch (e) { return { ok: false, error: e.message }; }
 }
