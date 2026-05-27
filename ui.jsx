@@ -40,6 +40,9 @@ const tagColor = (tag) => ({
 // styling regardless of how many layers of wrapper sit between this and the
 // .phone-fill root (needed for the persistent ShortsTab layer).
 function Phone({ children, label, width = 390, height = 844 }) {
+  // NOTE: the safe-area inset is applied at the PhoneStage outer container
+  // (app.jsx) so every screen — including the persistent ShortsTab layer —
+  // gets it for free. Don't add paddingTop here or you'll double-pad.
   return (
     <div data-phone="true" style={{
       width, height,
@@ -52,7 +55,6 @@ function Phone({ children, label, width = 390, height = 844 }) {
       border: `1px solid ${C.border2}`,
       boxShadow: '0 30px 80px rgba(0,0,0,0.45)',
       display: 'flex', flexDirection: 'column',
-      paddingTop: 'env(safe-area-inset-top, 0px)',
     }}>
       {children}
     </div>

@@ -127,7 +127,7 @@ function DebugFab() {
             background: 'rgba(20,20,22,0.95)',
             borderBottom: '1px solid rgba(255,255,255,0.1)',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))',
+            paddingTop: 'calc(12px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))',
           }}>
             <div>
               <div style={{ fontSize: 14, fontWeight: 700 }}>API debug log</div>

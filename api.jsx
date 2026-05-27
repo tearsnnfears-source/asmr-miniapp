@@ -20,14 +20,64 @@ const API_BASE = (function () {
 
 // ── Telegram bootstrap ────────────────────────────────────────
 // Call once at app start. Idempotent.
+//
+// Fullscreen mode (Bot API 8.0+) hides Telegram's bot-name bar so the
+// miniapp owns the whole viewport like a native app. In fullscreen the
+// system close/menu buttons float over the top-right corner, so we MUST
+// reserve a top inset (Telegram exposes it via contentSafeAreaInset).
+// We mirror both safeAreaInset (device notch / home indicator) and
+// contentSafeAreaInset (Telegram chrome overlay) into CSS variables so
+// every screen can opt in with a single `padding-top: var(--tg-safe-top)`.
 function initTelegram() {
   const tg = window.Telegram?.WebApp;
-  if (!tg) return null;
+  if (!tg) {
+    // Outside Telegram (preview URL in a browser): set zero insets so the
+    // CSS vars are always defined.
+    applySafeAreaVars(null);
+    return null;
+  }
   try {
     tg.ready();
     tg.expand();
   } catch (_) {}
+  // Fullscreen — guarded because older Telegram clients don't have it.
+  try { tg.requestFullscreen && tg.requestFullscreen(); } catch (_) {}
+  // Disable the swipe-down-to-close gesture so users don't accidentally
+  // dismiss the app when scrolling. With BackButton wired up they still
+  // have an explicit way out.
+  try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (_) {}
+  // Initial safe-area var write + subscribe to changes (fullscreen toggle,
+  // device rotation, etc.).
+  applySafeAreaVars(tg);
+  try {
+    tg.onEvent && tg.onEvent('safeAreaChanged',         () => applySafeAreaVars(tg));
+    tg.onEvent && tg.onEvent('contentSafeAreaChanged',  () => applySafeAreaVars(tg));
+    tg.onEvent && tg.onEvent('fullscreenChanged',       () => applySafeAreaVars(tg));
+    tg.onEvent && tg.onEvent('viewportChanged',         () => applySafeAreaVars(tg));
+  } catch (_) {}
   return tg;
+}
+
+// Write `--tg-safe-{top,bottom,left,right}` CSS vars on <html> from the
+// combined Telegram insets (device + content). Callers use them via
+// `padding-top: var(--tg-safe-top, env(safe-area-inset-top, 0px))` so a
+// browser fallback (CSS env) still works when the var is absent.
+function applySafeAreaVars(tg) {
+  const safe    = tg?.safeAreaInset        || { top: 0, bottom: 0, left: 0, right: 0 };
+  const content = tg?.contentSafeAreaInset || { top: 0, bottom: 0, left: 0, right: 0 };
+  // Combine: the top inset must clear both the device notch AND the
+  // Telegram close/menu button cluster (only present in fullscreen). The
+  // other edges are device-driven only.
+  const top    = Math.max(safe.top || 0,    content.top    || 0);
+  const bottom = Math.max(safe.bottom || 0, content.bottom || 0);
+  const left   = Math.max(safe.left || 0,   content.left   || 0);
+  const right  = Math.max(safe.right || 0,  content.right  || 0);
+  const root = document.documentElement;
+  if (!root) return;
+  root.style.setProperty('--tg-safe-top',    top    + 'px');
+  root.style.setProperty('--tg-safe-bottom', bottom + 'px');
+  root.style.setProperty('--tg-safe-left',   left   + 'px');
+  root.style.setProperty('--tg-safe-right',  right  + 'px');
 }
 function getInitData() {
   return window.Telegram?.WebApp?.initData || '';

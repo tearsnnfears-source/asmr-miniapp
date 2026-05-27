@@ -367,6 +367,14 @@ function PhoneStage({ children }) {
         position: 'fixed', inset: 0,
         background: '#0E0E0F',
         display: 'flex', flexDirection: 'column',
+        // Reserve room for the device notch / Telegram close button at the
+        // top, and the home indicator / nav bar at the bottom. CSS vars are
+        // populated by applySafeAreaVars() in api.jsx; env() is a graceful
+        // fallback when there's no Telegram WebApp (preview URLs).
+        paddingTop:    'var(--tg-safe-top,    env(safe-area-inset-top,    0px))',
+        paddingBottom: 'var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))',
+        paddingLeft:   'var(--tg-safe-left,   env(safe-area-inset-left,   0px))',
+        paddingRight:  'var(--tg-safe-right,  env(safe-area-inset-right,  0px))',
       }}>
         <div className="phone-fill" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           {children}
@@ -448,7 +456,7 @@ class AppErrorBoundary extends React.Component {
           background: '#0E0E0F', color: '#fff',
           padding: 24, overflowY: 'auto',
           fontFamily: "'DM Sans', system-ui, sans-serif",
-          paddingTop: 'calc(24px + env(safe-area-inset-top, 0px))',
+          paddingTop: 'calc(24px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))',
         }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#FF6B4A', marginBottom: 8 }}>UI crashed</div>
           <div style={{ fontSize: 13, marginBottom: 12 }}>{String(this.state.err && this.state.err.message || this.state.err)}</div>

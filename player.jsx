@@ -784,7 +784,7 @@ function PhotoLightbox({ photos, index, onClose, onNav }) {
       }}>
       {/* Counter */}
       <span style={{
-        position: 'absolute', top: 'calc(14px + env(safe-area-inset-top, 0px))',
+        position: 'absolute', top: 'calc(14px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))',
         left: '50%', transform: 'translateX(-50%)',
         fontSize: 13, fontWeight: 600,
         background: 'rgba(0,0,0,0.6)', padding: '4px 10px', borderRadius: 999,
@@ -792,7 +792,7 @@ function PhotoLightbox({ photos, index, onClose, onNav }) {
       }}>{safe + 1} / {total}</span>
       {/* Close */}
       <button onClick={onClose} style={{
-        position: 'absolute', top: 'calc(10px + env(safe-area-inset-top, 0px))',
+        position: 'absolute', top: 'calc(10px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))',
         right: 12,
         width: 36, height: 36, borderRadius: '50%',
         background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff',
@@ -833,7 +833,7 @@ function PhotoLightbox({ photos, index, onClose, onNav }) {
       {contentId != null && (
         <button onClick={onLike} style={{
           position: 'absolute',
-          bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))',
+          bottom: 'calc(20px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))',
           right: 16,
           width: 52, height: 52, borderRadius: '50%',
           background: isLiked ? '#FF7EC8' : 'rgba(0,0,0,0.55)',
@@ -851,7 +851,7 @@ function PhotoLightbox({ photos, index, onClose, onNav }) {
         </button>
       )}
       {/* Watermark — same SVG path as the live miniapp lightbox. */}
-      <div style={{ position: 'absolute', bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))', left: 16, pointerEvents: 'none', userSelect: 'none', opacity: 0.28 }}>
+      <div style={{ position: 'absolute', bottom: 'calc(20px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))', left: 16, pointerEvents: 'none', userSelect: 'none', opacity: 0.28 }}>
         <svg viewBox="50 350 935 420" width="110" height="49" xmlns="http://www.w3.org/2000/svg">
           <path fill="white" d="M54.42 668L249.735 363.5H334.56L408.075 668H322.38L268.005 404.39H301.935L145.335 668H54.42ZM139.68 608.84L174.48 545.33H323.25L332.82 608.84H139.68ZM432.928 668L493.828 363.5H579.958L532.978 599.705H678.268L664.348 668H432.928ZM734.349 668L781.764 431.795H688.239L702.159 363.5H974.904L960.984 431.795H867.894L820.479 668H734.349Z" />
         </svg>

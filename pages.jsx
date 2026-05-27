@@ -593,7 +593,10 @@ function ArtistPage({ accent = C.pink }) {
           below it (the old offset was for the fake status bar we removed).
           Share button removed — Telegram WebView already shows the user a
           way to open the group via the bot if they need it. */}
-      <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', flexShrink: 0, position: 'absolute', top: 'calc(8px + env(safe-area-inset-top, 0px))', left: 0, right: 0, zIndex: 5 }}>
+      {/* Phone is rendered inside PhoneStage which already reserves the
+          top safe area. Absolute top:8px is relative to Phone, so we
+          don't re-add the inset here or it would double-pad. */}
+      <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', flexShrink: 0, position: 'absolute', top: 8, left: 0, right: 0, zIndex: 5 }}>
         <button onClick={() => nav.back()} style={{
           width: 36, height: 36, borderRadius: 12,
           background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',

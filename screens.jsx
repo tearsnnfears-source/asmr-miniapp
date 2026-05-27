@@ -408,7 +408,7 @@ function ShortsPlayer({ accent = C.pink, allShorts, order, items, pos, setPos, o
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, transparent 25%, transparent 55%, rgba(0,0,0,0.85) 100%)', pointerEvents: 'none' }} />
 
         {/* top row: back + counter */}
-        <div style={{ position: 'absolute', top: 'calc(12px + env(safe-area-inset-top, 0px))', left: 12, right: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ position: 'absolute', top: 'calc(12px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))', left: 12, right: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <button onClick={() => onClose && onClose()} style={{
             width: 36, height: 36, borderRadius: '50%',
             background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
@@ -807,7 +807,7 @@ function PlaylistPicker({ contentId, accent, onClose }) {
         width: '100%', maxWidth: 480,
         background: C.dark2,
         borderTopLeftRadius: 22, borderTopRightRadius: 22,
-        padding: '16px 16px calc(20px + env(safe-area-inset-bottom, 0px))',
+        padding: '16px 16px calc(20px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))',
         maxHeight: '70vh', display: 'flex', flexDirection: 'column',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>

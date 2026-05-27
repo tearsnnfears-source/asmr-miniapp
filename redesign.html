@@ -25,6 +25,16 @@
   })();
 </script>
 <style>
+  /* Default Telegram safe-area vars — overwritten by api.jsx
+     applySafeAreaVars() once the WebApp object reports real insets. The
+     env(safe-area-inset-*) fallback covers iOS notch / home indicator in
+     a regular browser (preview URLs). */
+  :root {
+    --tg-safe-top:    env(safe-area-inset-top,    0px);
+    --tg-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --tg-safe-left:   env(safe-area-inset-left,   0px);
+    --tg-safe-right:  env(safe-area-inset-right,  0px);
+  }
   html, body {
     margin: 0; padding: 0;
     background: #0E0E0F; color: #fff;
@@ -50,6 +60,9 @@
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
     gap: 26px;
+    /* Keep logo + spinner clear of the floating Telegram close button. */
+    padding-top: var(--tg-safe-top, 0px);
+    padding-bottom: var(--tg-safe-bottom, 0px);
     transition: opacity 250ms ease-out;
   }
   #static-splash.is-leaving { opacity: 0; pointer-events: none; }
