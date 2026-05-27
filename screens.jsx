@@ -496,7 +496,24 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
   // Recommendation rail — always fetched (Up Next shows beneath the queue,
   // not instead of it). Limit big enough to feed Load-more cycles.
   const recState = window.useRecommended(v?.raw?.id ?? v?.id, 20);
-  const recItems = (recState.data?.items || []).filter(x => String(x.id) !== String(v?.id));
+
+  // Randomize the recommendation order. Why: backend /recommended is
+  // ordered by similarity, so when the current video is the artist's
+  // newest, position 1 ends up being their previous-newest. Autoplay
+  // through that pair → infinite ping-pong (A → B → A → B). Shuffling
+  // breaks the loop and keeps surprise across rewatches. useMemo keys
+  // on the source list + current video id so we shuffle ONCE per open
+  // (not on every like/follow re-render).
+  const recItems = React.useMemo(() => {
+    const raw = (recState.data?.items || []).filter(x => String(x.id) !== String(v?.id));
+    if (raw.length <= 1) return raw;
+    const out = raw.slice();
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  }, [recState.data, v?.id]);
 
   // Queue items rotated so the rest of the playlist follows the current
   // one and wraps to the beginning. Playing 4/4 → [1,2,3]; playing 2/4 → [3,4,1].
@@ -504,8 +521,19 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
     ? [...queue.slice(queueIdx + 1), ...queue.slice(0, queueIdx)]
     : [];
 
-  // Fallback for Up next when /recommended is empty.
-  const recOrFallback = recItems.length ? recItems : list.slice(0, 8).filter(x => String(x.id) !== String(v?.id));
+  // Fallback for Up next when /recommended is empty — shuffle the latest
+  // catalog slice so the autoplay chain stays varied here too.
+  const recOrFallback = React.useMemo(() => {
+    if (recItems.length) return recItems;
+    const pool = list.slice(0, 12).filter(x => String(x.id) !== String(v?.id));
+    if (pool.length <= 1) return pool;
+    const out = pool.slice();
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out.slice(0, 8);
+  }, [recItems, list, v?.id]);
   if (!v) return null;
   return (
     <Phone>
@@ -649,7 +677,7 @@ function VideoPageBody({ v, queueRest, recItems, accent, queue, queueIdx }) {
         <ActionPill
           active={autoplay} accent={accent}
           icon={<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 4l14 8-14 8z"/><circle cx="19" cy="6" r="2.5" fill="currentColor"/></svg>}
-          label={autoplay ? 'Autoplay on' : 'Autoplay'}
+          label="Autoplay"
           onClick={() => setAutoplay(a => !a)}
         />
       </div>

@@ -365,16 +365,20 @@ function PhoneStage({ children }) {
     return (
       <div style={{
         position: 'fixed', inset: 0,
-        background: '#0E0E0F',
+        // Match AppHeader / BottomNav background so the reserved safe-area
+        // strip at the top blends into the navigation visually instead of
+        // showing a slightly-darker C.dark band above the header.
+        background: '#161617',
         display: 'flex', flexDirection: 'column',
-        // Reserve room for the device notch / Telegram close button at the
-        // top, and the home indicator / nav bar at the bottom. CSS vars are
-        // populated by applySafeAreaVars() in api.jsx; env() is a graceful
-        // fallback when there's no Telegram WebApp (preview URLs).
-        paddingTop:    'var(--tg-safe-top,    env(safe-area-inset-top,    0px))',
-        paddingBottom: 'var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))',
-        paddingLeft:   'var(--tg-safe-left,   env(safe-area-inset-left,   0px))',
-        paddingRight:  'var(--tg-safe-right,  env(safe-area-inset-right,  0px))',
+        // Top inset goes on the outer container so every screen's header
+        // automatically clears the Telegram close/menu cluster.
+        // BOTTOM inset is intentionally NOT applied here — BottomNav
+        // absorbs it via its own padding so the nav background stretches
+        // all the way to the bottom of the viewport instead of leaving an
+        // empty band above the home indicator.
+        paddingTop:    'var(--tg-safe-top,   env(safe-area-inset-top,   0px))',
+        paddingLeft:   'var(--tg-safe-left,  env(safe-area-inset-left,  0px))',
+        paddingRight:  'var(--tg-safe-right, env(safe-area-inset-right, 0px))',
       }}>
         <div className="phone-fill" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           {children}

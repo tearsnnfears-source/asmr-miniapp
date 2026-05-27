@@ -261,7 +261,10 @@ function BottomNav({ active, centerMode, accent = C.pink, subAccent = C.lime }) 
       flexShrink: 0,
       background: C.dark2,
       borderTop: `1px solid ${C.border}`,
-      padding: '8px 6px 14px',
+      // Bottom padding absorbs the device home indicator / gesture bar
+      // (--tg-safe-bottom from api.jsx). The nav's background reaches the
+      // edge of the viewport while the tab labels sit above the indicator.
+      padding: '8px 6px calc(14px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))',
       display: 'grid',
       gridTemplateColumns: 'repeat(5, 1fr)',
       position: 'relative',

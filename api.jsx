@@ -46,38 +46,57 @@ function initTelegram() {
   // dismiss the app when scrolling. With BackButton wired up they still
   // have an explicit way out.
   try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (_) {}
-  // Initial safe-area var write + subscribe to changes (fullscreen toggle,
-  // device rotation, etc.).
-  applySafeAreaVars(tg);
+  // Initial safe-area var write + retry pattern: TG sometimes reports 0
+  // insets right after setHeaderColor / requestFullscreen even though the
+  // OS status bar + close-button cluster are visible. Re-applying on the
+  // next paint and at 120/420ms catches the corrected values.
+  refreshSafeAreasSoon(tg);
   try {
     tg.onEvent && tg.onEvent('safeAreaChanged',         () => applySafeAreaVars(tg));
     tg.onEvent && tg.onEvent('contentSafeAreaChanged',  () => applySafeAreaVars(tg));
-    tg.onEvent && tg.onEvent('fullscreenChanged',       () => applySafeAreaVars(tg));
+    tg.onEvent && tg.onEvent('fullscreenChanged',       () => refreshSafeAreasSoon(tg));
     tg.onEvent && tg.onEvent('viewportChanged',         () => applySafeAreaVars(tg));
   } catch (_) {}
   return tg;
 }
 
 // Write `--tg-safe-{top,bottom,left,right}` CSS vars on <html> from the
-// combined Telegram insets (device + content). Callers use them via
-// `padding-top: var(--tg-safe-top, env(safe-area-inset-top, 0px))` so a
-// browser fallback (CSS env) still works when the var is absent.
+// combined Telegram insets (device + content). The TOP inset must clear
+// BOTH the device notch/status bar AND the floating close-button cluster
+// in fullscreen, so we SUM safeAreaInset.top + contentSafeAreaInset.top
+// (not max — they're stacked, not overlapping) and enforce a per-platform
+// floor because some TG clients return 0 right after requestFullscreen()
+// even though the chrome is still painting on top of the WebView.
 function applySafeAreaVars(tg) {
   const safe    = tg?.safeAreaInset        || { top: 0, bottom: 0, left: 0, right: 0 };
   const content = tg?.contentSafeAreaInset || { top: 0, bottom: 0, left: 0, right: 0 };
-  // Combine: the top inset must clear both the device notch AND the
-  // Telegram close/menu button cluster (only present in fullscreen). The
-  // other edges are device-driven only.
-  const top    = Math.max(safe.top || 0,    content.top    || 0);
-  const bottom = Math.max(safe.bottom || 0, content.bottom || 0);
-  const left   = Math.max(safe.left || 0,   content.left   || 0);
-  const right  = Math.max(safe.right || 0,  content.right  || 0);
+  let top    = (safe.top    || 0) + (content.top    || 0);
+  let bottom = (safe.bottom || 0) + (content.bottom || 0);
+  const left   = (safe.left  || 0) + (content.left  || 0);
+  const right  = (safe.right || 0) + (content.right || 0);
+  // Platform floor — gentle minimum so content never slides under the
+  // close-row even when the SDK lies about the inset. Pulled from the
+  // podpivo.tv miniapp which battle-tested these numbers on real devices.
+  const platform = String(tg?.platform || '').toLowerCase();
+  let topFloor = 0;
+  if (platform.startsWith('android')) topFloor = 82;
+  else if (platform === 'ios')        topFloor = 76;
+  else if (platform === 'macos')      topFloor = 48;
+  // tdesktop / weba / webk / web / unknown → 0 (native TG chrome lives
+  // outside the WebView on desktop, so we don't need to reserve space).
+  if (tg && top < topFloor) top = topFloor;
   const root = document.documentElement;
   if (!root) return;
   root.style.setProperty('--tg-safe-top',    top    + 'px');
   root.style.setProperty('--tg-safe-bottom', bottom + 'px');
   root.style.setProperty('--tg-safe-left',   left   + 'px');
   root.style.setProperty('--tg-safe-right',  right  + 'px');
+}
+function refreshSafeAreasSoon(tg) {
+  applySafeAreaVars(tg);
+  try { requestAnimationFrame(() => applySafeAreaVars(tg)); } catch (_) {}
+  setTimeout(() => applySafeAreaVars(tg), 120);
+  setTimeout(() => applySafeAreaVars(tg), 420);
 }
 function getInitData() {
   return window.Telegram?.WebApp?.initData || '';
