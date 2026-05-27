@@ -608,8 +608,10 @@ function VideoPageBody({ v, nextUp, accent, queue, queueIdx }) {
 
   return (
     <div style={SCROLL_BODY}>
-      {/* Player. loop = replay; onEnded drives autoplay chaining. */}
-      <window.VideoPlayer key={v.id} video={v} accent={accent} loop={replay} onEnded={onEnded} />
+      {/* Player. loop = replay; autoStart begins playback on mount so
+          autoplay-chained videos don't require an extra tap. onEnded
+          drives chaining. */}
+      <window.VideoPlayer key={v.id} video={v} accent={accent} loop={replay} onEnded={onEnded} autoStart />
 
       {/* Title row — kept clean: just the title, no prev/next arrows. */}
       <div style={{ padding: '14px 14px 6px' }}>
