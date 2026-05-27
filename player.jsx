@@ -258,27 +258,34 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
     background: v.thumb?.bg || '#000',
     overflow: 'hidden',
   };
-  // Vertical shorts: cover the surface (crops a bit but no letterbox).
-  // Regular videos: contain (full frame visible).
   const videoFit = vertical ? 'cover' : 'contain';
+
+  // Custom controls overlay (for non-vertical, non-fillParent calls — i.e.
+  // VideoPage). Shorts player keeps no chrome.
+  const useCustomChrome = !vertical;
 
   return (
     <div style={containerStyle}>
       {phase === 'playing' && (
-        <video
-          ref={videoRef}
-          controls={!vertical}
-          playsInline
-          webkit-playsinline="true"
-          autoPlay={vertical || autoStart}
-          loop={vertical || loop}
-          style={{
-            position: 'absolute', inset: 0,
-            width: '100%', height: '100%',
-            background: '#000',
-            objectFit: videoFit,
-          }}
-        />
+        <React.Fragment>
+          <video
+            ref={videoRef}
+            controls={false}
+            playsInline
+            webkit-playsinline="true"
+            autoPlay={vertical || autoStart}
+            loop={vertical || loop}
+            style={{
+              position: 'absolute', inset: 0,
+              width: '100%', height: '100%',
+              background: '#000',
+              objectFit: videoFit,
+            }}
+          />
+          {useCustomChrome && (
+            <CustomVideoChrome videoRef={videoRef} accent={accent} loop={loop} />
+          )}
+        </React.Fragment>
       )}
       {phase !== 'playing' && (
         <React.Fragment>
@@ -445,6 +452,218 @@ function ShortsThumbVideo({ short }) {
     </div>
   );
 }
+
+// ── CustomVideoChrome ────────────────────────────────────────
+// Bespoke overlay for the regular VideoPage player. Provides play/pause +
+// scrub bar + time + fullscreen, tap-to-toggle, and auto-hide controls
+// after 3s of inactivity. Ported from the live miniapp's initVpCustomPlayer.
+function CustomVideoChrome({ videoRef, accent, loop }) {
+  const [paused, setPaused] = React.useState(true);
+  const [currentTime, setCurrentTime] = React.useState(0);
+  const [duration, setDuration] = React.useState(0);
+  const [controlsVisible, setControlsVisible] = React.useState(true);
+  const [scrubbing, setScrubbing] = React.useState(false);
+  const [muted, setMuted] = React.useState(false);
+  const hideTimer = React.useRef(null);
+  const trackRef = React.useRef(null);
+
+  // Schedule controls to fade out after a short idle period — but never
+  // while paused or scrubbing.
+  const scheduleHide = React.useCallback(() => {
+    clearTimeout(hideTimer.current);
+    if (paused || scrubbing) return;
+    hideTimer.current = setTimeout(() => setControlsVisible(false), 3000);
+  }, [paused, scrubbing]);
+  const wakeControls = React.useCallback(() => {
+    setControlsVisible(true);
+    scheduleHide();
+  }, [scheduleHide]);
+
+  // Subscribe to video state on mount (the video element is already in the
+  // DOM under us — VideoPlayer.attachStream rendered it before we render).
+  React.useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    const onPlay = () => { setPaused(false); scheduleHide(); };
+    const onPause = () => { setPaused(true); setControlsVisible(true); };
+    const onTime = () => setCurrentTime(el.currentTime || 0);
+    const onDur = () => setDuration(el.duration || 0);
+    const onVol = () => setMuted(el.muted);
+    setPaused(el.paused); setMuted(el.muted);
+    setCurrentTime(el.currentTime || 0); setDuration(el.duration || 0);
+    el.addEventListener('play', onPlay);
+    el.addEventListener('pause', onPause);
+    el.addEventListener('timeupdate', onTime);
+    el.addEventListener('durationchange', onDur);
+    el.addEventListener('loadedmetadata', onDur);
+    el.addEventListener('volumechange', onVol);
+    return () => {
+      el.removeEventListener('play', onPlay);
+      el.removeEventListener('pause', onPause);
+      el.removeEventListener('timeupdate', onTime);
+      el.removeEventListener('durationchange', onDur);
+      el.removeEventListener('loadedmetadata', onDur);
+      el.removeEventListener('volumechange', onVol);
+      clearTimeout(hideTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // React to externally-flipped loop prop.
+  React.useEffect(() => {
+    const el = videoRef.current;
+    if (el) el.loop = !!loop;
+  }, [loop, videoRef]);
+
+  const togglePlay = () => {
+    const el = videoRef.current;
+    if (!el) return;
+    if (el.paused) el.play().catch(() => {});
+    else el.pause();
+    wakeControls();
+  };
+  const toggleMute = () => {
+    const el = videoRef.current;
+    if (!el) return;
+    el.muted = !el.muted;
+    wakeControls();
+  };
+  const toggleFullscreen = () => {
+    const el = videoRef.current;
+    if (!el) return;
+    // iOS Safari: only video.webkitEnterFullscreen works.
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    } else if (el.webkitEnterFullscreen) {
+      el.webkitEnterFullscreen();
+    } else if (el.requestFullscreen) {
+      el.requestFullscreen().catch(() => {});
+    } else if (el.parentElement?.requestFullscreen) {
+      el.parentElement.requestFullscreen().catch(() => {});
+    }
+  };
+
+  // Scrub bar: pointerdown → seek and start tracking; pointermove updates;
+  // pointerup commits.
+  const seekFromPointer = (clientX) => {
+    const track = trackRef.current;
+    const el = videoRef.current;
+    if (!track || !el || !duration) return;
+    const rect = track.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    el.currentTime = ratio * duration;
+    setCurrentTime(el.currentTime);
+  };
+  const onScrubDown = (e) => {
+    setScrubbing(true);
+    setControlsVisible(true);
+    seekFromPointer(e.clientX ?? e.touches?.[0]?.clientX ?? 0);
+    const onMove = (ev) => seekFromPointer(ev.clientX ?? ev.touches?.[0]?.clientX ?? 0);
+    const onUp = () => {
+      setScrubbing(false);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      scheduleHide();
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+
+  const fmt = (s) => {
+    s = Math.max(0, Math.floor(s || 0));
+    const m = Math.floor(s / 60), sec = s % 60;
+    if (m >= 60) {
+      const h = Math.floor(m / 60), mm = m % 60;
+      return `${h}:${String(mm).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    }
+    return `${m}:${String(sec).padStart(2, '0')}`;
+  };
+  const progressPct = duration ? (currentTime / duration) * 100 : 0;
+
+  return (
+    <div
+      onPointerMove={wakeControls}
+      onPointerEnter={wakeControls}
+      onClick={(e) => {
+        // Tap on the empty area (not on a control button) = toggle play.
+        if (e.target.closest && e.target.closest('button, [data-control]')) return;
+        togglePlay();
+      }}
+      style={{ position: 'absolute', inset: 0 }}
+    >
+      {/* Center play/pause big button — visible when paused or while idle. */}
+      {(paused || controlsVisible) && (
+        <button onClick={togglePlay} style={{
+          position: 'absolute', left: '50%', top: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 64, height: 64, borderRadius: '50%',
+          background: 'rgba(0,0,0,0.55)', border: 'none',
+          color: '#fff', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          opacity: controlsVisible || paused ? 1 : 0,
+          transition: 'opacity 200ms ease',
+          pointerEvents: controlsVisible || paused ? 'auto' : 'none',
+        }}>
+          {paused
+            ? <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+            : <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z" /></svg>}
+        </button>
+      )}
+      {/* Bottom bar: scrub + time + buttons */}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0,
+        padding: '24px 12px 10px',
+        background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.78) 100%)',
+        opacity: controlsVisible ? 1 : 0,
+        transition: 'opacity 200ms ease',
+        pointerEvents: controlsVisible ? 'auto' : 'none',
+      }}>
+        {/* Scrub track */}
+        <div
+          ref={trackRef}
+          onPointerDown={onScrubDown}
+          style={{
+            position: 'relative', height: 14,
+            display: 'flex', alignItems: 'center',
+            cursor: 'pointer',
+            touchAction: 'none',
+          }}>
+          <div style={{ position: 'absolute', left: 0, right: 0, height: 3, background: 'rgba(255,255,255,0.25)', borderRadius: 2 }} />
+          <div style={{ position: 'absolute', left: 0, width: `${progressPct}%`, height: 3, background: accent, borderRadius: 2 }} />
+          <div style={{
+            position: 'absolute', left: `${progressPct}%`, transform: 'translate(-50%, 0)',
+            width: 14, height: 14, borderRadius: '50%', background: accent,
+            boxShadow: '0 0 0 3px rgba(0,0,0,0.4)',
+          }} />
+        </div>
+        {/* Bottom row: time on the left, controls on the right */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginTop: 8, fontSize: 11, fontWeight: 600,
+          fontVariantNumeric: 'tabular-nums', color: '#fff',
+        }}>
+          <span>{fmt(currentTime)} / {fmt(duration)}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button onClick={toggleMute} style={chromeBtnStyle}>
+              {muted
+                ? <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 9v6h4l5 4V5L9 9H5z M16 9l4 6 M20 9l-4 6"/></svg>
+                : <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 9v6h4l5 4V5L9 9H5z M16 8a4 4 0 0 1 0 8 M18.5 5.5a8 8 0 0 1 0 13"/></svg>}
+            </button>
+            <button onClick={toggleFullscreen} style={chromeBtnStyle}>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8V4h4 M16 4h4v4 M20 16v4h-4 M8 20H4v-4"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+const chromeBtnStyle = {
+  width: 34, height: 34, borderRadius: 8,
+  background: 'transparent', border: 'none',
+  color: '#fff', cursor: 'pointer',
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  fontFamily: 'inherit',
+};
 
 // ── PhotoLightbox ─────────────────────────────────────────────
 // Full-screen photo viewer. Takes a list of photo items (normalized — id,
