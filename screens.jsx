@@ -493,16 +493,19 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
   const fetchedState = window.useVideo(passed ? null : requestedId);
   const v = passed || fetchedState.data || list.find(x => String(x.id) === String(requestedId)) || list[0] || VIDEOS[0];
 
-  // Recommendation rail — only fetched when there's no playlist queue.
-  const recState = window.useRecommended(queue ? null : (v?.raw?.id ?? v?.id), 8);
-  const recItems = recState.data?.items || [];
+  // Recommendation rail — always fetched (Up Next shows beneath the queue,
+  // not instead of it). Limit big enough to feed Load-more cycles.
+  const recState = window.useRecommended(v?.raw?.id ?? v?.id, 20);
+  const recItems = (recState.data?.items || []).filter(x => String(x.id) !== String(v?.id));
 
-  // What ends up under "Up next":
-  //  - If we're inside a playlist queue: the tail of the queue (next items)
-  //  - Otherwise: recommendations (fallback to latest if empty)
-  const nextUp = queue
-    ? queue.slice(queueIdx + 1)
-    : (recItems.length ? recItems : list.slice(0, 4).filter(x => String(x.id) !== String(v?.id)));
+  // Queue items rotated so the rest of the playlist follows the current
+  // one and wraps to the beginning. Playing 4/4 → [1,2,3]; playing 2/4 → [3,4,1].
+  const queueRest = queue
+    ? [...queue.slice(queueIdx + 1), ...queue.slice(0, queueIdx)]
+    : [];
+
+  // Fallback for Up next when /recommended is empty.
+  const recOrFallback = recItems.length ? recItems : list.slice(0, 8).filter(x => String(x.id) !== String(v?.id));
   if (!v) return null;
   return (
     <Phone>
@@ -520,14 +523,14 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
         <div style={{ width: 36 }} />
       </div>
 
-      <VideoPageBody v={v} nextUp={nextUp} accent={accent} queue={queue} queueIdx={queueIdx} />
+      <VideoPageBody v={v} queueRest={queueRest} recItems={recOrFallback} accent={accent} queue={queue} queueIdx={queueIdx} />
     </Phone>
   );
 }
 
 // Body extracted so it can use hooks on `v.id` cleanly without making the
 // outer fallback resolution noisy. Re-mounts when v.id changes via key.
-function VideoPageBody({ v, nextUp, accent, queue, queueIdx }) {
+function VideoPageBody({ v, queueRest, recItems, accent, queue, queueIdx }) {
   const nav = window.useNav();
   // Pull the live artist record so we get the real photo + counts (not the
   // bare {name, handle, 0, 0} stub embedded on each video row).
@@ -585,26 +588,28 @@ function VideoPageBody({ v, nextUp, accent, queue, queueIdx }) {
 
   // Auto-advance when the current video ends and Autoplay is on.
   // Source of next:
-  //  - playlist queue → next item in queue (queueIdx + 1)
-  //  - otherwise → first item in nextUp (recommended)
+  //  - playlist queue → next item in the rotated queue (so even when the
+  //    user starts on the last item, the rest of the playlist plays).
+  //  - otherwise → first recommended.
   const onEnded = React.useCallback(() => {
     if (!autoplay || replay) return;
     let next = null;
     let nextQueue = null;
     let nextQueueIdx = -1;
-    if (queue && queueIdx >= 0 && queueIdx + 1 < queue.length) {
-      next = queue[queueIdx + 1];
+    if (queue && queueRest.length) {
+      next = queueRest[0];
       nextQueue = queue;
-      nextQueueIdx = queueIdx + 1;
-    } else if (nextUp && nextUp.length) {
-      next = nextUp[0];
+      // Find the index of `next` inside the original queue array.
+      nextQueueIdx = queue.findIndex(x => String(x.id) === String(next.id));
+    } else if (recItems && recItems.length) {
+      next = recItems[0];
     }
     if (!next) return;
     nav.replace('video', {
       id: next.id, video: next,
       queue: nextQueue, queueIdx: nextQueueIdx,
     });
-  }, [autoplay, replay, queue, queueIdx, nextUp, nav]);
+  }, [autoplay, replay, queue, queueIdx, queueRest, recItems, nav]);
 
   return (
     <div style={SCROLL_BODY}>
@@ -676,10 +681,10 @@ function VideoPageBody({ v, nextUp, accent, queue, queueIdx }) {
         </div>
       </div>
 
-      {/* Queue / Up next header. Inside a playlist queue we show counter +
-          a horizontal preview rail (like main miniapp). Otherwise it's the
-          regular recommendation list. */}
-      {queue ? (
+      {/* Queue rail — only when inside a playlist. Shows the rest of the
+          playlist (rotated so it wraps from the end back to the start),
+          and a "N / M" counter. Tap a tile to jump to that position. */}
+      {queue && queueRest.length > 0 && (
         <React.Fragment>
           <div style={{ padding: '14px 14px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, letterSpacing: 1.2, textTransform: 'uppercase' }}>
@@ -687,36 +692,27 @@ function VideoPageBody({ v, nextUp, accent, queue, queueIdx }) {
             </div>
             <div style={{ fontSize: 11, color: accent, fontWeight: 700 }}>{queueIdx + 1} / {queue.length}</div>
           </div>
-          {/* Horizontal mini rail of upcoming items */}
-          {nextUp.length > 0 && (
-            <div style={{ padding: '6px 14px 8px', display: 'flex', gap: 8, overflowX: 'auto' }}>
-              {nextUp.slice(0, 12).map((nv, i) => (
+          <div style={{ padding: '6px 14px 4px', display: 'flex', gap: 8, overflowX: 'auto' }}>
+            {queueRest.map((nv) => {
+              const jumpIdx = queue.findIndex(x => String(x.id) === String(nv.id));
+              return (
                 <div key={nv.id}
-                  onClick={() => nav.replace('video', { id: nv.id, video: nv, queue, queueIdx: queueIdx + 1 + i })}
-                  style={{
-                    flexShrink: 0, width: 110, cursor: 'pointer',
-                  }}>
+                  onClick={() => nav.replace('video', { id: nv.id, video: nv, queue, queueIdx: jumpIdx })}
+                  style={{ flexShrink: 0, width: 110, cursor: 'pointer' }}>
                   <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 8, overflow: 'hidden' }}>
                     <Thumb thumb={nv.thumb} duration={nv.duration} />
                   </div>
                   <div style={{ fontSize: 10.5, fontWeight: 600, marginTop: 5, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{nv.title}</div>
                 </div>
-              ))}
-            </div>
-          )}
-        </React.Fragment>
-      ) : (
-        <React.Fragment>
-          <div style={{ padding: '14px 14px 4px' }}>
-            <SectionHeader title="Up next" accent={accent} action="" />
-          </div>
-          <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {nextUp.map((nv) => (
-              <CompactRow key={nv.id} v={nv} accent={accent} />
-            ))}
+              );
+            })}
           </div>
         </React.Fragment>
       )}
+
+      {/* Up Next — always rendered below the queue. Capped at 5, Load more
+          reveals another 5. */}
+      <UpNextSection items={recItems} accent={accent} />
 
       {/* Playlist picker modal */}
       {showPlaylistPicker && (
@@ -727,6 +723,36 @@ function VideoPageBody({ v, nextUp, accent, queue, queueIdx }) {
         />
       )}
     </div>
+  );
+}
+
+// Pagination-aware Up Next list. Lives outside VideoPageBody so it keeps its
+// `visible` state when the body re-renders (e.g. like state changes).
+function UpNextSection({ items, accent }) {
+  const [visible, setVisible] = React.useState(5);
+  if (!items || !items.length) return null;
+  const shown = items.slice(0, visible);
+  return (
+    <React.Fragment>
+      <div style={{ padding: '14px 14px 4px' }}>
+        <SectionHeader title="Up next" accent={accent} action="" />
+      </div>
+      <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {shown.map((nv) => (
+          <CompactRow key={nv.id} v={nv} accent={accent} />
+        ))}
+      </div>
+      {visible < items.length && (
+        <div style={{ padding: '0 14px 16px' }}>
+          <button onClick={() => setVisible(v => v + 5)} style={{
+            width: '100%', background: 'transparent', color: accent,
+            border: `1px solid ${accent}55`, borderRadius: 12,
+            padding: '12px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}>Load more ({items.length - visible} left)</button>
+        </div>
+      )}
+    </React.Fragment>
   );
 }
 
