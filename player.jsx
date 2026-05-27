@@ -73,7 +73,7 @@ async function prefetchPlayable(ids, concurrency = 3) {
   await Promise.all(workers);
 }
 
-function VideoPlayer({ video, accent, fillParent = false, vertical = false, autoStart = false, loop = false }) {
+function VideoPlayer({ video, accent, fillParent = false, vertical = false, autoStart = false, loop = false, onEnded }) {
   const v = video;
   const [phase, setPhase] = React.useState('idle'); // 'idle' | 'loading' | 'playing' | 'error'
   const [errorMsg, setErrorMsg] = React.useState('');
@@ -262,6 +262,7 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
             webkit-playsinline="true"
             autoPlay={vertical || autoStart}
             loop={vertical || loop}
+            onEnded={onEnded}
             style={{
               position: 'absolute', inset: 0,
               width: '100%', height: '100%',
@@ -523,35 +524,64 @@ function CustomVideoChrome({ videoRef, accent, loop }) {
     el.muted = !el.muted;
     wakeControls();
   };
-  const toggleFullscreen = () => {
+  // Direct port of main miniapp's toggleVpFullscreen — combination of an
+  // immersive CSS class on the wrapper + native Fullscreen API + screen
+  // orientation lock. Works inside Telegram WebView even on iOS where the
+  // standalone Fullscreen API is blocked.
+  const toggleFullscreen = async () => {
     const el = videoRef.current;
     if (!el) return;
-    const tg = window.Telegram?.WebApp;
-    // 1) Telegram WebApp 8.0+ (Dec 2024) — lets the miniapp go fullscreen
-    //    inside Telegram on phones, including iOS where the Fullscreen API
-    //    is otherwise blocked. Best path when available.
-    if (tg && typeof tg.requestFullscreen === 'function') {
+    const wrap = el.parentElement; // CustomVideoChrome wrapper div
+    const isInFs = !!(document.fullscreenElement || document.webkitFullscreenElement)
+      || (wrap && wrap.classList.contains('vp-immersive'));
+    if (isInFs) {
+      try { wrap?.classList.remove('vp-immersive'); } catch (_) {}
+      try { window.Telegram?.WebApp?.exitFullscreen?.(); } catch (_) {}
       try {
-        if (tg.isFullscreen) tg.exitFullscreen();
-        else tg.requestFullscreen();
-        return;
+        if (document.fullscreenElement) await document.exitFullscreen?.();
+        else if (document.webkitFullscreenElement) document.webkitExitFullscreen?.();
       } catch (_) {}
+      try { await screen.orientation?.unlock?.(); } catch (_) {}
+      return;
     }
-    // 2) iOS Safari outside of new Telegram — webkitEnterFullscreen on the
-    //    video element is the only way to actually fullscreen.
-    if (el.webkitEnterFullscreen) {
-      try { el.webkitEnterFullscreen(); return; } catch (_) {}
+    // Entering FS: apply our CSS-immersive class as a guaranteed baseline.
+    try { wrap?.classList.add('vp-immersive'); } catch (_) {}
+    // Then ask the host for true fullscreen if available.
+    const tg = window.Telegram?.WebApp;
+    if (tg?.requestFullscreen) {
+      try { tg.requestFullscreen(); } catch (_) {}
     }
-    // 3) Standard Fullscreen API on the wrapper.
-    const wrap = el.parentElement;
-    if (document.fullscreenElement || document.webkitFullscreenElement) {
-      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
-    } else if (wrap && wrap.requestFullscreen) {
-      wrap.requestFullscreen().catch(() => {});
-    } else if (el.requestFullscreen) {
-      el.requestFullscreen().catch(() => {});
-    }
+    try { window.Telegram?.WebApp?.expand?.(); } catch (_) {}
+    try {
+      if (wrap?.requestFullscreen) {
+        try { await wrap.requestFullscreen({ navigationUI: 'hide' }); }
+        catch (_) { await wrap.requestFullscreen(); }
+      } else if (wrap?.webkitRequestFullscreen) {
+        wrap.webkitRequestFullscreen();
+      } else if (el.webkitEnterFullscreen && /iPad|iPhone|iPod/i.test(navigator.userAgent)) {
+        // iOS Safari fallback when fullscreening the wrap isn't allowed.
+        el.webkitEnterFullscreen();
+      }
+    } catch (_) {}
+    try { await screen.orientation?.lock?.('landscape'); } catch (_) {}
   };
+  // Sync the CSS-immersive class out of fullscreenchange — when the user
+  // hits the Esc key or swipes down inside native fullscreen, drop our
+  // class too so the player goes back to the regular embedded layout.
+  React.useEffect(() => {
+    const onChange = () => {
+      const wrap = videoRef.current?.parentElement;
+      if (!wrap) return;
+      const native = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      if (!native) wrap.classList.remove('vp-immersive');
+    };
+    document.addEventListener('fullscreenchange', onChange);
+    document.addEventListener('webkitfullscreenchange', onChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange);
+      document.removeEventListener('webkitfullscreenchange', onChange);
+    };
+  }, [videoRef]);
 
   // Scrub bar: pointerdown → seek and start tracking; pointermove updates;
   // pointerup commits.

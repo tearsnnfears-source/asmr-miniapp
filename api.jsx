@@ -642,6 +642,20 @@ async function actionDeletePlaylist(playlistId) {
   } catch (e) { return { ok: false, error: e.message }; }
 }
 
+// Recommended videos for the VideoPage Up Next rail.
+function useRecommended(contentId, limit = 8) {
+  return useFetch(
+    `recommended:${contentId}:${limit}`,
+    async () => {
+      if (contentId == null) return { items: [] };
+      const data = await apiGet('/miniapp/recommended', { content_id: contentId, limit: String(limit) });
+      return { items: (data.items || []).map((it, i) => normalizeVideo(it, i)) };
+    },
+    { items: [] },
+    [contentId, limit],
+  );
+}
+
 // Search — GET /miniapp/search?q=&limit=
 function useSearch(q, limit = 20) {
   const enabled = q && q.length >= 2;
@@ -923,7 +937,7 @@ initTelegram();
 Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
-  useVideos, useVideo, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useSearch, userFromTelegram,
+  useVideos, useVideo, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, userFromTelegram,
   actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionStartCryptoCheckout, actionStartFreeTrial,
   actionCreatePlaylist, actionAddToPlaylist, actionRemoveFromPlaylist, actionDeletePlaylist,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,

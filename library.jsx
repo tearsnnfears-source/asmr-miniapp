@@ -565,8 +565,23 @@ function PlaylistPage({ accent = C.pink }) {
         <div style={{ width: 38 }} />
       </div>
       <div style={SCROLL_BODY}>
-        <div style={{ padding: '12px 14px 8px', fontSize: 12, color: C.muted }}>
-          {items.length} videos
+        {/* Header summary + Play playlist CTA */}
+        <div style={{ padding: '14px 14px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>{name}</div>
+            <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>{items.length} videos</div>
+          </div>
+          {items.length > 0 && (
+            <button onClick={() => nav.go('video', { id: items[0].id, video: items[0], queue: items, queueIdx: 0 })} style={{
+              background: accent, color: '#000', border: 'none',
+              padding: '10px 16px', borderRadius: 999,
+              fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              fontFamily: 'inherit', whiteSpace: 'nowrap',
+            }}>
+              <Ico.play /> Play
+            </button>
+          )}
         </div>
         {state.loading && !items.length && (
           <div style={{ padding: '40px 14px', textAlign: 'center', color: C.muted, fontSize: 13 }}>Loading…</div>
@@ -581,8 +596,10 @@ function PlaylistPage({ accent = C.pink }) {
           </div>
         )}
         <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {items.map(v => (
-            <div key={v.id} onClick={() => nav.go('video', { id: v.id, video: v })} style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
+          {items.map((v, i) => (
+            <div key={v.id}
+              onClick={() => nav.go('video', { id: v.id, video: v, queue: items, queueIdx: i })}
+              style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
               <div style={{ width: 130, flexShrink: 0 }}>
                 <Thumb thumb={v.thumb} duration={v.duration} />
               </div>

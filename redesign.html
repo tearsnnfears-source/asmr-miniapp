@@ -67,6 +67,35 @@
     animation: spl-spin 0.7s linear infinite;
   }
   @keyframes spl-spin { to { transform: rotate(360deg); } }
+
+  /* Immersive video — applied by player.jsx toggleFullscreen. Pin the
+     player wrap to the whole viewport on top of the app chrome. Works
+     even when the native Fullscreen API is blocked (iOS in Telegram). */
+  .vp-immersive {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 9500 !important;
+    background: #000 !important;
+    border-radius: 0 !important;
+    aspect-ratio: auto !important;
+  }
+  .vp-immersive video {
+    width: 100vw !important;
+    height: 100vh !important;
+    object-fit: contain !important;
+  }
+  @media (orientation: portrait) {
+    /* On a vertical phone, lay the player on its side so the video gets
+       the long edge of the screen even when we can't lock orientation. */
+    .vp-immersive.vp-force-landscape {
+      width: 100vh !important;
+      height: 100vw !important;
+      transform-origin: top left !important;
+      transform: rotate(90deg) translateY(-100%) !important;
+    }
+  }
 </style>
 </head>
 <body>

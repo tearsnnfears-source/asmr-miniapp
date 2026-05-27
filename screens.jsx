@@ -484,22 +484,25 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
   const nav = window.useNav();
   const passed = nav.params?.video;
   const requestedId = nav.params?.id;
-  // Three-tier resolution so any video in the DB opens, no matter how big
-  // the catalog gets:
-  //  1) `nav.params.video` — the object was handed to us by the tile click
-  //     (covers Home / Artist / Saved / Search tiles).
-  //  2) `useVideo(id)` — single-row fetch by id (covers deep-links, push
-  //     notifications, restored sessions, anything-by-id).
-  //  3) Latest list (useVideos(30)) — last-ditch fallback so the screen
-  //     doesn't blank out on weird states.
+  // Queue context — set when the user came from a playlist or Play-all.
+  // nav.params.queue = [video,...], nav.params.queueIdx = position in queue.
+  const queue = nav.params?.queue;
+  const queueIdx = typeof nav.params?.queueIdx === 'number' ? nav.params.queueIdx : -1;
   const liteState = window.useVideos(30);
   const list = liteState.data || [];
   const fetchedState = window.useVideo(passed ? null : requestedId);
   const v = passed || fetchedState.data || list.find(x => String(x.id) === String(requestedId)) || list[0] || VIDEOS[0];
-  // "Up next" comes from the lite list, starting after this video if it's
-  // there; otherwise just the head of the list.
-  const matchedIdx = list.findIndex(x => String(x.id) === String(v?.id));
-  const nextUp = matchedIdx >= 0 ? list.slice(matchedIdx + 1, matchedIdx + 5) : list.slice(0, 4);
+
+  // Recommendation rail — only fetched when there's no playlist queue.
+  const recState = window.useRecommended(queue ? null : (v?.raw?.id ?? v?.id), 8);
+  const recItems = recState.data?.items || [];
+
+  // What ends up under "Up next":
+  //  - If we're inside a playlist queue: the tail of the queue (next items)
+  //  - Otherwise: recommendations (fallback to latest if empty)
+  const nextUp = queue
+    ? queue.slice(queueIdx + 1)
+    : (recItems.length ? recItems : list.slice(0, 4).filter(x => String(x.id) !== String(v?.id)));
   if (!v) return null;
   return (
     <Phone>
@@ -517,14 +520,14 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
         <div style={{ width: 36 }} />
       </div>
 
-      <VideoPageBody v={v} nextUp={nextUp} accent={accent} />
+      <VideoPageBody v={v} nextUp={nextUp} accent={accent} queue={queue} queueIdx={queueIdx} />
     </Phone>
   );
 }
 
 // Body extracted so it can use hooks on `v.id` cleanly without making the
 // outer fallback resolution noisy. Re-mounts when v.id changes via key.
-function VideoPageBody({ v, nextUp, accent }) {
+function VideoPageBody({ v, nextUp, accent, queue, queueIdx }) {
   const nav = window.useNav();
   // Pull the live artist record so we get the real photo + counts (not the
   // bare {name, handle, 0, 0} stub embedded on each video row).
@@ -544,6 +547,17 @@ function VideoPageBody({ v, nextUp, accent }) {
   const [localLike, setLocalLike] = React.useState(null);
   const [localFollow, setLocalFollow] = React.useState(null);
   const [replay, setReplay] = React.useState(false);
+  const [autoplay, setAutoplay] = React.useState(() => {
+    // Default ON when we're inside a queue (playlist), OFF for one-offs.
+    try {
+      const saved = localStorage.getItem('vp_autoplay');
+      if (saved != null) return saved === '1';
+    } catch (_) {}
+    return !!queue;
+  });
+  React.useEffect(() => {
+    try { localStorage.setItem('vp_autoplay', autoplay ? '1' : '0'); } catch (_) {}
+  }, [autoplay]);
   const [showPlaylistPicker, setShowPlaylistPicker] = React.useState(false);
   const isLiked = localLike != null ? localLike : serverHearted;
   const heartCount = serverHeartCount + (
@@ -569,10 +583,33 @@ function VideoPageBody({ v, nextUp, accent }) {
   };
   const onReplay = () => setReplay(r => !r);
 
+  // Auto-advance when the current video ends and Autoplay is on.
+  // Source of next:
+  //  - playlist queue → next item in queue (queueIdx + 1)
+  //  - otherwise → first item in nextUp (recommended)
+  const onEnded = React.useCallback(() => {
+    if (!autoplay || replay) return;
+    let next = null;
+    let nextQueue = null;
+    let nextQueueIdx = -1;
+    if (queue && queueIdx >= 0 && queueIdx + 1 < queue.length) {
+      next = queue[queueIdx + 1];
+      nextQueue = queue;
+      nextQueueIdx = queueIdx + 1;
+    } else if (nextUp && nextUp.length) {
+      next = nextUp[0];
+    }
+    if (!next) return;
+    nav.replace('video', {
+      id: next.id, video: next,
+      queue: nextQueue, queueIdx: nextQueueIdx,
+    });
+  }, [autoplay, replay, queue, queueIdx, nextUp, nav]);
+
   return (
     <div style={SCROLL_BODY}>
-      {/* Player. loop prop drives Replay toggle. */}
-      <window.VideoPlayer key={v.id} video={v} accent={accent} loop={replay} />
+      {/* Player. loop = replay; onEnded drives autoplay chaining. */}
+      <window.VideoPlayer key={v.id} video={v} accent={accent} loop={replay} onEnded={onEnded} />
 
       {/* Title row — kept clean: just the title, no prev/next arrows. */}
       <div style={{ padding: '14px 14px 6px' }}>
@@ -601,6 +638,12 @@ function VideoPageBody({ v, nextUp, accent }) {
           icon={<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-15.5 6.3L3 16" /><path d="M3 21v-5h5" /></svg>}
           label={replay ? 'Replay on' : 'Replay'}
           onClick={onReplay}
+        />
+        <ActionPill
+          active={autoplay} accent={accent}
+          icon={<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 4l14 8-14 8z"/><circle cx="19" cy="6" r="2.5" fill="currentColor"/></svg>}
+          label={autoplay ? 'Autoplay on' : 'Autoplay'}
+          onClick={() => setAutoplay(a => !a)}
         />
       </div>
 
@@ -631,17 +674,47 @@ function VideoPageBody({ v, nextUp, accent }) {
         </div>
       </div>
 
-      {/* "Up next" header */}
-      <div style={{ padding: '14px 14px 4px' }}>
-        <SectionHeader title="Up next" accent={accent} action="" />
-      </div>
-
-      {/* Next videos list */}
-      <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {nextUp.map((nv) => (
-          <CompactRow key={nv.id} v={nv} accent={accent} />
-        ))}
-      </div>
+      {/* Queue / Up next header. Inside a playlist queue we show counter +
+          a horizontal preview rail (like main miniapp). Otherwise it's the
+          regular recommendation list. */}
+      {queue ? (
+        <React.Fragment>
+          <div style={{ padding: '14px 14px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+              Queue
+            </div>
+            <div style={{ fontSize: 11, color: accent, fontWeight: 700 }}>{queueIdx + 1} / {queue.length}</div>
+          </div>
+          {/* Horizontal mini rail of upcoming items */}
+          {nextUp.length > 0 && (
+            <div style={{ padding: '6px 14px 8px', display: 'flex', gap: 8, overflowX: 'auto' }}>
+              {nextUp.slice(0, 12).map((nv, i) => (
+                <div key={nv.id}
+                  onClick={() => nav.replace('video', { id: nv.id, video: nv, queue, queueIdx: queueIdx + 1 + i })}
+                  style={{
+                    flexShrink: 0, width: 110, cursor: 'pointer',
+                  }}>
+                  <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 8, overflow: 'hidden' }}>
+                    <Thumb thumb={nv.thumb} duration={nv.duration} />
+                  </div>
+                  <div style={{ fontSize: 10.5, fontWeight: 600, marginTop: 5, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{nv.title}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </React.Fragment>
+      ) : (
+        <React.Fragment>
+          <div style={{ padding: '14px 14px 4px' }}>
+            <SectionHeader title="Up next" accent={accent} action="" />
+          </div>
+          <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {nextUp.map((nv) => (
+              <CompactRow key={nv.id} v={nv} accent={accent} />
+            ))}
+          </div>
+        </React.Fragment>
+      )}
 
       {/* Playlist picker modal */}
       {showPlaylistPicker && (
