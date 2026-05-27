@@ -14,7 +14,18 @@ const SHORTS_LIMIT = 300;
 // so the loaded video elements aren't blown away by Home/Saved tab clicks.
 function ShortsTab({ accent = C.pink }) {
   const shortsState = window.useShorts(SHORTS_LIMIT);
-  const allShorts = shortsState.data || [];
+  const artistsState = window.useArtists();
+  // Enrich each short's artist with the photo from /miniapp/artists so the
+  // tile avatars in the grid show real faces, not a single letter.
+  const allShorts = React.useMemo(() => {
+    const raw = shortsState.data || [];
+    const byName = new Map((artistsState.data || []).map(a => [a.name, a]));
+    return raw.map(s => {
+      const live = byName.get(s.artist?.name);
+      if (!live) return s;
+      return { ...s, artist: { ...s.artist, photo: live.photo, profilePhoto: live.profilePhoto } };
+    });
+  }, [shortsState.data, artistsState.data]);
   const favState = window.useFavorites();
   const likedIds = new Set((favState.data?.items || []).map(it => Number(it.raw?.content_id ?? it.id)));
 
@@ -245,7 +256,7 @@ function ShortsTile({ s, idx, accent, fresh, onOpen }) {
           <Avatar artist={s.artist} size={20} />
           <div style={{ fontSize: 10, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.artist.name}</div>
         </div>
-        <div style={{ fontSize: 10, color: C.muted2, fontWeight: 500 }}>{s.views} views</div>
+        <div style={{ fontSize: 10, color: C.muted2, fontWeight: 500 }}>{s.artist.handle}</div>
       </div>
     </div>
   );
@@ -447,9 +458,11 @@ function ShortsPlayer({ accent = C.pink, allShorts, order, items, pos, setPos, o
           {s.label && (
             <div style={{ fontSize: 13, lineHeight: 1.35, marginBottom: 6 }}>{s.label}</div>
           )}
-          <div style={{ fontSize: 10, color: C.muted, fontWeight: 600, letterSpacing: 0.5 }}>
-            {s.views || '0'} views{s.duration ? ` · ${s.duration}` : ''}
-          </div>
+          {s.duration && (
+            <div style={{ fontSize: 10, color: C.muted, fontWeight: 600, letterSpacing: 0.5 }}>
+              {s.duration}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -532,21 +545,6 @@ function VideoPageBody({ v, nextUp, accent }) {
   const [localFollow, setLocalFollow] = React.useState(null);
   const [replay, setReplay] = React.useState(false);
   const [showPlaylistPicker, setShowPlaylistPicker] = React.useState(false);
-  // Local +1 bump on views once the registerView fires. Backend dedupes,
-  // so the user only ever pushes the counter once; this just makes the
-  // UI reflect that immediately without waiting for a refetch.
-  const [viewBump, setViewBump] = React.useState(0);
-  React.useEffect(() => {
-    const onView = (e) => {
-      if (e.detail?.contentId == null) return;
-      if (Number(e.detail.contentId) !== Number(contentId)) return;
-      if (e.detail.counted) setViewBump(1);
-    };
-    window.addEventListener('miniapp:view', onView);
-    return () => window.removeEventListener('miniapp:view', onView);
-  }, [contentId]);
-  const viewsDisplay = (Number(v.raw?.views || v.views || 0) || 0) + viewBump;
-
   const isLiked = localLike != null ? localLike : serverHearted;
   const heartCount = serverHeartCount + (
     localLike == null ? 0 :
@@ -580,8 +578,6 @@ function VideoPageBody({ v, nextUp, accent }) {
       <div style={{ padding: '14px 14px 6px' }}>
         <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.3 }}>{v.title}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: 11, color: C.muted }}>
-          <span>{viewsDisplay} views</span>
-          <span>·</span>
           <span>{v.age || 'recent'}</span>
         </div>
       </div>

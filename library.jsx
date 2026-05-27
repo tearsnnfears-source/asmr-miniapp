@@ -336,7 +336,18 @@ function LikedVideos({ accent }) {
 function LikedShorts({ accent }) {
   const nav = window.useNav();
   const favState = window.useFavorites();
-  const items = favState.data?.shorts || [];
+  const artistsState = window.useArtists();
+  // Same artist-photo enrichment as the Shorts grid — saved tiles get real
+  // faces instead of letters.
+  const items = React.useMemo(() => {
+    const raw = favState.data?.shorts || [];
+    const byName = new Map((artistsState.data || []).map(a => [a.name, a]));
+    return raw.map(s => {
+      const live = byName.get(s.artist?.name);
+      if (!live) return s;
+      return { ...s, artist: { ...s.artist, photo: live.photo, profilePhoto: live.profilePhoto } };
+    });
+  }, [favState.data, artistsState.data]);
   if (favState.loading && !items.length) {
     return <div style={{ padding: '40px 14px', textAlign: 'center', color: C.muted, fontSize: 13 }}>Loading your saved shorts…</div>;
   }

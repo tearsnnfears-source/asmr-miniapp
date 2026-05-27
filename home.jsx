@@ -66,8 +66,6 @@ function FeedCard({ v, accent, density, featured }) {
           <div style={{ fontSize: 11, color: C.muted, marginTop: 3, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
             <span onClick={(e) => { e.stopPropagation(); nav.go('artist', { id: v.artist.id }); }} style={{ color: C.muted2, fontWeight: 600, cursor: 'pointer' }}>{v.artist.name}</span>
             <span>·</span>
-            <span>{v.views} views</span>
-            <span>·</span>
             <span>{v.age}</span>
           </div>
         </div>
@@ -109,7 +107,7 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
               <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25, marginBottom: 6 }}>{hero.title}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Avatar artist={hero.artist} size={24} />
-                <span style={{ fontSize: 11, color: C.muted2 }}>{hero.artist.name} · {hero.views} views · {hero.age}</span>
+                <span style={{ fontSize: 11, color: C.muted2 }}>{hero.artist.name} · {hero.age}</span>
               </div>
             </div>
           </div>
@@ -185,7 +183,7 @@ function CompactRow({ v, accent }) {
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
         }}>{v.title}</div>
         <div style={{ fontSize: 10.5, color: C.muted, marginTop: 4, fontWeight: 500 }}>{v.artist.name}</div>
-        <div style={{ fontSize: 10.5, color: C.muted, marginTop: 2 }}>{v.views} views · {v.age}</div>
+        <div style={{ fontSize: 10.5, color: C.muted, marginTop: 2 }}>{v.age}</div>
         {v.artist.fresh && (
           <span style={{ display: 'inline-block', marginTop: 6, fontSize: 9, padding: '2px 6px', background: `${accent}22`, color: accent, borderRadius: 4, fontWeight: 700, letterSpacing: 0.5 }}>FRESH ARTIST</span>
         )}
@@ -251,7 +249,7 @@ function MosaicCard({ v, accent, wide }) {
         }}>{v.title}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
           <Avatar artist={v.artist} size={16} />
-          <div style={{ fontSize: 10, color: C.muted, fontWeight: 500, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{v.artist.name} · {v.views} views</div>
+          <div style={{ fontSize: 10, color: C.muted, fontWeight: 500, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{v.artist.name}</div>
         </div>
       </div>
     </div>
