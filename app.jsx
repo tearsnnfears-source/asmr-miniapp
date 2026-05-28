@@ -22,6 +22,7 @@ const SCREENS = {
   profile:        ({ accent })                    => <window.ProfilePage accent={accent} />,
   faq:            ({ accent })                    => <window.FAQPage accent={accent} />,
   search:         ({ accent })                    => <window.SearchPage accent={accent} />,
+  'followed-feed':({ accent })                    => <window.FollowedFeedPage accent={accent} />,
   'paywall-video':({ accent })                    => <window.PaywallLock accent={accent} mode="video" />,
   'paywall-artist':({ accent })                   => <window.PaywallLock accent={accent} mode="artist" />,
 };
@@ -40,6 +41,7 @@ const SCREEN_TO_TAB = {
   profile: '',
   faq: '',
   search: '',
+  'followed-feed': 'home',
   'paywall-video': 'home',
   'paywall-artist': 'artists',
 };

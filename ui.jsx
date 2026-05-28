@@ -650,6 +650,65 @@ const TickerSlides = {
       </div>
     );
   },
+  // "Got an artist in mind?" slide — inline input + send button hitting
+  // /miniapp/suggest_artist. Replaces the old ad slot. Component so
+  // hooks (useNav, useState) are legal.
+  suggestArtist: function SuggestArtistSlide({ accent, lime }) {
+    const [name, setName] = React.useState('');
+    const [busy, setBusy] = React.useState(false);
+    const [sent, setSent] = React.useState(false);
+    const send = async (e) => {
+      e?.stopPropagation?.();
+      if (busy || sent) return;
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      setBusy(true);
+      const r = await window.actionSuggestArtist(trimmed);
+      setBusy(false);
+      if (r?.ok) { setSent(true); setName(''); }
+      else alert(r?.message || 'Could not send. Try again.');
+    };
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 56 }}>
+        <div style={{
+          width: 38, height: 38, borderRadius: 10,
+          background: `linear-gradient(135deg, ${accent}, ${C.purple})`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#000', flexShrink: 0,
+        }}>💡</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 9, color: lime, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>Missing someone?</div>
+          {sent ? (
+            <div style={{ fontSize: 12, fontWeight: 600 }}>🎉 Sent — we'll take a look.</div>
+          ) : (
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              placeholder="Suggest an artist…"
+              style={{
+                width: '100%',
+                background: 'transparent', border: 'none', outline: 'none',
+                color: '#fff', fontSize: 13, fontFamily: 'inherit',
+                padding: 0,
+              }}
+            />
+          )}
+        </div>
+        {!sent && (
+          <button onClick={send} disabled={busy || !name.trim()} style={{
+            background: name.trim() ? lime : 'rgba(255,255,255,0.08)',
+            color: name.trim() ? '#000' : 'rgba(255,255,255,0.4)',
+            border: 'none', padding: '7px 12px', borderRadius: 999,
+            fontSize: 11, fontWeight: 800, letterSpacing: 0.4,
+            cursor: name.trim() ? 'pointer' : 'default',
+            whiteSpace: 'nowrap', fontFamily: 'inherit',
+            flexShrink: 0,
+          }}>{busy ? '…' : 'Send'}</button>
+        )}
+      </div>
+    );
+  },
   ad: ({ accent, lime }) => (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 56 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

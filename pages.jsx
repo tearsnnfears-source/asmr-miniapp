@@ -193,6 +193,15 @@ function ProfilePage({ accent = C.pink }) {
               <Row icon="🔄" color={accent} label={user.isPro ? 'Renew subscription' : 'Get PRO'} onClick={() => nav.go('subscription')} />
             )}
           </RowGroup>
+          {/* Notifications group — only the expiry reminder for now.
+              Only meaningful for Pro users (a free account has nothing
+              to expire). Backend honours user.notify_expiry via the
+              scheduler. */}
+          {user.isPro && (
+            <RowGroup label="Notifications">
+              <ExpiryReminderRow user={user} accent={accent} />
+            </RowGroup>
+          )}
           <RowGroup label="Help">
             <Row icon="❓" label="FAQ" onClick={() => nav.go('faq')} />
           </RowGroup>
@@ -224,6 +233,52 @@ function Row({ icon, color, label, value, badge, onClick }) {
       {badge && <span style={{ fontSize: 10, padding: '2px 8px', background: color ? `${color}1c` : 'rgba(255,255,255,0.05)', color: color || C.muted2, borderRadius: 999, fontWeight: 700 }}>{badge}</span>}
       {value && <span style={{ fontSize: 12, color: C.muted }}>{value}</span>}
       <span style={{ color: C.muted, fontSize: 16 }}>›</span>
+    </div>
+  );
+}
+
+// Expiry-reminder row — toggle wired to /miniapp/set_notify_expiry.
+// Initial state reads user.raw.notify_expiry (defaults to true on the
+// backend if the field is missing).
+function ExpiryReminderRow({ user, accent }) {
+  const initial = user?.raw?.notify_expiry !== false; // default = on
+  const [on, setOn] = React.useState(initial);
+  const [busy, setBusy] = React.useState(false);
+  const onClick = async () => {
+    if (busy) return;
+    const next = !on;
+    setOn(next); // optimistic
+    setBusy(true);
+    const r = await window.actionSetNotifyExpiry(next);
+    setBusy(false);
+    if (!r.ok) setOn(!next); // rollback on failure
+  };
+  return (
+    <div onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderBottom: 'none', cursor: 'pointer' }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: 8,
+        background: `${accent}1c`,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 14,
+      }}>⏰</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>Expiry reminder</div>
+        <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>3 days before subscription ends</div>
+      </div>
+      <div style={{
+        width: 38, height: 22, borderRadius: 999,
+        background: on ? accent : 'rgba(255,255,255,0.12)',
+        position: 'relative', transition: 'background 200ms',
+        flexShrink: 0,
+      }}>
+        <div style={{
+          position: 'absolute', top: 2, left: on ? 18 : 2,
+          width: 18, height: 18, borderRadius: '50%',
+          background: '#fff',
+          transition: 'left 200ms',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+        }} />
+      </div>
     </div>
   );
 }
@@ -1299,4 +1354,41 @@ function ArtistPage({ accent = C.pink }) {
   );
 }
 
-Object.assign(window, { ProfilePage, SubscriptionPage, FAQPage, PaywallLock, ArtistPage, SearchPage });
+// ── FOLLOWED FEED PAGE ────────────────────────────────────────
+// Full list of recent videos from artists the user follows. Reached
+// from the "See all →" tile on Home's Followed rail. Just a slim
+// header + a column of CompactRow tiles — no pagination on the
+// backend, the endpoint already caps at 20.
+function FollowedFeedPage({ accent = C.pink }) {
+  const nav = window.useNav();
+  const state = window.useFollowedFeed();
+  const items = state.data?.videos || [];
+  return (
+    <Phone>
+      <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.dark2, borderBottom: `1px solid ${C.border}` }}>
+        <button onClick={() => nav.back()} style={{ ...iconBtn, border: 'none' }}><Ico.chevL /></button>
+        <span style={{ fontSize: 13, fontWeight: 700 }}>Followed feed</span>
+        <div style={{ width: 38 }} />
+      </div>
+      <div style={SCROLL_BODY}>
+        {state.loading && !items.length ? (
+          <div style={{ padding: '40px 14px', textAlign: 'center', color: C.muted, fontSize: 13 }}>Loading…</div>
+        ) : !items.length ? (
+          <div style={{ padding: '40px 18px', textAlign: 'center' }}>
+            <div style={{ fontSize: 36, marginBottom: 10 }}>🎤</div>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>No new videos yet</div>
+            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+              Follow more artists from the Artists tab and we'll surface their fresh drops here.
+            </div>
+          </div>
+        ) : (
+          <div style={{ padding: '12px 14px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {items.map(v => <CompactRow key={v.id} v={v} accent={accent} />)}
+          </div>
+        )}
+      </div>
+    </Phone>
+  );
+}
+
+Object.assign(window, { ProfilePage, SubscriptionPage, FAQPage, PaywallLock, ArtistPage, SearchPage, FollowedFeedPage });

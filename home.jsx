@@ -196,15 +196,15 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
         )}
 
         {/* Auto-ticker. Trial slide only when the user can still claim
-            one — paid subs + anyone who already burned the trial see
-            just the stats slide. Ad slide is parked until we have real
-            promo content to surface. */}
+            one — paid subs + anyone who already burned the trial drop
+            it. suggestArtist replaces the old ad slot and is always
+            available — it's a real CTA, not a placeholder. */}
         {(() => {
           const userState = nav.user || {};
           const trialEligible = !userState.isPro && !userState.trialUsed;
           const slides = trialEligible
-            ? [TickerSlides.freeTrial, TickerSlides.stats]
-            : [TickerSlides.stats];
+            ? [TickerSlides.freeTrial, TickerSlides.stats, TickerSlides.suggestArtist]
+            : [TickerSlides.stats, TickerSlides.suggestArtist];
           return (
             <div style={{ padding: '10px 14px 4px' }}>
               <TickerBanner accent={accent} slides={slides} />
@@ -236,6 +236,11 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
             </div>
           ))}
         </div>
+
+        {/* Followed feed rail — only when the user has at least one
+            video from someone they follow. Compact horizontal tiles +
+            trailing "See all" CTA that opens FollowedFeedPage. */}
+        <FollowedRail accent={accent} />
 
         {/* Personalised feed */}
         <div style={{ padding: '16px 14px 6px' }}>
@@ -293,6 +298,80 @@ function HeroArtistLine({ artist, age }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <Avatar artist={live} size={24} />
       <span style={{ fontSize: 11, color: C.muted2 }}>{live.name} · {age}</span>
+    </div>
+  );
+}
+
+// Horizontal rail of videos from artists the user follows. Renders
+// nothing when there are no follows or the feed is empty. Trailing
+// "See all" tile opens the FollowedFeedPage.
+function FollowedRail({ accent }) {
+  const nav = window.useNav();
+  const state = window.useFollowedFeed();
+  const items = state.data?.videos || [];
+  if (!items.length) return null;
+  const shown = items.slice(0, 7); // first 7 fit comfortably above the fold
+  return (
+    <React.Fragment>
+      <div style={{ padding: '14px 14px 4px' }}>
+        <SectionHeader
+          title="Followed"
+          accent={accent}
+          action=""
+          icon={<span style={{ color: accent }}><Ico.heartFilled /></span>}
+        />
+      </div>
+      <div style={{
+        display: 'flex', gap: 10, padding: '4px 14px 12px',
+        overflowX: 'auto', scrollSnapType: 'x mandatory',
+      }}>
+        {shown.map(v => (
+          <FollowedTile key={v.id} v={v} accent={accent} />
+        ))}
+        {/* See-all tile — same footprint so the rail stays even. */}
+        <div onClick={() => nav.go('followed-feed')} style={{
+          flexShrink: 0, width: 140, scrollSnapAlign: 'center', cursor: 'pointer',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{
+            width: '100%', aspectRatio: '16/9', borderRadius: 12,
+            background: `linear-gradient(135deg, ${accent}33, ${C.purple}22)`,
+            border: `1px solid ${accent}55`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: accent, fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 14, letterSpacing: 1, textAlign: 'center', padding: '0 8px',
+          }}>
+            See all →
+          </div>
+          <div style={{ fontSize: 10, color: C.muted, marginTop: 6, textAlign: 'center' }}>
+            {items.length} new
+          </div>
+        </div>
+      </div>
+    </React.Fragment>
+  );
+}
+
+// Small tile for the Followed rail. ~140px wide, 16:9 thumb, tiny avatar+title underneath.
+function FollowedTile({ v, accent }) {
+  const nav = window.useNav();
+  const artist = useEnrichedArtist(v.artist);
+  return (
+    <div onClick={() => nav.gate(() => nav.go('video', { id: v.id, video: v }))} style={{
+      flexShrink: 0, width: 140, scrollSnapAlign: 'center', cursor: 'pointer',
+    }}>
+      <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 12, overflow: 'hidden' }}>
+        <Thumb thumb={v.thumb} duration={v.duration} />
+      </div>
+      <div style={{
+        fontSize: 11, fontWeight: 600, marginTop: 6, lineHeight: 1.25,
+        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+      }}>{v.title}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
+        <Avatar artist={artist} size={14} />
+        <div style={{ fontSize: 10, color: C.muted, fontWeight: 500, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', minWidth: 0 }}>{artist.name}</div>
+      </div>
     </div>
   );
 }

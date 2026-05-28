@@ -1162,6 +1162,50 @@ async function actionCheckInvite() {
   } catch (e) { return { ok: false, error: e.message }; }
 }
 
+// Recent videos from the artists the current user follows. Empty
+// {videos: []} when nothing matches — Home uses that to drop the
+// whole "Followed" rail.
+function useFollowedFeed() {
+  return useFetch(
+    'followed_feed',
+    async () => {
+      const initData = getInitData();
+      if (!initData) return { videos: [] };
+      const data = await apiPost('/miniapp/followed_feed', { initData });
+      const list = (data.videos || []).map((v, i) => normalizeVideo(v, i)).filter(v => v.id != null);
+      return { videos: list };
+    },
+    { videos: [] },
+    [],
+  );
+}
+
+// Toggle the bot's "X days before expiry" reminder. Bot honours the
+// flag in scheduler.py — we just flip it.
+async function actionSetNotifyExpiry(enabled) {
+  const initData = getInitData();
+  if (!initData) return { ok: false, reason: 'no-tg' };
+  try {
+    await apiPost('/miniapp/set_notify_expiry', { initData, notify_expiry: !!enabled });
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+// User-submitted artist suggestion → backend stores in artist_suggestions
+// and pings admins via the bot.
+async function actionSuggestArtist(name) {
+  const initData = getInitData();
+  if (!initData) return { ok: false, reason: 'no-tg' };
+  const trimmed = (name || '').trim();
+  if (!trimmed) return { ok: false, error: 'empty', message: 'Type an artist name first' };
+  try {
+    await apiPost('/miniapp/suggest_artist', { initData, artist_name: trimmed });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message, message: 'Could not send. Try again.' };
+  }
+}
+
 // Read-only: returns the newest invite link without consuming the row.
 // Powers the AppHeader bell so the user can reopen the link any time.
 function useMyInvite() {
@@ -1190,8 +1234,8 @@ initTelegram();
 Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
-  useVideos, useVideo, usePaginatedVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, userFromTelegram,
-  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionStartCryptoCheckout, actionStartFreeTrial, actionCheckInvite, actionCreateStarsInvoice, actionOpenTribute, startInvitePolling, stopInvitePolling,
+  useVideos, useVideo, usePaginatedVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, useFollowedFeed, userFromTelegram,
+  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionStartCryptoCheckout, actionStartFreeTrial, actionCheckInvite, actionCreateStarsInvoice, actionOpenTribute, actionSetNotifyExpiry, actionSuggestArtist, startInvitePolling, stopInvitePolling,
   actionCreatePlaylist, actionAddToPlaylist, actionRemoveFromPlaylist, actionDeletePlaylist,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded
