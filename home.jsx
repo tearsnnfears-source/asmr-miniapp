@@ -198,13 +198,22 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
         </div>
         )}
 
-        {/* Auto-ticker: free trial → stats → ads, every 5s */}
-        <div style={{ padding: '10px 14px 4px' }}>
-          <TickerBanner
-            accent={accent}
-            slides={[TickerSlides.freeTrial, TickerSlides.stats, TickerSlides.ad]}
-          />
-        </div>
+        {/* Auto-ticker. Trial slide only when the user can still claim
+            one — paid subs + anyone who already burned the trial see
+            just the stats slide. Ad slide is parked until we have real
+            promo content to surface. */}
+        {(() => {
+          const userState = nav.user || {};
+          const trialEligible = !userState.isPro && !userState.trialUsed;
+          const slides = trialEligible
+            ? [TickerSlides.freeTrial, TickerSlides.stats]
+            : [TickerSlides.stats];
+          return (
+            <div style={{ padding: '10px 14px 4px' }}>
+              <TickerBanner accent={accent} slides={slides} />
+            </div>
+          );
+        })()}
 
         {/* Category pills — tap to open Search pre-filled with that tag. */}
         <div style={{ padding: '12px 14px 4px' }}>
