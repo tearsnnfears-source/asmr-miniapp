@@ -597,20 +597,10 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
   if (!v) return null;
   return (
     <Phone>
-      {/* Slim back bar (replaces header on watch screen) */}
-      <div style={{
-        padding: '8px 12px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        flexShrink: 0, background: C.dark,
-      }}>
-        <button onClick={() => nav.back()} style={{
-          width: 36, height: 36, borderRadius: 12,
-          background: C.dark2, border: `1px solid ${C.border}`,
-          color: C.text, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-        }}><Ico.chevL /></button>
-        <div style={{ width: 36 }} />
-      </div>
-
+      {/* No more slim back bar — the back affordance sits on top of the
+          player itself as a translucent pill (see VideoPageBody). When
+          the player goes fullscreen it covers the whole viewport at
+          z-index 9500, so this in-Phone button is hidden automatically. */}
       <VideoPageBody v={v} queueRest={queueRest} recItems={recOrFallback} recLoading={recState.loading && !recItems.length} accent={accent} queue={queue} queueIdx={queueIdx} />
     </Phone>
   );
@@ -703,8 +693,35 @@ function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queu
     <div style={SCROLL_BODY}>
       {/* Player. loop = replay; autoStart begins playback on mount so
           autoplay-chained videos don't require an extra tap. onEnded
-          drives chaining. */}
-      <window.VideoPlayer key={v.id} video={v} accent={accent} loop={replay} onEnded={onEnded} autoStart />
+          drives chaining. The translucent back button is overlaid on
+          the player — it disappears automatically the moment the
+          player enters fullscreen because the .vp-immersive layer
+          covers the whole viewport at z-index 9500. */}
+      <div style={{ position: 'relative' }}>
+        <window.VideoPlayer key={v.id} video={v} accent={accent} loop={replay} onEnded={onEnded} autoStart />
+        <button
+          onClick={() => nav.back()}
+          aria-label="Back"
+          style={{
+            // PhoneStage already reserved --tg-safe-top above us, so we
+            // just offset from the player edge here. No extra safe-area
+            // math — that was double-padding the chrome inset.
+            position: 'absolute',
+            top: 10, left: 10,
+            width: 34, height: 34, borderRadius: '50%',
+            background: 'rgba(0,0,0,0.45)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            border: 'none',
+            color: '#fff',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 10,
+            fontFamily: 'inherit',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+          }}
+        ><Ico.chevL /></button>
+      </div>
 
       {/* Title row — kept clean: just the title, no prev/next arrows. */}
       <div style={{ padding: '14px 14px 6px' }}>
