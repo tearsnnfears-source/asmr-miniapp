@@ -365,8 +365,11 @@ function LikedShorts({ accent }) {
   return (
     <div style={{ padding: '12px 14px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
       {items.map((s, i) => {
-        // Non-Pro: blurred static thumb + paywall on tap (no video preview).
+        // Non-Pro: blurred preview (artist photo fallback) + paywall on tap.
         if (!nav.isPro) {
+          const liveArtist = (artistsState.data || []).find(a => a.name === s.artist?.name);
+          const fallbackPhoto = liveArtist?.profilePhoto || liveArtist?.photo;
+          const bgUrl = s.thumb?.src || fallbackPhoto;
           return (
             <div key={s.id} onClick={() => nav.openPaywall && nav.openPaywall()} style={{
               position: 'relative', aspectRatio: '9/16', borderRadius: 14,
@@ -377,9 +380,10 @@ function LikedShorts({ accent }) {
                 filter: 'blur(7px) brightness(0.7)',
                 WebkitFilter: 'blur(7px) brightness(0.7)',
                 transform: 'scale(1.08)',
-              }}>
-                <Thumb thumb={s.thumb} duration={null} />
-              </div>
+                background: bgUrl
+                  ? `url('${bgUrl.replace(/'/g, "\\'")}') center/cover no-repeat`
+                  : (s.thumb?.bg || '#1a1a1c'),
+              }} />
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                 <div style={{
                   width: 38, height: 38, borderRadius: '50%',

@@ -182,8 +182,12 @@ function AppHeader({ user: userProp, accent = C.pink }) {
   // lifetime). The previous fallback on `tier !== 'free'` left expired
   // subscribers wearing their last tier badge — which conflicts with
   // the gated /content/play behaviour on the backend.
-  const showTier = !userLoading && user.isPro;
-  const showFree = !userLoading && !user.isPro;
+  // Grace users get their own orange badge so they don't look like
+  // strangers — same UX as the live miniapp.
+  const showGrace = !userLoading && user.isGrace;
+  const showTier  = !userLoading && user.isPro;
+  const showFree  = !userLoading && !user.isPro && !user.isGrace;
+  const GRACE_COLOR = '#FF9800';
   return (
     <div style={{
       padding: '8px 14px 10px',
@@ -194,7 +198,11 @@ function AppHeader({ user: userProp, accent = C.pink }) {
     }}>
       {/* clickable cluster → profile */}
       <div onClick={() => nav.go('profile')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-        <Avatar artist={{ id: 'u-' + (user.telegramId || 0), name: user.name, photo: user.photo }} size={40} ring={showTier ? tierColor : accent} />
+        <Avatar
+          artist={{ id: 'u-' + (user.telegramId || 0), name: user.name, photo: user.photo }}
+          size={40}
+          ring={showTier ? tierColor : (showGrace ? GRACE_COLOR : accent)}
+        />
         <div>
           <div style={{ fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
             {user.name}
@@ -204,6 +212,12 @@ function AppHeader({ user: userProp, accent = C.pink }) {
                 fontSize: 12, letterSpacing: 1, padding: '2px 6px', borderRadius: 4,
                 background: tierColor, color: '#000', lineHeight: 1, fontWeight: 700,
               }}>{tier.toUpperCase()}{user.isInfinite ? ' ∞' : ''}</span>
+            ) : showGrace ? (
+              <span style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 12, letterSpacing: 1, padding: '2px 6px', borderRadius: 4,
+                background: GRACE_COLOR, color: '#000', lineHeight: 1, fontWeight: 700,
+              }}>GRACE {user.graceDaysLeft}d</span>
             ) : showFree ? (
               <span style={{
                 fontFamily: "'Bebas Neue', sans-serif",
@@ -222,7 +236,9 @@ function AppHeader({ user: userProp, accent = C.pink }) {
           <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>
             {user.isPro
               ? (user.isInfinite ? 'lifetime · view profile ›' : `${daysLabel} days left · view profile ›`)
-              : 'view profile ›'}
+              : (showGrace
+                  ? `Renew to keep access · view profile ›`
+                  : 'view profile ›')}
           </div>
         </div>
       </div>

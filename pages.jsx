@@ -89,8 +89,34 @@ function ProfilePage({ accent = C.pink }) {
           ))}
         </div>
 
-        {/* Subscription card */}
-        {user.isPro ? (
+        {/* Subscription card — three variants: active sub / grace / free */}
+        {user.isGrace ? (
+        <div style={{ padding: '12px 14px 6px' }}>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(255,152,0,0.18), transparent 70%)',
+            border: '1px solid rgba(255,152,0,0.55)',
+            borderRadius: 16, padding: 14,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 10, color: '#FF9800', fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' }}>Grace period</div>
+                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: '#FF9800', letterSpacing: 1, lineHeight: 1, marginTop: 4 }}>
+                  {user.graceDaysLeft} day{user.graceDaysLeft === 1 ? '' : 's'} left
+                </div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>Renew to keep access — your saves stay intact.</div>
+              </div>
+              <button onClick={() => nav.go('subscription')} style={{
+                background: '#FF9800', color: '#000', border: 'none',
+                padding: '9px 14px', borderRadius: 999, fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                whiteSpace: 'nowrap', flexShrink: 0,
+              }}>Renew</button>
+            </div>
+            <div style={{ height: 4, marginTop: 12, background: 'rgba(255,255,255,0.08)', borderRadius: 2 }}>
+              <div style={{ width: `${(user.graceDaysLeft / 7) * 100}%`, height: '100%', background: '#FF9800', borderRadius: 2 }} />
+            </div>
+          </div>
+        </div>
+        ) : user.isPro ? (
         <div style={{ padding: '12px 14px 6px' }}>
           <div style={{
             background: `linear-gradient(135deg, ${tierColor}22, transparent 70%)`,
@@ -1167,6 +1193,10 @@ function ArtistPage({ accent = C.pink }) {
                 <div style={{ padding: '12px 14px 4px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                   {shorts.items.map((s, i) => {
                     if (!nav.isPro) {
+                      // Artist photo is the natural fallback here — we're
+                      // already on the artist's page, and shorts rarely
+                      // ship a thumbnail_url.
+                      const bgUrl = s.thumb?.src || a.profilePhoto || a.photo;
                       return (
                         <div key={s.id || i} onClick={() => nav.openPaywall && nav.openPaywall()} style={{
                           aspectRatio: '9/16', borderRadius: 10, overflow: 'hidden',
@@ -1177,9 +1207,10 @@ function ArtistPage({ accent = C.pink }) {
                             filter: 'blur(7px) brightness(0.7)',
                             WebkitFilter: 'blur(7px) brightness(0.7)',
                             transform: 'scale(1.08)',
-                          }}>
-                            <Thumb thumb={s.thumb} duration={null} />
-                          </div>
+                            background: bgUrl
+                              ? `url('${bgUrl.replace(/'/g, "\\'")}') center/cover no-repeat`
+                              : (s.thumb?.bg || '#1a1a1c'),
+                          }} />
                           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <div style={{
                               width: 32, height: 32, borderRadius: '50%',

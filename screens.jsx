@@ -240,10 +240,17 @@ function ShortsTab({ accent = C.pink }) {
 
 function ShortsTile({ s, idx, accent, fresh, onOpen }) {
   const nav = window.useNav();
-  // Non-Pro users see a blurred static thumb + lock badge — no video
-  // preview is loaded at all, so the gated tile is also cheap to render.
-  // Tap pops the paywall sheet instead of opening the swipe player.
+  // Non-Pro users see a blurred preview (artist photo or thumb) + lock
+  // badge — no video preview is loaded at all, so the gated tile is
+  // cheap to render. Tap pops the paywall sheet instead of opening the
+  // swipe player.
   if (!nav.isPro) {
+    // Most shorts don't ship a thumbnail_url — fall back to the artist
+    // photo so the locked tile isn't just a flat gradient.
+    const artistsState = window.useArtists();
+    const liveArtist = (artistsState.data || []).find(a => a.name === s.artist?.name);
+    const fallbackPhoto = liveArtist?.profilePhoto || liveArtist?.photo;
+    const bgUrl = s.thumb?.src || fallbackPhoto;
     return (
       <div onClick={() => nav.openPaywall && nav.openPaywall()} style={{
         position: 'relative', aspectRatio: '9/16', borderRadius: 14,
@@ -254,9 +261,10 @@ function ShortsTile({ s, idx, accent, fresh, onOpen }) {
           filter: 'blur(7px) brightness(0.7)',
           WebkitFilter: 'blur(7px) brightness(0.7)',
           transform: 'scale(1.08)',
-        }}>
-          <Thumb thumb={s.thumb} duration={null} />
-        </div>
+          background: bgUrl
+            ? `url('${bgUrl.replace(/'/g, "\\'")}') center/cover no-repeat`
+            : (s.thumb?.bg || '#1a1a1c'),
+        }} />
         {/* Lock badge */}
         <div style={{
           position: 'absolute', inset: 0,

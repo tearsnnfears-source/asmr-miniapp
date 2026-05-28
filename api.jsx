@@ -840,6 +840,16 @@ function useUser() {
       // 403s and shows "Open from Telegram"). Lifetime users are still
       // covered: the bot writes a huge units value for them, so days>0.
       const isPro = days > 0;
+      // Grace period (Tribute only): the scheduler keeps units at
+      // -1..-6 for up to 7 days after expiry so the user can renew
+      // before getting kicked. Backend still 403s /content/play in
+      // this window, so isPro stays false — but the UI surfaces a
+      // distinct 'Grace Nd' badge + Renew CTA instead of the bare
+      // FREE state so the user knows they're a tap away from coming
+      // back, not a stranger.
+      const GRACE_WINDOW = 7;
+      const isGrace = days < 0 && days > -GRACE_WINDOW;
+      const graceDaysLeft = isGrace ? (GRACE_WINDOW - Math.abs(days)) : 0;
       return {
         name: p.full_name || tgFallback.name,
         username: (p.username || tgFallback.username || '').replace(/^@/, ''),
@@ -847,6 +857,8 @@ function useUser() {
         photo: tgFallback.photo, // server doesn't ship it; use Telegram's
         daysLeft: days,
         isPro,
+        isGrace,
+        graceDaysLeft,
         // Only flip the ∞ flag for genuine lifetime accounts (big units).
         // The previous "(isPro && days===0)" branch made every 0-day Pro
         // user look like lifetime, which is what showed PLUS ∞ for an
