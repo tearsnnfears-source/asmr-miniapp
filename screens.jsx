@@ -123,15 +123,19 @@ function ShortsTab({ accent = C.pink }) {
   // Play All — build a shuffled index list spanning all shorts (not filtered),
   // start at position 0. Swiping inside the player walks through the order
   // top-to-bottom, so the counter reads "1/N" and goes to "N/N".
+  // Wrapped in nav.gate so non-Pro users hit the paywall sheet instead
+  // of opening the swipe player.
   const onPlayAll = () => {
     if (!allShorts.length) return;
-    const order = Array.from({ length: allShorts.length }, (_, i) => i);
-    for (let i = order.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [order[i], order[j]] = [order[j], order[i]];
-    }
-    setPlayOrder(order);
-    setPlayingPos(0);
+    nav.gate(() => {
+      const order = Array.from({ length: allShorts.length }, (_, i) => i);
+      for (let i = order.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [order[i], order[j]] = [order[j], order[i]];
+      }
+      setPlayOrder(order);
+      setPlayingPos(0);
+    });
   };
 
   return (
@@ -235,6 +239,41 @@ function ShortsTab({ accent = C.pink }) {
 }
 
 function ShortsTile({ s, idx, accent, fresh, onOpen }) {
+  const nav = window.useNav();
+  // Non-Pro users see a blurred static thumb + lock badge — no video
+  // preview is loaded at all, so the gated tile is also cheap to render.
+  // Tap pops the paywall sheet instead of opening the swipe player.
+  if (!nav.isPro) {
+    return (
+      <div onClick={() => nav.openPaywall && nav.openPaywall()} style={{
+        position: 'relative', aspectRatio: '9/16', borderRadius: 14,
+        overflow: 'hidden', background: '#161617', cursor: 'pointer',
+      }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          filter: 'blur(14px) brightness(0.5)',
+          WebkitFilter: 'blur(14px) brightness(0.5)',
+          transform: 'scale(1.15)',
+        }}>
+          <Thumb thumb={s.thumb} duration={null} />
+        </div>
+        {/* Lock badge */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none',
+        }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: '50%',
+            background: 'rgba(0,0,0,0.6)',
+            border: `1px solid ${accent}55`,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 16, boxShadow: `0 4px 14px ${accent}33`,
+          }}>🔒</div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div onClick={() => onOpen && onOpen(idx)} style={{
       position: 'relative', aspectRatio: '9/16', borderRadius: 14,
@@ -482,6 +521,19 @@ function compactNum(n) {
 // ── VIDEO PAGE ────────────────────────────────────────────────
 function VideoPage({ accent = C.pink, density = 'comfortable' }) {
   const nav = window.useNav();
+  // Non-Pro users get bounced back to home + paywall sheet. Every tile
+  // tap already goes through nav.gate, so this is mostly a safety net
+  // for direct nav (Telegram restoring last page, deep links etc).
+  const proGateRef = React.useRef(false);
+  React.useEffect(() => {
+    if (proGateRef.current) return;
+    if (!nav.isPro) {
+      proGateRef.current = true;
+      nav.openPaywall && nav.openPaywall();
+      nav.replace && nav.replace('home');
+    }
+  }, [nav.isPro]);
+  if (!nav.isPro) return null;
   const passed = nav.params?.video;
   const requestedId = nav.params?.id;
   // Queue context — set when the user came from a playlist or Play-all.

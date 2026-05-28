@@ -115,6 +115,12 @@ function AppShell() {
   //   · the AppHeader bell (taps into the read-only useMyInvite hook)
   const [inviteLink, setInviteLink] = React.useState(null);
 
+  // Global paywall sheet state. Set via nav.openPaywall() — surfaces the
+  // "Subscribe to unlock" modal whenever a non-Pro user tries to play /
+  // open premium content (shorts grid tap, video tile tap, artist tile
+  // tap, saved tile tap, etc).
+  const [paywallOpen, setPaywallOpen] = React.useState(false);
+
   // One-shot check at boot: if there's a pending invite (user returned
   // from Cryptocloud, or simply re-opened after a free-trial activation),
   // pop the modal right after the splash hides. Consumes the row server-
@@ -168,8 +174,10 @@ function AppShell() {
     },
     // Open the immersive shorts overlay over the current screen.
     // items = array of normalized shorts; idx = starting position.
+    // Gated for non-Pro users — pops the paywall instead.
     openShorts: (items, idx = 0) => {
       if (!items || !items.length) return;
+      if (!isPro) { setPaywallOpen(true); return; }
       setShortsPlayer({ items, pos: idx });
     },
     closeShorts: () => setShortsPlayer(null),
@@ -180,7 +188,19 @@ function AppShell() {
     openInvite: (link) => { if (link) setInviteLink(link); },
     closeInvite: () => setInviteLink(null),
     inviteLink,
-  }), [current.screen, current.params, stack.length, isPro, user, userState.loading, shortsPlayer, inviteLink]);
+    // Paywall — opens the bottom-sheet upsell. `gate(action)` runs the
+    // action straight through for Pro users, or pops the paywall for
+    // free users. Every gated touch surface uses gate() so we can't
+    // forget a spot.
+    openPaywall: () => setPaywallOpen(true),
+    closePaywall: () => setPaywallOpen(false),
+    gate: (action) => {
+      if (isPro) { action && action(); return true; }
+      setPaywallOpen(true);
+      return false;
+    },
+    paywallOpen,
+  }), [current.screen, current.params, stack.length, isPro, user, userState.loading, shortsPlayer, inviteLink, paywallOpen]);
 
   const renderScreen = SCREENS[current.screen] || SCREENS.home;
   const view = renderScreen({ accent, density, params: current.params });
@@ -319,6 +339,13 @@ function AppShell() {
           link={inviteLink}
           accent={accent}
           onClose={() => setInviteLink(null)}
+        />
+      )}
+      {/* Paywall upsell — opened by nav.openPaywall / nav.gate. */}
+      {paywallOpen && (
+        <window.PaywallSheet
+          accent={accent}
+          onClose={() => setPaywallOpen(false)}
         />
       )}
       <window.DebugFab />

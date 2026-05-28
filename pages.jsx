@@ -148,7 +148,12 @@ function ProfilePage({ accent = C.pink }) {
             <Row icon="⭐" color={accent} label="My saved" badge={String(savedCount)} onClick={() => nav.go('saved')} />
             <Row icon="📂" color={accent} label="Playlists" badge={String((window.useUserPlaylists().data?.playlists || []).length)} onClick={() => nav.go('saved', { tab: 'playlists' })} />
             <Row icon="🎤" color={accent} label="Followed artists" badge={String(followingCount)} onClick={() => nav.go('artists')} />
-            <Row icon="🔄" color={accent} label={user.isPro ? 'Manage subscription' : 'Get PRO'} onClick={() => nav.go('subscription')} />
+            {/* Subscribe row only shown when the user has no remaining
+                days — otherwise we don't want to encourage a second
+                purchase on top of an active sub. */}
+            {!(user.daysLeft > 0) && (
+              <Row icon="🔄" color={accent} label={user.isPro ? 'Renew subscription' : 'Get PRO'} onClick={() => nav.go('subscription')} />
+            )}
           </RowGroup>
           <RowGroup label="Help">
             <Row icon="❓" label="FAQ" onClick={() => nav.go('faq')} />
@@ -1156,17 +1161,45 @@ function ArtistPage({ accent = C.pink }) {
               </div>
             )}
 
-            {/* Shorts — real video previews, 3-col grid */}
+            {/* Shorts — real video previews, 3-col grid (gated for free) */}
             {tab === 'shorts' && (
               <div>
                 <div style={{ padding: '12px 14px 4px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-                  {shorts.items.map((s, i) => (
-                    <div key={s.id || i} onClick={() => nav.openShorts(shorts.items, i)} style={{ aspectRatio: '9/16', borderRadius: 10, overflow: 'hidden', position: 'relative', background: '#161617', cursor: 'pointer' }}>
-                      <window.ShortsThumbVideo short={s} />
-                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.6) 100%)', pointerEvents: 'none' }} />
-                      {s.duration && <span style={{ position: 'absolute', right: 5, bottom: 5, fontSize: 9, fontWeight: 700, color: '#fff' }}>{s.duration}</span>}
-                    </div>
-                  ))}
+                  {shorts.items.map((s, i) => {
+                    if (!nav.isPro) {
+                      return (
+                        <div key={s.id || i} onClick={() => nav.openPaywall && nav.openPaywall()} style={{
+                          aspectRatio: '9/16', borderRadius: 10, overflow: 'hidden',
+                          position: 'relative', background: '#161617', cursor: 'pointer',
+                        }}>
+                          <div style={{
+                            position: 'absolute', inset: 0,
+                            filter: 'blur(14px) brightness(0.5)',
+                            WebkitFilter: 'blur(14px) brightness(0.5)',
+                            transform: 'scale(1.15)',
+                          }}>
+                            <Thumb thumb={s.thumb} duration={null} />
+                          </div>
+                          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{
+                              width: 32, height: 32, borderRadius: '50%',
+                              background: 'rgba(0,0,0,0.6)',
+                              border: `1px solid ${accent}55`,
+                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 14,
+                            }}>🔒</div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={s.id || i} onClick={() => nav.openShorts(shorts.items, i)} style={{ aspectRatio: '9/16', borderRadius: 10, overflow: 'hidden', position: 'relative', background: '#161617', cursor: 'pointer' }}>
+                        <window.ShortsThumbVideo short={s} />
+                        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.6) 100%)', pointerEvents: 'none' }} />
+                        {s.duration && <span style={{ position: 'absolute', right: 5, bottom: 5, fontSize: 9, fontWeight: 700, color: '#fff' }}>{s.duration}</span>}
+                      </div>
+                    );
+                  })}
                 </div>
                 {shorts.hasMore && (
                   <div style={{ padding: '6px 14px 18px' }}>
@@ -1184,6 +1217,33 @@ function ArtistPage({ accent = C.pink }) {
                 <div style={{ padding: '12px 14px 4px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
                   {photos.items.map((p, i) => {
                     const url = p.thumb?.src || p.raw?.url || p.raw?.thumbnail_url || '';
+                    if (!nav.isPro) {
+                      return (
+                        <div key={p.id || i} onClick={() => nav.openPaywall && nav.openPaywall()} style={{
+                          aspectRatio: '1/1', borderRadius: 6, overflow: 'hidden',
+                          position: 'relative', cursor: 'pointer', background: '#1a1a1c',
+                        }}>
+                          <div style={{
+                            position: 'absolute', inset: 0,
+                            filter: 'blur(14px) brightness(0.5)',
+                            WebkitFilter: 'blur(14px) brightness(0.5)',
+                            transform: 'scale(1.15)',
+                            background: url
+                              ? `url('${url.replace(/'/g, "\\'")}') center/cover no-repeat`
+                              : (p.thumb?.bg || '#1a1a1c'),
+                          }} />
+                          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{
+                              width: 26, height: 26, borderRadius: '50%',
+                              background: 'rgba(0,0,0,0.6)',
+                              border: `1px solid ${accent}55`,
+                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 12,
+                            }}>🔒</div>
+                          </div>
+                        </div>
+                      );
+                    }
                     return (
                       <div key={p.id || i} onClick={() => setLightboxIdx(i)} style={{
                         aspectRatio: '1/1', borderRadius: 6, overflow: 'hidden', position: 'relative',

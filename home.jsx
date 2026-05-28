@@ -51,8 +51,11 @@ function HomeV1({ accent = C.pink, density = 'comfortable' }) {
 // Big-card row used in V1
 function FeedCard({ v, accent, density, featured }) {
   const nav = window.useNav();
+  // Home thumbnails stay clear even for non-Pro users (per spec) — but
+  // the tap is gated through nav.gate so the paywall sheet pops instead
+  // of opening the player.
   return (
-    <div onClick={() => nav.go('video', { id: v.id, video: v })} style={{ cursor: 'pointer' }}>
+    <div onClick={() => nav.gate(() => nav.go('video', { id: v.id, video: v }))} style={{ cursor: 'pointer' }}>
       <Thumb thumb={v.thumb} duration={v.duration} badge={featured ? { label: 'Just dropped', bg: accent } : null} />
       <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
         <Avatar artist={v.artist} size={36} ring={v.artist.fresh ? accent : null} />
@@ -93,7 +96,7 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
         {/* Hero — large featured drop */}
         {hero && (
         <div style={{ padding: '12px 14px 4px' }}>
-          <div onClick={() => nav.go('video', { id: hero.id, video: hero })} style={{
+          <div onClick={() => nav.gate(() => nav.go('video', { id: hero.id, video: hero }))} style={{
             position: 'relative', borderRadius: 18, overflow: 'hidden',
             aspectRatio: '16/10', background: hero.thumb.bg, cursor: 'pointer',
           }}>
@@ -179,8 +182,9 @@ function CompactRow({ v, accent }) {
   // Pass the full video object too — needed for artist pages where the
   // video isn't in the global useVideos(500) cache (otherwise VideoPage
   // would fall back to the Home feed's first item).
+  // Tap is gated — non-Pro users hit the paywall sheet instead of nav.
   return (
-    <div onClick={() => nav.go('video', { id: v.id, video: v })} style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
+    <div onClick={() => nav.gate(() => nav.go('video', { id: v.id, video: v }))} style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
       <div style={{ width: 140, flexShrink: 0 }}>
         <Thumb thumb={v.thumb} duration={v.duration} />
       </div>

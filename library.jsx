@@ -303,7 +303,7 @@ function LikedVideos({ accent }) {
     <div>
       <div style={{ padding: '6px 14px 8px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {items.slice(0, visible).map(v => (
-          <div key={v.id} onClick={() => nav.go('video', { id: v.id, video: v })} style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
+          <div key={v.id} onClick={() => nav.gate(() => nav.go('video', { id: v.id, video: v }))} style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
             <div style={{ width: 130, flexShrink: 0 }}>
               <Thumb thumb={v.thumb} duration={v.duration} />
             </div>
@@ -364,27 +364,56 @@ function LikedShorts({ accent }) {
   }
   return (
     <div style={{ padding: '12px 14px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-      {items.map((s, i) => (
-        <div key={s.id}
-          onClick={() => nav.openShorts(items, i)}
-          style={{
-            position: 'relative', aspectRatio: '9/16', borderRadius: 14,
-            overflow: 'hidden', background: '#161617', cursor: 'pointer',
-          }}>
-          <window.ShortsThumbVideo short={s} />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.75) 100%)', pointerEvents: 'none' }} />
-          <div style={{ position: 'absolute', left: 8, right: 8, bottom: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-              <Avatar artist={s.artist} size={20} />
-              <div style={{ fontSize: 10, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.artist.name}</div>
+      {items.map((s, i) => {
+        // Non-Pro: blurred static thumb + paywall on tap (no video preview).
+        if (!nav.isPro) {
+          return (
+            <div key={s.id} onClick={() => nav.openPaywall && nav.openPaywall()} style={{
+              position: 'relative', aspectRatio: '9/16', borderRadius: 14,
+              overflow: 'hidden', background: '#161617', cursor: 'pointer',
+            }}>
+              <div style={{
+                position: 'absolute', inset: 0,
+                filter: 'blur(14px) brightness(0.5)',
+                WebkitFilter: 'blur(14px) brightness(0.5)',
+                transform: 'scale(1.15)',
+              }}>
+                <Thumb thumb={s.thumb} duration={null} />
+              </div>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                <div style={{
+                  width: 38, height: 38, borderRadius: '50%',
+                  background: 'rgba(0,0,0,0.6)',
+                  border: `1px solid ${accent}55`,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 16,
+                }}>🔒</div>
+              </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: C.muted2, fontWeight: 500 }}>
-              <span style={{ color: accent }}><Ico.heartFilled /></span>
-              <span>Saved</span>
+          );
+        }
+        return (
+          <div key={s.id}
+            onClick={() => nav.openShorts(items, i)}
+            style={{
+              position: 'relative', aspectRatio: '9/16', borderRadius: 14,
+              overflow: 'hidden', background: '#161617', cursor: 'pointer',
+            }}>
+            <window.ShortsThumbVideo short={s} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.75) 100%)', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', left: 8, right: 8, bottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <Avatar artist={s.artist} size={20} />
+                <div style={{ fontSize: 10, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.artist.name}</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: C.muted2, fontWeight: 500 }}>
+                <span style={{ color: accent }}><Ico.heartFilled /></span>
+                <span>Saved</span>
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -484,6 +513,7 @@ function VideoPlaylists({ accent }) {
 // Real liked photos — same shape as Liked videos / Liked shorts, just
 // filtered by content_type='photo'. Tapping a tile opens PhotoLightbox.
 function LikedPhotos({ accent }) {
+  const nav = window.useNav();
   const favState = window.useFavorites();
   const items = favState.data?.photos || [];
   const [visible, setVisible] = React.useState(15);
@@ -507,6 +537,35 @@ function LikedPhotos({ accent }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
         {items.slice(0, visible).map((p, i) => {
           const url = p.thumb?.src || p.raw?.thumbnail_url || '';
+          // Non-Pro: blur the thumb and pop paywall on tap. Lightbox stays
+          // gated since each /content/play is a paid asset on the backend.
+          if (!nav.isPro) {
+            return (
+              <div key={p.id || i} onClick={() => nav.openPaywall && nav.openPaywall()} style={{
+                aspectRatio: '1/1', borderRadius: 6, overflow: 'hidden',
+                position: 'relative', cursor: 'pointer', background: '#1a1a1c',
+              }}>
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  filter: 'blur(14px) brightness(0.5)',
+                  WebkitFilter: 'blur(14px) brightness(0.5)',
+                  transform: 'scale(1.15)',
+                  background: url
+                    ? `url('${url.replace(/'/g, "\\'")}') center/cover no-repeat`
+                    : (p.thumb?.bg || '#1a1a1c'),
+                }} />
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.6)',
+                    border: `1px solid ${accent}55`,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 13,
+                  }}>🔒</div>
+                </div>
+              </div>
+            );
+          }
           return (
             <div key={p.id || i} onClick={() => setLightboxIdx(i)} style={{
               aspectRatio: '1/1', borderRadius: 6, overflow: 'hidden',
@@ -572,7 +631,7 @@ function PlaylistPage({ accent = C.pink }) {
             <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>{items.length} videos</div>
           </div>
           {items.length > 0 && (
-            <button onClick={() => nav.go('video', { id: items[0].id, video: items[0], queue: items, queueIdx: 0 })} style={{
+            <button onClick={() => nav.gate(() => nav.go('video', { id: items[0].id, video: items[0], queue: items, queueIdx: 0 }))} style={{
               background: accent, color: '#000', border: 'none',
               padding: '10px 16px', borderRadius: 999,
               fontSize: 13, fontWeight: 700, cursor: 'pointer',
@@ -598,7 +657,7 @@ function PlaylistPage({ accent = C.pink }) {
         <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {items.map((v, i) => (
             <div key={v.id}
-              onClick={() => nav.go('video', { id: v.id, video: v, queue: items, queueIdx: i })}
+              onClick={() => nav.gate(() => nav.go('video', { id: v.id, video: v, queue: items, queueIdx: i }))}
               style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
               <div style={{ width: 130, flexShrink: 0 }}>
                 <Thumb thumb={v.thumb} duration={v.duration} />

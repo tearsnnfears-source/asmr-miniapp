@@ -753,4 +753,88 @@ function InviteModal({ link, onClose, accent = C.pink }) {
   );
 }
 
-Object.assign(window, { C, tagColor, Phone, Ico, Thumb, Avatar, AppHeader, BottomNav, StatsStrip, PromoBanner, Chip, SectionHeader, TickerBanner, TickerSlides, TIER_COLORS, InviteModal });
+// ── Paywall: BlurLock + PaywallSheet ─────────────────────────
+// BlurLock wraps a tile so non-Pro users see a blurred preview with a
+// padlock badge. PaywallSheet is the bottom-of-screen "subscribe to
+// unlock" modal opened by nav.openPaywall — single source of truth so
+// every gated tap surfaces the same UX. Tapping the wrapper itself
+// fires onClick (typically nav.openPaywall) so the user always lands
+// on the same upsell.
+function BlurLock({ children, onClick, badge = '🔒', accent = C.pink, blur = 10, dim = 0.55 }) {
+  return (
+    <div onClick={onClick} style={{
+      position: 'relative', cursor: onClick ? 'pointer' : 'default',
+      borderRadius: 'inherit', overflow: 'hidden',
+    }}>
+      {/* Real content with strong blur + dim. pointer-events:none so taps
+          go to the overlay, not the (possibly clickable) child. */}
+      <div style={{
+        filter: `blur(${blur}px) brightness(${dim})`,
+        WebkitFilter: `blur(${blur}px) brightness(${dim})`,
+        pointerEvents: 'none', userSelect: 'none',
+        transform: 'scale(1.05)', // hide blur edge bleed
+      }}>{children}</div>
+      {/* Lock badge in the center */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        pointerEvents: 'none',
+      }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: '50%',
+          background: 'rgba(0,0,0,0.55)',
+          border: `1px solid ${accent}55`,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 16, boxShadow: `0 4px 14px ${accent}33`,
+        }}>{badge}</div>
+      </div>
+    </div>
+  );
+}
+
+function PaywallSheet({ accent = C.pink, onClose }) {
+  const nav = useNav();
+  const go = () => { onClose && onClose(); nav.go('subscription'); };
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 9650,
+      background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 480,
+        background: `linear-gradient(160deg, ${accent}22, ${C.dark2} 55%)`,
+        borderTopLeftRadius: 24, borderTopRightRadius: 24,
+        borderTop: `1px solid ${accent}55`,
+        padding: '20px 18px calc(20px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))',
+        boxShadow: `0 -20px 60px ${accent}22`,
+        textAlign: 'center',
+      }}>
+        <div style={{ width: 44, height: 4, background: 'rgba(255,255,255,0.18)', borderRadius: 999, margin: '0 auto 14px' }} />
+        <div style={{ fontSize: 36, marginBottom: 6 }}>🔒</div>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 26, letterSpacing: 1.2, lineHeight: 1 }}>
+          Locked · <span style={{ color: accent }}>PRO only</span>
+        </div>
+        <div style={{ fontSize: 13, color: C.muted2, marginTop: 8, lineHeight: 1.45, maxWidth: 320, margin: '8px auto 0' }}>
+          Subscribe to unlock the full catalog — videos, shorts, photos, every artist.
+        </div>
+        <button onClick={go} style={{
+          width: '100%', marginTop: 18,
+          background: `linear-gradient(135deg, ${accent}, ${C.purple})`,
+          color: '#000', border: 'none', borderRadius: 14,
+          padding: '15px 16px',
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 17, letterSpacing: 1.2, cursor: 'pointer',
+          boxShadow: `0 8px 24px ${accent}55`,
+        }}>SEE PLANS →</button>
+        <button onClick={onClose} style={{
+          marginTop: 8, background: 'transparent', border: 'none',
+          color: C.muted, fontSize: 12, fontWeight: 600,
+          cursor: 'pointer', padding: 8, fontFamily: 'inherit',
+        }}>Maybe later</button>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { C, tagColor, Phone, Ico, Thumb, Avatar, AppHeader, BottomNav, StatsStrip, PromoBanner, Chip, SectionHeader, TickerBanner, TickerSlides, TIER_COLORS, InviteModal, BlurLock, PaywallSheet });
