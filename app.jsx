@@ -109,6 +109,27 @@ function AppShell() {
   // nav.openShorts(items, idx) to pop the immersive player.
   const [shortsPlayer, setShortsPlayer] = React.useState(null); // { items, order, pos } | null
 
+  // Global invite modal state. Set via nav.openInvite(link) — used by
+  //   · the boot-time auto-show below (after returning from checkout)
+  //   · the SubscriptionPage trial CTA (link comes from /miniapp/free_trial)
+  //   · the AppHeader bell (taps into the read-only useMyInvite hook)
+  const [inviteLink, setInviteLink] = React.useState(null);
+
+  // One-shot check at boot: if there's a pending invite (user returned
+  // from Cryptocloud, or simply re-opened after a free-trial activation),
+  // pop the modal right after the splash hides. Consumes the row server-
+  // side so we don't re-pop on every nav action — the bell affordance
+  // (useMyInvite) takes over for persistent access afterwards.
+  const inviteCheckedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (inviteCheckedRef.current) return;
+    if (!window.isInsideTelegram || !window.isInsideTelegram()) return;
+    inviteCheckedRef.current = true;
+    window.actionCheckInvite?.().then(res => {
+      if (res?.invite_link) setInviteLink(res.invite_link);
+    });
+  }, []);
+
   const nav = React.useMemo(() => ({
     go: (screen, params = {}) => {
       if (!SCREENS[screen]) {
@@ -154,7 +175,12 @@ function AppShell() {
     closeShorts: () => setShortsPlayer(null),
     shortsPlayer,
     setShortsPlayer,
-  }), [current.screen, current.params, stack.length, isPro, user, userState.loading, shortsPlayer]);
+    // Invite modal — surfaced after free trial / paid checkout, and any
+    // time the user taps the AppHeader bell.
+    openInvite: (link) => { if (link) setInviteLink(link); },
+    closeInvite: () => setInviteLink(null),
+    inviteLink,
+  }), [current.screen, current.params, stack.length, isPro, user, userState.loading, shortsPlayer, inviteLink]);
 
   const renderScreen = SCREENS[current.screen] || SCREENS.home;
   const view = renderScreen({ accent, density, params: current.params });
@@ -286,6 +312,14 @@ function AppShell() {
             accent={accent}
           />
         </div>
+      )}
+      {/* Invite-link modal — your private group page. */}
+      {inviteLink && (
+        <window.InviteModal
+          link={inviteLink}
+          accent={accent}
+          onClose={() => setInviteLink(null)}
+        />
       )}
       <window.DebugFab />
 

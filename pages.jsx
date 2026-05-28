@@ -289,10 +289,20 @@ function SubscriptionPage({ accent = C.pink }) {
               return;
             }
             if (plan === 'week') {
-              // Trial activated server-side; reload profile state.
+              // Trial activated server-side. Bounce home and pop the
+              // invite modal so the user lands on their group link.
               nav.reset('home');
+              if (res.invite_link) {
+                setTimeout(() => nav.openInvite?.(res.invite_link), 350);
+              }
+              // Invalidate caches so the new tier / days_left / invite show
+              // up immediately without a manual refresh.
+              window.invalidate?.('user');
+              window.invalidate?.('my_invite');
             }
-            // For paid plans Cryptocloud opens external link; user returns and profile refreshes on reload.
+            // For paid plans Cryptocloud opens external link; the invite
+            // modal will auto-pop on the user's next app open via
+            // actionCheckInvite() in AppShell.
           }} style={{
             width: '100%',
             background: `linear-gradient(135deg, ${accent}, ${C.purple})`,

@@ -1002,6 +1002,38 @@ async function actionStartFreeTrial() {
   } catch (e) { return { ok: false, error: e.message }; }
 }
 
+// One-shot: returns the user's pending invite link and marks the row as
+// "used" on the backend. Called once at AppShell boot — if a checkout
+// happened between sessions, the auto-modal pops here.
+async function actionCheckInvite() {
+  const initData = getInitData();
+  if (!initData) return { ok: false, reason: 'no-tg' };
+  try {
+    const res = await apiPost('/miniapp/check_invite', { initData });
+    return { ok: true, invite_link: res.invite_link || null };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+// Read-only: returns the newest invite link without consuming the row.
+// Powers the AppHeader bell so the user can reopen the link any time.
+function useMyInvite() {
+  return useFetch(
+    'my_invite',
+    async () => {
+      const initData = getInitData();
+      if (!initData) return { invite_link: null };
+      try {
+        const data = await apiPost('/miniapp/my_invite', { initData });
+        return { invite_link: data.invite_link || null };
+      } catch (_) {
+        return { invite_link: null };
+      }
+    },
+    { invite_link: null },
+    [],
+  );
+}
+
 // ── Boot ──────────────────────────────────────────────────────
 initTelegram();
 
@@ -1010,8 +1042,8 @@ initTelegram();
 Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
-  useVideos, useVideo, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, userFromTelegram,
-  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionStartCryptoCheckout, actionStartFreeTrial,
+  useVideos, useVideo, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, userFromTelegram,
+  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionStartCryptoCheckout, actionStartFreeTrial, actionCheckInvite,
   actionCreatePlaylist, actionAddToPlaylist, actionRemoveFromPlaylist, actionDeletePlaylist,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded

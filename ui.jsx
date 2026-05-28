@@ -224,10 +224,7 @@ function AppHeader({ user: userProp, accent = C.pink }) {
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
         <button onClick={() => nav.go('search')} style={iconBtn}><Ico.search /></button>
-        <button style={iconBtn}>
-          <Ico.bell />
-          <span style={{ position: 'absolute', top: 6, right: 7, width: 8, height: 8, borderRadius: '50%', background: accent }} />
-        </button>
+        <AppHeaderBell accent={accent} />
       </div>
     </div>
   );
@@ -241,6 +238,29 @@ const iconBtn = {
   color: C.text, cursor: 'pointer',
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
 };
+
+// Bell that surfaces the user's group invite link. Reads it lazily from
+// /miniapp/my_invite (read-only, never consumes). Tap → opens the
+// InviteModal via nav.openInvite. Dot only shows when there's a real link.
+function AppHeaderBell({ accent = C.pink }) {
+  const nav = useNav();
+  const myInvite = window.useMyInvite ? window.useMyInvite() : { data: { invite_link: null } };
+  const link = myInvite.data?.invite_link;
+  const onTap = () => {
+    if (link) nav.openInvite?.(link);
+  };
+  return (
+    <button onClick={onTap} style={iconBtn} title={link ? 'Your group link' : ''}>
+      <Ico.bell />
+      {link && (
+        <span style={{
+          position: 'absolute', top: 6, right: 7,
+          width: 8, height: 8, borderRadius: '50%', background: accent,
+        }} />
+      )}
+    </button>
+  );
+}
 
 // NEW Bottom nav — 5 tabs with center action (Subscribe → Profile after subscribing)
 // `active` / `centerMode` props from screens override; otherwise pulled from nav context.
@@ -601,4 +621,103 @@ const TickerSlides = {
   ),
 };
 
-Object.assign(window, { C, tagColor, Phone, Ico, Thumb, Avatar, AppHeader, BottomNav, StatsStrip, PromoBanner, Chip, SectionHeader, TickerBanner, TickerSlides, TIER_COLORS });
+// ── InviteModal ───────────────────────────────────────────────
+// "Your private page" — pops after free trial / paid checkout and
+// whenever the user taps the AppHeader bell. The Join button uses
+// tg.openTelegramLink so it stays inside the Telegram client.
+function InviteModal({ link, onClose, accent = C.pink }) {
+  const openLink = (e) => {
+    e?.preventDefault?.();
+    if (!link) return;
+    const tg = window.Telegram?.WebApp;
+    const isTg = /^https?:\/\/(t\.me|telegram\.me)\//i.test(link) || /^tg:\/\//i.test(link);
+    if (isTg && tg && typeof tg.openTelegramLink === 'function') {
+      tg.openTelegramLink(link);
+    } else if (tg && typeof tg.openLink === 'function') {
+      tg.openLink(link);
+    } else {
+      window.open(link, '_blank', 'noopener');
+    }
+    onClose && onClose();
+  };
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch (_) {
+      // Fallback for older WebViews — select and execCommand('copy').
+      const ta = document.createElement('textarea');
+      ta.value = link; document.body.appendChild(ta);
+      ta.select(); try { document.execCommand('copy'); } catch (_) {}
+      ta.remove();
+    }
+  };
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 9700,
+      background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '24px 18px',
+      paddingTop: 'calc(24px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))',
+      paddingBottom: 'calc(24px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))',
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 360,
+        background: `linear-gradient(160deg, ${accent}22, ${C.dark2} 70%)`,
+        border: `1px solid ${accent}66`,
+        borderRadius: 22,
+        padding: '24px 20px 20px',
+        boxShadow: `0 18px 60px ${accent}33, 0 0 0 1px rgba(255,255,255,0.04)`,
+        textAlign: 'center',
+      }}>
+        <div style={{
+          fontSize: 32, marginBottom: 8,
+        }}>🎉</div>
+        <div style={{
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 26, letterSpacing: 1.2, lineHeight: 1,
+        }}>Your <span style={{ color: accent }}>page</span> is ready</div>
+        <div style={{ fontSize: 13, color: C.muted2, marginTop: 8, lineHeight: 1.45 }}>
+          Tap below to open your private group. Save the link — it's yours.
+        </div>
+        {/* Link preview row */}
+        <div style={{
+          marginTop: 16, display: 'flex', alignItems: 'center', gap: 8,
+          background: 'rgba(0,0,0,0.4)', border: `1px solid ${C.border}`,
+          borderRadius: 12, padding: '10px 12px',
+          textAlign: 'left',
+        }}>
+          <div style={{
+            flex: 1, minWidth: 0,
+            fontSize: 11, color: C.muted2, fontFamily: 'monospace',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>{link || '—'}</div>
+          <button onClick={copy} style={{
+            background: 'transparent', border: `1px solid ${C.border2}`,
+            color: C.muted2, padding: '5px 10px', borderRadius: 999,
+            fontSize: 10, fontWeight: 700, cursor: 'pointer',
+            fontFamily: 'inherit', flexShrink: 0,
+          }}>Copy</button>
+        </div>
+        {/* CTA */}
+        <button onClick={openLink} disabled={!link} style={{
+          width: '100%', marginTop: 14,
+          background: link ? `linear-gradient(135deg, ${accent}, ${C.purple})` : 'rgba(255,255,255,0.08)',
+          color: link ? '#000' : C.muted2,
+          border: 'none', borderRadius: 14,
+          padding: '14px 16px',
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 18, letterSpacing: 1.2,
+          cursor: link ? 'pointer' : 'default',
+          boxShadow: link ? `0 8px 22px ${accent}55` : 'none',
+        }}>JOIN GROUP →</button>
+        <button onClick={onClose} style={{
+          marginTop: 8, background: 'transparent', border: 'none',
+          color: C.muted, fontSize: 12, fontWeight: 600,
+          cursor: 'pointer', padding: 8, fontFamily: 'inherit',
+        }}>Maybe later</button>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { C, tagColor, Phone, Ico, Thumb, Avatar, AppHeader, BottomNav, StatsStrip, PromoBanner, Chip, SectionHeader, TickerBanner, TickerSlides, TIER_COLORS, InviteModal });
