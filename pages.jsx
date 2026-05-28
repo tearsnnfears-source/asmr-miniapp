@@ -380,7 +380,7 @@ function SubscriptionPage({ accent = C.pink }) {
           <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
             {hasAnySub
               ? (isInfiniteSub ? 'Lifetime access · everything unlocked' : `Current: ${user.daysLeft} days · max 60 total`)
-              : 'Cancel anytime · No auto-renewal'}
+              : 'Cancel anytime'}
           </div>
         </div>
 
@@ -583,7 +583,7 @@ function SubscriptionPage({ accent = C.pink }) {
             {busy ? 'PROCESSING…' : `SUBSCRIBE — ${cur.name} €${price}/MO →`}
           </button>
           <div style={{ textAlign: 'center', fontSize: 10, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>
-            Cancel anytime · No auto-renewal · Powered by Tribute / Cryptocloud
+            Cancel anytime · Powered by Tribute / Cryptocloud
           </div>
         </div>
 
@@ -1068,13 +1068,6 @@ function ArtistPage({ accent = C.pink }) {
               background: '#4ADE80', color: '#000', fontSize: 9.5, fontWeight: 800,
               padding: '4px 10px', borderRadius: 999, letterSpacing: 0.8, textTransform: 'uppercase',
             }}>▶ In app</span>
-          )}
-          {!a.ready && a.fresh && (
-            <span style={{
-              position: 'absolute', right: 14, bottom: 18,
-              background: C.lime, color: '#000', fontSize: 9.5, fontWeight: 800,
-              padding: '4px 10px', borderRadius: 999, letterSpacing: 0.8, textTransform: 'uppercase',
-            }}>Fresh</span>
           )}
         </div>
 

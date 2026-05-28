@@ -180,12 +180,6 @@ function ArtistCard({ a, accent }) {
           letterSpacing: 0.5, textTransform: 'uppercase',
           display: 'inline-flex', alignItems: 'center', gap: 3,
         }}>▶ IN APP</span>
-      ) : a.fresh ? (
-        <span style={{
-          position: 'absolute', left: 8, top: 8, background: C.lime, color: '#000',
-          fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 999,
-          letterSpacing: 0.5, textTransform: 'uppercase',
-        }}>✨ NEW</span>
       ) : a.hot ? (
         <span style={{
           position: 'absolute', left: 8, top: 8, background: '#FF6B4A', color: '#000',

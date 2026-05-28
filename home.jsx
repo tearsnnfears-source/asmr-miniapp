@@ -48,9 +48,22 @@ function HomeV1({ accent = C.pink, density = 'comfortable' }) {
   );
 }
 
+// Cheap hook: pulls the live artist record (with photo) by name. The
+// normalizeVideo output only carries {id, name, handle}, so video tiles
+// would otherwise show a letter avatar. useArtists is module-cached, so
+// the lookup is effectively O(N) once and free thereafter.
+function useEnrichedArtist(artist) {
+  const artistsState = window.useArtists();
+  if (!artist?.name) return artist;
+  const live = (artistsState.data || []).find(a => a.name === artist.name);
+  if (!live) return artist;
+  return { ...artist, photo: live.photo, profilePhoto: live.profilePhoto };
+}
+
 // Big-card row used in V1
 function FeedCard({ v, accent, density, featured }) {
   const nav = window.useNav();
+  const artist = useEnrichedArtist(v.artist);
   // Home thumbnails stay clear even for non-Pro users (per spec) — but
   // the tap is gated through nav.gate so the paywall sheet pops instead
   // of opening the player.
@@ -58,7 +71,7 @@ function FeedCard({ v, accent, density, featured }) {
     <div onClick={() => nav.gate(() => nav.go('video', { id: v.id, video: v }))} style={{ cursor: 'pointer' }}>
       <Thumb thumb={v.thumb} duration={v.duration} badge={featured ? { label: 'Just dropped', bg: accent } : null} />
       <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-        <Avatar artist={v.artist} size={36} ring={v.artist.fresh ? accent : null} />
+        <Avatar artist={artist} size={36} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             fontSize: density === 'compact' ? 13 : 14,
@@ -67,7 +80,7 @@ function FeedCard({ v, accent, density, featured }) {
             overflow: 'hidden',
           }}>{v.title}</div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 3, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span onClick={(e) => { e.stopPropagation(); nav.go('artist', { id: v.artist.id }); }} style={{ color: C.muted2, fontWeight: 600, cursor: 'pointer' }}>{v.artist.name}</span>
+            <span onClick={(e) => { e.stopPropagation(); nav.go('artist', { id: artist.id }); }} style={{ color: C.muted2, fontWeight: 600, cursor: 'pointer' }}>{artist.name}</span>
             <span>·</span>
             <span>{v.age}</span>
           </div>
@@ -79,21 +92,37 @@ function FeedCard({ v, accent, density, featured }) {
 }
 
 // ── HOME V2 — Editorial ───────────────────────────────────────
-// Hero promo on top, category tiles, mixed feed
+// Newest drop on top, Browse tags, then a personalised feed that grows
+// with Load more taps. No more static slice / mixed FeedCard sandwich.
 function HomeV2({ accent = C.pink, density = 'comfortable' }) {
   const nav = window.useNav();
-  // Home uses a small batch so the first paint isn't blocked on the giant
-  // 500-row response (which takes ~12s on Railway). The full list is kept
-  // warm in the background by AppShell so VideoPage / ArtistPage still
-  // open instantly.
-  const videosState = window.useVideos(30);
+  // 60 rows covers the first three Load-more clicks comfortably without
+  // blocking first paint on the 500-row response.
+  const videosState = window.useVideos(60);
   const videos = videosState.data || [];
   const hero = videos[0];
+
+  // Personalised order — shuffle the catalog tail so two opens of the
+  // app don't show the same For-You sequence. Stable per render via
+  // useMemo + videos.length as a cheap key.
+  const feed = React.useMemo(() => {
+    const tail = videos.slice(1);
+    if (tail.length <= 1) return tail;
+    const out = tail.slice();
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  }, [videos.length]);
+
+  const [visible, setVisible] = React.useState(8);
+  const shown = feed.slice(0, visible);
   return (
     <Phone>
       <AppHeader accent={accent} />
       <div style={SCROLL_BODY}>
-        {/* Hero — large featured drop */}
+        {/* Hero — newest drop. Featured chip + tap to play. */}
         {hero && (
         <div style={{ padding: '12px 14px 4px' }}>
           <div onClick={() => nav.gate(() => nav.go('video', { id: hero.id, video: hero }))} style={{
@@ -105,13 +134,10 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
               position: 'absolute', left: 12, top: 12,
               background: accent, color: '#000', fontWeight: 700,
               fontSize: 10, padding: '4px 8px', borderRadius: 999, letterSpacing: 0.6, textTransform: 'uppercase',
-            }}>Featured drop</span>
+            }}>Newest drop</span>
             <div style={{ position: 'absolute', left: 14, right: 14, bottom: 12 }}>
               <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25, marginBottom: 6 }}>{hero.title}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Avatar artist={hero.artist} size={24} />
-                <span style={{ fontSize: 11, color: C.muted2 }}>{hero.artist.name} · {hero.age}</span>
-              </div>
+              <HeroArtistLine artist={hero.artist} age={hero.age} />
             </div>
           </div>
         </div>
@@ -125,10 +151,7 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
           />
         </div>
 
-        {/* Category pills — tap to open Search pre-filled with that tag.
-            Source is /miniapp/tags via useTags(); backend sorts by video
-            count DESC so the most popular tag is first. CATEGORIES is
-            just the offline-preview fallback. */}
+        {/* Category pills — tap to open Search pre-filled with that tag. */}
         <div style={{ padding: '12px 14px 4px' }}>
           <SectionHeader title="Browse" accent={accent} action="" />
         </div>
@@ -153,36 +176,52 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
           ))}
         </div>
 
-        {/* Trending row label */}
-        <div style={{ padding: '14px 14px 6px' }}>
+        {/* Personalised feed */}
+        <div style={{ padding: '16px 14px 6px' }}>
           <SectionHeader
-            title="Recommended"
+            title="For you"
             accent={accent}
+            action={feed.length > visible ? '' : ''}
             icon={<span style={{ color: accent }}><Ico.flame /></span>}
           />
         </div>
-
-        {/* Mixed feed: big card + 2x compact rows */}
-        <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {videos[1] && <FeedCard v={videos[1]} accent={accent} density={density} />}
-          {videos.slice(2, 6).map(v => (
-            <CompactRow key={v.id} v={v} accent={accent} />
-          ))}
-          {videos[6] && <FeedCard v={videos[6]} accent={accent} density={density} />}
+        <div style={{ padding: '6px 14px 8px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {shown.map(v => <CompactRow key={v.id} v={v} accent={accent} />)}
         </div>
+        {feed.length > visible && (
+          <div style={{ padding: '4px 14px 18px' }}>
+            <button onClick={() => setVisible(n => n + 8)} style={{
+              width: '100%', background: 'transparent', color: accent,
+              border: `1px solid ${accent}55`, borderRadius: 12,
+              padding: '12px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}>Load more ({feed.length - visible} left)</button>
+          </div>
+        )}
       </div>
       <BottomNav active="home" accent={accent} />
     </Phone>
   );
 }
 
-// Compact horizontal row — thumbnail-left
+// Hero artist line — pulls live photo via useEnrichedArtist so the
+// hero avatar isn't a letter when the catalog ships an unenriched record.
+function HeroArtistLine({ artist, age }) {
+  const live = useEnrichedArtist(artist);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <Avatar artist={live} size={24} />
+      <span style={{ fontSize: 11, color: C.muted2 }}>{live.name} · {age}</span>
+    </div>
+  );
+}
+
+// Compact horizontal row — thumbnail + title + tiny avatar/name line.
 function CompactRow({ v, accent }) {
   const nav = window.useNav();
-  // Pass the full video object too — needed for artist pages where the
-  // video isn't in the global useVideos(500) cache (otherwise VideoPage
-  // would fall back to the Home feed's first item).
-  // Tap is gated — non-Pro users hit the paywall sheet instead of nav.
+  // Enrich with live artist record so the avatar shows the real photo,
+  // not just a letter fallback (v.artist from normalizeVideo has no photo).
+  const artist = useEnrichedArtist(v.artist);
   return (
     <div onClick={() => nav.gate(() => nav.go('video', { id: v.id, video: v }))} style={{ display: 'flex', gap: 10, cursor: 'pointer' }}>
       <div style={{ width: 140, flexShrink: 0 }}>
@@ -193,11 +232,11 @@ function CompactRow({ v, accent }) {
           fontSize: 13, fontWeight: 600, lineHeight: 1.3,
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
         }}>{v.title}</div>
-        <div style={{ fontSize: 10.5, color: C.muted, marginTop: 4, fontWeight: 500 }}>{v.artist.name}</div>
-        <div style={{ fontSize: 10.5, color: C.muted, marginTop: 2 }}>{v.age}</div>
-        {v.artist.fresh && (
-          <span style={{ display: 'inline-block', marginTop: 6, fontSize: 9, padding: '2px 6px', background: `${accent}22`, color: accent, borderRadius: 4, fontWeight: 700, letterSpacing: 0.5 }}>FRESH ARTIST</span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+          <Avatar artist={artist} size={18} />
+          <span style={{ fontSize: 11, color: C.muted2, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{artist.name}</span>
+        </div>
+        <div style={{ fontSize: 10.5, color: C.muted, marginTop: 3 }}>{v.age}</div>
       </div>
     </div>
   );
