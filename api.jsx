@@ -4,25 +4,41 @@
 //
 // Loaded after mock-data.jsx so window.ARTISTS/VIDEOS/SHORTS exist as fallback.
 
-// Default points at the PRODUCTION Railway service — the same bot
-// (@asmrleaksbot) and DB the live miniapp uses. When this redesign is
-// merged into main and served as the miniapp, payments, days, invite
-// links and admin notifications all flow through the prod handlers.
+// Backend selection. The miniapp is served from two Vercel deployments:
+//   • main domain (production)            → @asmrleaksbot       → prod backend
+//   • -git-<branch>-… preview deployments → @privateleakstvbot  → staging backend
 //
-// Overrides for debugging:
-//   ?api=staging         → @privateleakstvbot test bot (safe sandbox)
-//   ?api=prod            → explicit prod (default anyway)
-//   ?api=<https://…>     → arbitrary URL
-//   window.__MINIAPP_API_BASE__ → programmatic override
+// Telegram signs initData with the bot's token, so the backend MUST be
+// the one whose env holds the *matching* token — otherwise HMAC fails
+// and every request 403s with "Cannot parse user".
+//
+// We auto-detect by hostname so a freshly merged redesign-v2 → main
+// flips to prod with zero edits.
+//
+// Overrides (any of them wins):
+//   ?api=staging | ?api=prod | ?api=<https://…>
+//   window.__MINIAPP_API_BASE__
 const API_BASE = (function () {
+  const PROD    = 'https://asmr-bot-production.up.railway.app';
+  const STAGING = 'https://test-bot-production-e824.up.railway.app';
+
   if (window.__MINIAPP_API_BASE__) return window.__MINIAPP_API_BASE__;
   try {
     const override = new URLSearchParams(location.search).get('api');
-    if (override === 'staging') return 'https://test-bot-production-e824.up.railway.app';
-    if (override === 'prod')    return 'https://asmr-bot-production.up.railway.app';
+    if (override === 'staging') return STAGING;
+    if (override === 'prod')    return PROD;
     if (override && override.startsWith('http')) return override;
   } catch (_) {}
-  return 'https://asmr-bot-production.up.railway.app';
+
+  // Hostname-based default. Vercel preview deployments include
+  // "-git-" in the subdomain (e.g. asmr-miniapp-7x7b-git-redesign-v2-…
+  // .vercel.app). Anything else — bare custom domain, main vercel
+  // domain, telegram-internal proxy — counts as production.
+  try {
+    const h = location.hostname || '';
+    if (h.includes('-git-')) return STAGING;
+  } catch (_) {}
+  return PROD;
 })();
 
 // ── Telegram bootstrap ────────────────────────────────────────
