@@ -97,12 +97,13 @@ function FeedCard({ v, accent, density, featured }) {
 function HomeV2({ accent = C.pink, density = 'comfortable' }) {
   const nav = window.useNav();
   // 30 rows give a fast first paint while we wait for the full catalog
-  // (500 rows ≈ 10–12s on Railway). Both are warmed by AppShell, so we
-  // just read from cache here. Once the bigger payload lands we upgrade
-  // `videos` in place; the hero stays the same since both lists share
-  // newest-first ordering.
+  // (10000 is an effective "all videos" cap — DB has nowhere near).
+  // Both are warmed by AppShell so we just read from cache. Once the
+  // bigger payload lands we upgrade `videos` in place; the hero stays
+  // the same since both lists share newest-first ordering. Backend
+  // /miniapp/videos now also filters out rows tagged 'shorts'.
   const liteState = window.useVideos(30);
-  const fullState = window.useVideos(500);
+  const fullState = window.useVideos(10000);
   const videos = (fullState.data && fullState.data.length) ? fullState.data : (liteState.data || []);
   const hero = videos[0];
 

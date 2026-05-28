@@ -80,10 +80,12 @@ function AppShell() {
   // be unlimited without slowing down launch.
   window.useVideos(30);
   // Full catalog warmed in the background — the shuffled "For you" feed
-  // on Home wants a 500-row pool so free users get variety instead of
-  // the latest 60 on loop. ~10-12s on Railway; splash doesn't wait for
-  // it (only :30 is gating), so this is cost-free in perceived load.
-  window.useVideos(500);
+  // on Home wants the whole pool so free users (and paid users without
+  // signals) get real variety instead of the same newest slice on loop.
+  // limit=10000 is an effective "no cap" — DB has nowhere near that.
+  // Splash doesn't wait for it (only :30 is gating), so the long
+  // response is cost-free in perceived load.
+  window.useVideos(10000);
   // Must match SHORTS_LIMIT in screens.jsx — otherwise ShortsTab and the warm
   // cache would have different keys and the player would index into the wrong
   // array.
