@@ -374,9 +374,9 @@ function LikedShorts({ accent }) {
             }}>
               <div style={{
                 position: 'absolute', inset: 0,
-                filter: 'blur(14px) brightness(0.5)',
-                WebkitFilter: 'blur(14px) brightness(0.5)',
-                transform: 'scale(1.15)',
+                filter: 'blur(7px) brightness(0.7)',
+                WebkitFilter: 'blur(7px) brightness(0.7)',
+                transform: 'scale(1.08)',
               }}>
                 <Thumb thumb={s.thumb} duration={null} />
               </div>

@@ -764,7 +764,7 @@ function InviteModal({ link, onClose, accent = C.pink }) {
 // every gated tap surfaces the same UX. Tapping the wrapper itself
 // fires onClick (typically nav.openPaywall) so the user always lands
 // on the same upsell.
-function BlurLock({ children, onClick, badge = '🔒', accent = C.pink, blur = 10, dim = 0.55 }) {
+function BlurLock({ children, onClick, badge = '🔒', accent = C.pink, blur = 7, dim = 0.7 }) {
   return (
     <div onClick={onClick} style={{
       position: 'relative', cursor: onClick ? 'pointer' : 'default',

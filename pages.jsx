@@ -1174,9 +1174,9 @@ function ArtistPage({ accent = C.pink }) {
                         }}>
                           <div style={{
                             position: 'absolute', inset: 0,
-                            filter: 'blur(14px) brightness(0.5)',
-                            WebkitFilter: 'blur(14px) brightness(0.5)',
-                            transform: 'scale(1.15)',
+                            filter: 'blur(7px) brightness(0.7)',
+                            WebkitFilter: 'blur(7px) brightness(0.7)',
+                            transform: 'scale(1.08)',
                           }}>
                             <Thumb thumb={s.thumb} duration={null} />
                           </div>
@@ -1225,9 +1225,9 @@ function ArtistPage({ accent = C.pink }) {
                         }}>
                           <div style={{
                             position: 'absolute', inset: 0,
-                            filter: 'blur(14px) brightness(0.5)',
-                            WebkitFilter: 'blur(14px) brightness(0.5)',
-                            transform: 'scale(1.15)',
+                            filter: 'blur(7px) brightness(0.7)',
+                            WebkitFilter: 'blur(7px) brightness(0.7)',
+                            transform: 'scale(1.08)',
                             background: url
                               ? `url('${url.replace(/'/g, "\\'")}') center/cover no-repeat`
                               : (p.thumb?.bg || '#1a1a1c'),
