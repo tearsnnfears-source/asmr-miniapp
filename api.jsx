@@ -995,11 +995,18 @@ async function actionRegisterView(contentId) {
 
 async function actionStartFreeTrial() {
   const initData = getInitData();
-  if (!initData) return { ok: false, reason: 'no-tg' };
+  if (!initData) return { ok: false, reason: 'no-tg', message: 'Open from Telegram to activate trial' };
   try {
     const res = await apiPost('/miniapp/free_trial', { initData });
     return { ok: true, ...res };
-  } catch (e) { return { ok: false, error: e.message }; }
+  } catch (e) {
+    // Backend returns 409 Conflict when user.trial_used is already True —
+    // we want a friendly message here, not the raw HTTP error.
+    if (e.status === 409) {
+      return { ok: false, reason: 'trial-used', message: 'You\'ve already used your free trial.' };
+    }
+    return { ok: false, error: e.message, message: 'Could not activate trial. Try again.' };
+  }
 }
 
 // One-shot: returns the user's pending invite link and marks the row as

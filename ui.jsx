@@ -520,14 +520,14 @@ function TickerBanner({ accent = C.pink, lime = C.lime, slides, interval = 5000 
         transform: `translateX(-${idx * 100}%)`,
         transition: 'transform 450ms cubic-bezier(.4,0,.2,1)',
       }}>
-        {slides.map((s, i) => (
+        {slides.map((Slide, i) => (
           <div key={i} style={{
             width: '100%', flexShrink: 0,
             padding: '12px 14px 18px',
             boxSizing: 'border-box',
             minWidth: 0,
           }}>
-            {s({ accent, lime })}
+            <Slide accent={accent} lime={lime} />
           </div>
         ))}
       </div>
@@ -551,25 +551,58 @@ function TickerBanner({ accent = C.pink, lime = C.lime, slides, interval = 5000 
 
 // Slide builders — pure render fns so the ticker can lazy-render
 const TickerSlides = {
-  freeTrial: ({ accent, lime }) => (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 56 }}>
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-          <span style={{ color: lime, fontWeight: 800, fontSize: 9, letterSpacing: 1.2, textTransform: 'uppercase' }}>Limited offer</span>
-          <span style={{ background: lime, color: '#000', fontSize: 8, fontWeight: 800, padding: '1px 5px', borderRadius: 3, letterSpacing: 0.4 }}>NEW</span>
+  // Renders a slide as a real React component so hooks (useNav) are
+  // legal inside. TickerBanner consumes these as JSX <Slide />.
+  freeTrial: function FreeTrialSlide({ accent, lime }) {
+    const nav = useNav();
+    const [busy, setBusy] = React.useState(false);
+    const onGet = async (e) => {
+      e?.stopPropagation?.();
+      if (busy) return;
+      setBusy(true);
+      try {
+        const res = await window.actionStartFreeTrial();
+        if (res?.ok) {
+          if (res.invite_link) nav.openInvite?.(res.invite_link);
+          // New tier / days / link are fresh — drop the cached profile so
+          // the AppHeader badge and bell reflect them immediately.
+          window.invalidate?.('user');
+          window.invalidate?.('my_invite');
+          return;
+        }
+        if (res?.reason === 'trial-used') {
+          alert('You\'ve already used your free trial.');
+        } else if (res?.reason === 'no-tg') {
+          alert('Open from Telegram to activate trial');
+        } else {
+          alert(res?.message || 'Could not activate trial. Try again.');
+        }
+      } finally {
+        setBusy(false);
+      }
+    };
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 56 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <span style={{ color: lime, fontWeight: 800, fontSize: 9, letterSpacing: 1.2, textTransform: 'uppercase' }}>Limited offer</span>
+            <span style={{ background: lime, color: '#000', fontSize: 8, fontWeight: 800, padding: '1px 5px', borderRadius: 3, letterSpacing: 0.4 }}>NEW</span>
+          </div>
+          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, lineHeight: 1, letterSpacing: 0.8 }}>
+            Try <span style={{ color: lime }}>5 days free</span>
+          </div>
+          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', marginTop: 3 }}>Full library access · no card required</div>
         </div>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, lineHeight: 1, letterSpacing: 0.8 }}>
-          Try <span style={{ color: lime }}>5 days free</span>
-        </div>
-        <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', marginTop: 3 }}>Full library access · no card required</div>
+        <button onClick={onGet} disabled={busy} style={{
+          background: lime, color: '#000', border: 'none',
+          padding: '8px 14px', borderRadius: 999, fontSize: 11, fontWeight: 800,
+          whiteSpace: 'nowrap', cursor: busy ? 'default' : 'pointer',
+          opacity: busy ? 0.65 : 1,
+          fontFamily: 'inherit',
+        }}>{busy ? '…' : 'Get it →'}</button>
       </div>
-      <button style={{
-        background: lime, color: '#000', border: 'none',
-        padding: '8px 14px', borderRadius: 999, fontSize: 11, fontWeight: 800,
-        whiteSpace: 'nowrap', cursor: 'pointer',
-      }}>Get it →</button>
-    </div>
-  ),
+    );
+  },
   stats: ({ accent, lime }) => {
     // use spaces in numbers for compactness on phone widths
     const fmt = (n) => n.toLocaleString('en-US').replace(/,/g, ' ');

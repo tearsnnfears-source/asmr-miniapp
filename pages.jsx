@@ -285,7 +285,13 @@ function SubscriptionPage({ accent = C.pink }) {
               : await window.actionStartCryptoCheckout(plan);
             if (!res.ok) {
               console.warn('checkout failed:', res);
-              alert(res.message || 'Checkout unavailable. Try again.');
+              // The backend returns 409 if user.trial_used is True — we
+              // map it to a clear, untechnical message in actionStartFreeTrial.
+              if (res.reason === 'trial-used') {
+                alert('You\'ve already used your free trial.');
+              } else {
+                alert(res.message || 'Checkout unavailable. Try again.');
+              }
               return;
             }
             if (plan === 'week') {
