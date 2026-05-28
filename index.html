@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0E0E0F">
+<title>ASMR.LEAKS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
+<script>
+  // Mobile devtools panel — opt-in with ?debug=1 in the URL. Useful for
+  // inspecting console + network requests inside the Telegram WebView.
+  (function () {
+    try {
+      var qs = new URLSearchParams(location.search);
+      if (qs.get('debug') !== '1') return;
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/eruda';
+      s.onload = function () { try { window.eruda && window.eruda.init(); } catch (_) {} };
+      document.head.appendChild(s);
+    } catch (_) {}
+  })();
+</script>
+<style>
+  /* Default Telegram safe-area vars — overwritten by api.jsx
+     applySafeAreaVars() once the WebApp object reports real insets. The
+     env(safe-area-inset-*) fallback covers iOS notch / home indicator in
+     a regular browser (preview URLs). */
+  :root {
+    --tg-safe-top:    env(safe-area-inset-top,    0px);
+    --tg-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --tg-safe-left:   env(safe-area-inset-left,   0px);
+    --tg-safe-right:  env(safe-area-inset-right,  0px);
+  }
+  html, body {
+    margin: 0; padding: 0;
+    background: #0E0E0F; color: #fff;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    height: 100%; overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;
+  }
+  #root { height: 100%; width: 100%; }
+  * { box-sizing: border-box; }
+  *::-webkit-scrollbar { width: 0; height: 0; display: none; }
+  * { scrollbar-width: none; }
+  button { font-family: inherit; }
+  input { -webkit-appearance: none; appearance: none; }
+
+  /* Static splash. Renders before any React JS — so users never see the
+     mock-data fallback flash. App calls window.__hideSplash() once real
+     data is loaded; the 10s safety timeout below hides it regardless. */
+  #static-splash {
+    position: fixed; inset: 0; z-index: 100000;
+    background: #0E0E0F;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 26px;
+    /* No padding-top here on purpose: it was being driven by
+       --tg-safe-top, which is empty on the very first paint and gets
+       backfilled once Telegram replies — causing the logo to jump
+       downward mid-load. Logo is centered, the chrome doesn't overlap
+       the middle, so we don't need the reservation. */
+    transition: opacity 250ms ease-out;
+  }
+  #static-splash.is-leaving { opacity: 0; pointer-events: none; }
+  #static-splash .logo {
+    font-family: 'Bebas Neue', system-ui, sans-serif;
+    font-size: 42px; letter-spacing: 3px; line-height: 1;
+    color: #fff;
+  }
+  #static-splash .logo .accent { color: #FF7EC8; }
+  #static-splash .spin {
+    width: 36px; height: 36px;
+    border: 3px solid rgba(255,255,255,0.08);
+    border-top-color: #FF7EC8;
+    border-radius: 50%;
+    animation: spl-spin 0.7s linear infinite;
+  }
+  @keyframes spl-spin { to { transform: rotate(360deg); } }
+
+  /* Immersive video — applied by player.jsx toggleFullscreen. Pin the
+     player wrap to the whole viewport on top of the app chrome. Works
+     even when the native Fullscreen API is blocked (iOS in Telegram). */
+  .vp-immersive {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 9500 !important;
+    background: #000 !important;
+    border-radius: 0 !important;
+    aspect-ratio: auto !important;
+  }
+  .vp-immersive video {
+    width: 100vw !important;
+    height: 100vh !important;
+    object-fit: contain !important;
+  }
+  @media (orientation: portrait) {
+    /* On a vertical phone, lay the player on its side so the video gets
+       the long edge of the screen even when we can't lock orientation. */
+    .vp-immersive.vp-force-landscape {
+      width: 100vh !important;
+      height: 100vw !important;
+      transform-origin: top left !important;
+      transform: rotate(90deg) translateY(-100%) !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="static-splash">
+  <div class="logo">ASMR<span class="accent">.LEAKS</span></div>
+  <div class="spin"></div>
+</div>
+<script>
+  // Hide hook that AppShell calls once real data lands.
+  window.__hideSplash = function () {
+    var el = document.getElementById('static-splash');
+    if (!el) return;
+    el.classList.add('is-leaving');
+    setTimeout(function () { el && el.remove && el.remove(); }, 300);
+    window.__hideSplash = function () {}; // idempotent
+  };
+  // Safety net: never let the splash trap the user even if React crashes.
+  setTimeout(function () { window.__hideSplash(); }, 10000);
+</script>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="mock-data.jsx"></script>
+<script type="text/babel" src="api.jsx"></script>
+<script type="text/babel" src="debug.jsx"></script>
+<script type="text/babel" src="ui.jsx"></script>
+<script type="text/babel" src="player.jsx"></script>
+<script type="text/babel" src="home.jsx"></script>
+<script type="text/babel" src="screens.jsx"></script>
+<script type="text/babel" src="library.jsx"></script>
+<script type="text/babel" src="pages.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+</body>
+</html>

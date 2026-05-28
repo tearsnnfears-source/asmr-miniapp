@@ -4,18 +4,25 @@
 //
 // Loaded after mock-data.jsx so window.ARTISTS/VIDEOS/SHORTS exist as fallback.
 
-// Default points at the staging Railway service so the redesign uses the
-// staging bot (@privateleakstvbot) without touching the production backend
-// that the live miniapp (index.html.html) still uses. Override via
-// ?api=prod in the URL or window.__MINIAPP_API_BASE__ if needed.
+// Default points at the PRODUCTION Railway service — the same bot
+// (@asmrleaksbot) and DB the live miniapp uses. When this redesign is
+// merged into main and served as the miniapp, payments, days, invite
+// links and admin notifications all flow through the prod handlers.
+//
+// Overrides for debugging:
+//   ?api=staging         → @privateleakstvbot test bot (safe sandbox)
+//   ?api=prod            → explicit prod (default anyway)
+//   ?api=<https://…>     → arbitrary URL
+//   window.__MINIAPP_API_BASE__ → programmatic override
 const API_BASE = (function () {
   if (window.__MINIAPP_API_BASE__) return window.__MINIAPP_API_BASE__;
   try {
     const override = new URLSearchParams(location.search).get('api');
-    if (override === 'prod') return 'https://asmr-bot-production.up.railway.app';
+    if (override === 'staging') return 'https://test-bot-production-e824.up.railway.app';
+    if (override === 'prod')    return 'https://asmr-bot-production.up.railway.app';
     if (override && override.startsWith('http')) return override;
   } catch (_) {}
-  return 'https://test-bot-production-e824.up.railway.app';
+  return 'https://asmr-bot-production.up.railway.app';
 })();
 
 // ── Telegram bootstrap ────────────────────────────────────────
