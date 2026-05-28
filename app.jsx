@@ -95,11 +95,12 @@ function AppShell() {
   React.useEffect(() => {
     const list = shortsState.data || [];
     if (!list.length) return;
-    // Warm only the first 6 IDs (1.5 rows visible without scrolling) so we
-    // don't hammer Railway with 24 parallel /content/play POSTs — that was
-    // making the backend slow to respond to the very requests we're trying
-    // to speed up. The rest load lazily via IntersectionObserver.
-    const ids = list.slice(0, 6).map(s => s.raw?.id ?? s.id).filter(x => x != null);
+    // Warm the first 4 IDs — exactly the 2×2 grid the user sees above
+    // the fold the moment they tap Shorts. Concurrency stays at 2 so
+    // we don't hit Railway with parallel /content/play POSTs (it was
+    // visibly throttling the very requests we wanted to speed up at
+    // concurrency 4+). The rest load lazily via IntersectionObserver.
+    const ids = list.slice(0, 4).map(s => s.raw?.id ?? s.id).filter(x => x != null);
     if (ids.length && window.prefetchPlayable) {
       window.prefetchPlayable(ids, 2);
     }
