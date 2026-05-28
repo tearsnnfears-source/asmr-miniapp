@@ -21,6 +21,7 @@ const SCREENS = {
   subscription:   ({ accent })                    => <window.SubscriptionPage accent={accent} />,
   profile:        ({ accent })                    => <window.ProfilePage accent={accent} />,
   faq:            ({ accent })                    => <window.FAQPage accent={accent} />,
+  search:         ({ accent })                    => <window.SearchPage accent={accent} />,
   'paywall-video':({ accent })                    => <window.PaywallLock accent={accent} mode="video" />,
   'paywall-artist':({ accent })                   => <window.PaywallLock accent={accent} mode="artist" />,
 };
@@ -38,6 +39,7 @@ const SCREEN_TO_TAB = {
   subscription: '',
   profile: '',
   faq: '',
+  search: '',
   'paywall-video': 'home',
   'paywall-artist': 'artists',
 };

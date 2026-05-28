@@ -122,13 +122,15 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
           />
         </div>
 
-        {/* Category pills (visual) */}
+        {/* Category pills — tap to open Search pre-filled with that tag.
+            Source is /miniapp/tags via useTags(); CATEGORIES is just the
+            fallback for offline preview. */}
         <div style={{ padding: '12px 14px 4px' }}>
           <SectionHeader title="Browse" accent={accent} action="" />
         </div>
         <div style={{ display: 'flex', gap: 10, padding: '8px 14px 4px', overflowX: 'auto' }}>
-          {CATEGORIES.slice(0,6).map((c, i) => (
-            <div key={c.id} style={{
+          {(window.useTags().data || CATEGORIES).slice(0,8).map((c, i) => (
+            <div key={c.id} onClick={() => nav.go('search', { q: c.label })} style={{
               flexShrink: 0,
               width: 72, height: 72, borderRadius: 16,
               background: i % 2 === 0
@@ -136,6 +138,7 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
                 : `linear-gradient(135deg, ${C.lime}30, ${C.blue}20)`,
               border: `1px solid ${C.border2}`,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+              cursor: 'pointer',
             }}>
               <div style={{ fontSize: 24, color: i % 2 === 0 ? accent : C.lime, fontWeight: 700 }}>{c.icon}</div>
               <div style={{ fontSize: 10, fontWeight: 600 }}>{c.label}</div>

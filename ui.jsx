@@ -223,7 +223,7 @@ function AppHeader({ user: userProp, accent = C.pink }) {
         </div>
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
-        <button style={iconBtn}><Ico.search /></button>
+        <button onClick={() => nav.go('search')} style={iconBtn}><Ico.search /></button>
         <button style={iconBtn}>
           <Ico.bell />
           <span style={{ position: 'absolute', top: 6, right: 7, width: 8, height: 8, borderRadius: '50%', background: accent }} />

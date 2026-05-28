@@ -7,26 +7,29 @@ function ProfilePage({ accent = C.pink }) {
   const initials = (user.name || 'U').trim().split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase();
   const tier = (user.tier || 'free').toLowerCase();
   const tierColor = window.TIER_COLORS?.[tier] || C.lime;
+  // Real counts — favorites covers liked videos+shorts+photos, follows is
+  // the artist subscription list. Falls back to 0 while the hooks load.
+  const favState  = window.useFavorites();
+  const followState = window.useFollows();
+  const savedCount = favState.data?.count
+    ?? ((favState.data?.videos?.length || 0)
+      + (favState.data?.shorts?.length || 0)
+      + (favState.data?.photos?.length || 0));
+  const followingCount = (followState.data?.artists || []).length;
   const stats = [
     user.isPro
       ? { val: String(user.daysLeft || 0), unit: 'd', label: 'Days left' }
       : { val: 'Free', label: 'Plan' },
-    { val: '0', label: 'Saved' },
-    { val: '0', label: 'Following' },
+    { val: String(savedCount), label: 'Saved' },
+    { val: String(followingCount), label: 'Following' },
   ];
   return (
     <Phone>
       <AppHeader accent={accent} />
       <div style={SCROLL_BODY}>
-        {/* Cover + avatar */}
+        {/* Cover + avatar — gear button removed (was a no-op). */}
         <div style={{ position: 'relative', height: 130, background: `linear-gradient(135deg, ${accent}55, ${C.purple}55, ${C.dark3})` }}>
           <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 30% 60%, rgba(255,255,255,0.15), transparent 60%)' }} />
-          <button style={{
-            position: 'absolute', right: 14, top: 14,
-            background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
-            width: 32, height: 32, borderRadius: 10, cursor: 'pointer',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
-          }}>⚙</button>
         </div>
         <div style={{ padding: '0 14px', marginTop: -48, position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
@@ -128,22 +131,18 @@ function ProfilePage({ accent = C.pink }) {
         </div>
         )}
 
-        {/* Row list */}
+        {/* Row list — only rows that actually work. Mock Language /
+            Notifications / Appearance / Support / Terms entries were
+            removed; they'll come back when their screens exist. */}
         <div style={{ padding: '8px 14px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           <RowGroup label="Library">
-            <Row icon="⭐" color={accent} label="My saved" badge={String(window.useFavorites().data?.count || 0)} onClick={() => nav.go('saved')} />
-            <Row icon="📂" color={accent} label="Albums & playlists" onClick={() => nav.go('saved', { tab: 'albums' })} />
-            <Row icon="🔄" color={accent} label="Renew subscription" onClick={() => nav.go('subscription')} />
-          </RowGroup>
-          <RowGroup label="App">
-            <Row icon="🌐" label="Language" value="English" />
-            <Row icon="🔔" label="Notifications" />
-            <Row icon="🌗" label="Appearance" value="Dark" />
+            <Row icon="⭐" color={accent} label="My saved" badge={String(savedCount)} onClick={() => nav.go('saved')} />
+            <Row icon="📂" color={accent} label="Playlists" badge={String((window.useUserPlaylists().data?.playlists || []).length)} onClick={() => nav.go('saved', { tab: 'playlists' })} />
+            <Row icon="🎤" color={accent} label="Followed artists" badge={String(followingCount)} onClick={() => nav.go('artists')} />
+            <Row icon="🔄" color={accent} label={user.isPro ? 'Manage subscription' : 'Get PRO'} onClick={() => nav.go('subscription')} />
           </RowGroup>
           <RowGroup label="Help">
             <Row icon="❓" label="FAQ" onClick={() => nav.go('faq')} />
-            <Row icon="💬" label="Support" />
-            <Row icon="📜" label="Terms · Privacy" />
           </RowGroup>
         </div>
       </div>
@@ -417,6 +416,186 @@ function FAQPage({ accent = C.pink }) {
             }}>💬 Chat</button>
           </div>
         </div>
+      </div>
+    </Phone>
+  );
+}
+
+// ── SEARCH PAGE ───────────────────────────────────────────────
+// Single-screen search across artists + videos. Opened from AppHeader's
+// magnifier icon and from Home's Browse pills (with the tag pre-filled).
+//
+// Layout:
+//   slim back bar + input (autofocused) + ✕ to clear
+//   then either:
+//     · no query → Browse rail (tags as quick-pick chips)
+//     · with query → artist row (filtered locally from useArtists by name)
+//                    + video list (from /miniapp/search)
+//
+// We debounce the q → deferredQ transition by 280ms so the backend isn't
+// hammered on every keystroke; the artist filter is local & instant.
+function SearchPage({ accent = C.pink }) {
+  const nav = window.useNav();
+  const initialQ = nav.params?.q || '';
+  const [q, setQ] = React.useState(initialQ);
+  const [deferredQ, setDeferredQ] = React.useState(initialQ);
+  const inputRef = React.useRef(null);
+
+  // Debounce backend search — local artist filter responds instantly so
+  // the user sees something the moment they start typing.
+  React.useEffect(() => {
+    const id = setTimeout(() => setDeferredQ(q.trim()), 280);
+    return () => clearTimeout(id);
+  }, [q]);
+
+  // Focus the input on mount so the keyboard pops automatically.
+  React.useEffect(() => {
+    const t = setTimeout(() => { try { inputRef.current?.focus(); } catch (_) {} }, 80);
+    return () => clearTimeout(t);
+  }, []);
+
+  const tagsState  = window.useTags();
+  const tags       = (tagsState.data || []);
+  const artistsAll = (window.useArtists().data || []);
+  const searchState = window.useSearch(deferredQ, 24);
+  const videoResults = searchState.data?.results || [];
+
+  // Local artist match — case-insensitive contains. Cap to a sensible
+  // number so the rail stays scrollable rather than overwhelming.
+  const matchedArtists = React.useMemo(() => {
+    const needle = deferredQ.toLowerCase();
+    if (!needle || needle.length < 2) return [];
+    return artistsAll.filter(a => {
+      const name = (a.name || '').toLowerCase();
+      const handle = (a.handle || '').toLowerCase();
+      return name.includes(needle) || handle.includes(needle);
+    }).slice(0, 12);
+  }, [deferredQ, artistsAll]);
+
+  const showResults = deferredQ.length >= 2;
+  const isLoading = showResults && searchState.loading;
+  const noResults = showResults && !searchState.loading && matchedArtists.length === 0 && videoResults.length === 0;
+
+  return (
+    <Phone>
+      {/* Slim header — back + input + clear */}
+      <div style={{
+        padding: '8px 10px 10px',
+        display: 'flex', alignItems: 'center', gap: 8,
+        flexShrink: 0, background: C.dark2, borderBottom: `1px solid ${C.border}`,
+      }}>
+        <button onClick={() => nav.back()} style={{
+          width: 38, height: 38, borderRadius: 12,
+          background: 'transparent', border: 'none',
+          color: C.text, cursor: 'pointer',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+        }}><Ico.chevL /></button>
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'center', gap: 8,
+          background: C.dark, border: `1px solid ${C.border}`,
+          borderRadius: 12, padding: '8px 10px',
+        }}>
+          <span style={{ color: C.muted, flexShrink: 0 }}><Ico.search /></span>
+          <input
+            ref={inputRef}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Artists, tags, titles…"
+            inputMode="search"
+            autoCapitalize="none"
+            autoCorrect="off"
+            style={{
+              flex: 1, minWidth: 0,
+              background: 'transparent', border: 'none', color: C.text,
+              fontSize: 14, outline: 'none', fontFamily: 'inherit',
+              padding: 0,
+            }}
+          />
+          {q && (
+            <button onClick={() => { setQ(''); setDeferredQ(''); inputRef.current?.focus(); }} style={{
+              background: 'transparent', border: 'none', color: C.muted,
+              fontSize: 18, lineHeight: 1, cursor: 'pointer', padding: 2,
+            }}>×</button>
+          )}
+        </div>
+      </div>
+
+      <div style={SCROLL_BODY}>
+        {!showResults && (
+          <React.Fragment>
+            <div style={{ padding: '18px 14px 6px' }}>
+              <div style={{ fontSize: 10, color: C.muted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Browse</div>
+            </div>
+            <div style={{ padding: '6px 14px 14px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {tags.map(t => (
+                <button key={t.id} onClick={() => { setQ(t.label); setDeferredQ(t.label); }} style={{
+                  background: `${accent}18`, color: accent,
+                  border: `1px solid ${accent}55`, borderRadius: 999,
+                  padding: '8px 14px', fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}>{t.icon} {t.label}</button>
+              ))}
+            </div>
+            {/* Hint */}
+            <div style={{ padding: '6px 14px', color: C.muted, fontSize: 12 }}>
+              Type 2+ characters to search across artists and videos.
+            </div>
+          </React.Fragment>
+        )}
+
+        {showResults && (
+          <React.Fragment>
+            {matchedArtists.length > 0 && (
+              <React.Fragment>
+                <div style={{ padding: '14px 14px 4px' }}>
+                  <div style={{ fontSize: 10, color: C.muted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                    Artists · {matchedArtists.length}
+                  </div>
+                </div>
+                <div style={{ padding: '8px 14px 6px', display: 'flex', gap: 12, overflowX: 'auto' }}>
+                  {matchedArtists.map(a => (
+                    <div key={a.id} onClick={() => nav.go('artist', { id: a.id })} style={{
+                      flexShrink: 0, width: 78, textAlign: 'center', cursor: 'pointer',
+                    }}>
+                      <Avatar artist={a} size={64} ring={accent} />
+                      <div style={{
+                        fontSize: 11, fontWeight: 600, marginTop: 6,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>{a.name}</div>
+                    </div>
+                  ))}
+                </div>
+              </React.Fragment>
+            )}
+
+            <div style={{ padding: '14px 14px 4px' }}>
+              <div style={{ fontSize: 10, color: C.muted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Videos {videoResults.length ? `· ${videoResults.length}` : ''}
+              </div>
+            </div>
+
+            {isLoading && (
+              <div style={{ padding: '20px 14px', textAlign: 'center', color: C.muted, fontSize: 12 }}>
+                Searching…
+              </div>
+            )}
+
+            {!isLoading && videoResults.length > 0 && (
+              <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {videoResults.map(v => <CompactRow key={v.id} v={v} accent={accent} />)}
+              </div>
+            )}
+
+            {noResults && (
+              <div style={{ padding: '40px 18px', textAlign: 'center' }}>
+                <div style={{ fontSize: 34, marginBottom: 10 }}>🔎</div>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Nothing matched "{deferredQ}"</div>
+                <div style={{ fontSize: 12, color: C.muted }}>Try a different word or pick a tag above.</div>
+              </div>
+            )}
+          </React.Fragment>
+        )}
       </div>
     </Phone>
   );
@@ -793,4 +972,4 @@ function ArtistPage({ accent = C.pink }) {
   );
 }
 
-Object.assign(window, { ProfilePage, SubscriptionPage, FAQPage, PaywallLock, ArtistPage });
+Object.assign(window, { ProfilePage, SubscriptionPage, FAQPage, PaywallLock, ArtistPage, SearchPage });
