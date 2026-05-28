@@ -177,23 +177,148 @@ function Row({ icon, color, label, value, badge, onClick }) {
 }
 
 // ── SUBSCRIPTION PAGE ─────────────────────────────────────────
+// ── Subscription page — 1:1 port of the live miniapp flow ──────
+// Tiers PLUS / PRO / ELITE (ELITE = SOON, disabled); one monthly plan
+// (31 days). Payment methods: Card via Tribute / TG Stars / SBP via
+// Tribute / Crypto via Cryptocloud. Trial card up top calls
+// actionStartFreeTrial. After paid checkout the AppShell-level
+// startInvitePolling picks up the bot-issued group invite link.
+const TIER_PRICES = {
+  plus:  { eur: 6, stars: 500 },
+  pro:   { eur: 8, stars: 650 },
+  elite: { eur: 10, stars: 800 },
+};
 function SubscriptionPage({ accent = C.pink }) {
   const nav = window.useNav();
-  const [plan, setPlan] = React.useState('year');
-  const plans = [
-    { id: 'week',  title: '5 days FREE', price: '$0', sub: 'then $4.99/wk · cancel anytime', tag: 'TRY FREE', tagBg: C.lime, accent: C.lime },
-    { id: 'month', title: '1 Month',     price: '$8.99', sub: 'Billed monthly', tag: '', accent: accent },
-    { id: 'year',  title: '12 Months',   price: '$3.33', sub: '/mo · $39.99 billed yearly', tag: 'SAVE 63%', tagBg: accent, accent: accent, recommended: true },
-    { id: 'life',  title: 'Lifetime',    price: '$99', sub: 'One-time · all future content', tag: 'BEST', tagBg: C.purple, accent: C.purple },
-  ];
-  const perks = [
-    { ico: '🎬', label: 'Full catalog · 11 385 videos' },
-    { ico: '📸', label: '53 168 photos in HD' },
-    { ico: '⚡', label: 'Unlimited shorts feed' },
-    { ico: '⬇', label: 'Offline saves & playlists' },
-    { ico: '🚫', label: 'No ads · no rate limits' },
-    { ico: '🆕', label: 'Early access to new drops' },
-  ];
+  const userState = window.useUser();
+  const user = userState.data || {};
+  const isInsideTg = !!(window.isInsideTelegram && window.isInsideTelegram());
+  const hasAnySub = user.isPro;
+  const isInfiniteSub = user.isInfinite;
+
+  // Tier carousel state. ELITE is "SOON" and cannot be picked.
+  const [tier, setTier] = React.useState('plus');
+  // Payment method: 0=Card 1=Stars 2=SBP 3=Crypto
+  const [method, setMethod] = React.useState(0);
+  const [busy, setBusy] = React.useState(false);
+
+  // Promo: local-only ASMR2026 = +7 days note (matches live miniapp).
+  const [promo, setPromo] = React.useState('');
+  const [promoState, setPromoState] = React.useState(''); // 'ok' | 'bad' | ''
+  const applyPromo = () => {
+    const code = promo.trim().toUpperCase();
+    if (!code) { setPromoState('bad'); return; }
+    if (code === 'ASMR2026') { setPromoState('ok'); }
+    else { setPromoState('bad'); }
+  };
+
+  // Match live miniapp's per-tier Tribute URLs (provided via /miniapp/profile).
+  const tributeUrl = tier === 'pro'
+    ? (user.tributeProUrl || 'https://t.me/tribute/app?startapp=sT5D')
+    : (user.tributePlusUrl || 'https://t.me/tribute/app?startapp=sQSn');
+
+  const planDays = 31;
+  const tierMeta = {
+    plus:  { name: 'PLUS',  color: C.pink,   accent: C.pink,  gradient: 'linear-gradient(145deg,#1a0d1f,#260d1a)' },
+    pro:   { name: 'PRO',   color: '#00E5FF', accent: '#00E5FF', gradient: 'linear-gradient(145deg,#091820,#0d1f26)' },
+    elite: { name: 'ELITE', color: '#FFD700', accent: '#FFD700', gradient: 'linear-gradient(145deg,#1a1508,#261d08)' },
+  };
+  const cur = tierMeta[tier];
+  const price = TIER_PRICES[tier].eur;
+
+  const onPay = async () => {
+    if (busy) return;
+    // Preview-mode (outside Telegram): just flip Pro locally.
+    if (!isInsideTg) {
+      nav.setPro(true); nav.reset('home'); return;
+    }
+    setBusy(true);
+    try {
+      // ── Card / SBP via Tribute ──────────────────────────────
+      if (method === 0 || method === 2) {
+        const r = window.actionOpenTribute(tributeUrl,
+          (link) => {
+            // Bot issued the invite — pop the modal and reset caches.
+            nav.openInvite?.(link);
+            window.invalidate?.('user');
+            window.invalidate?.('my_invite');
+          },
+          () => { /* timeout — silent; user can re-open via bell */ },
+        );
+        if (!r.ok) { alert(r.message || 'Could not open Tribute'); return; }
+        // Drop back to home so the polling overlay isn't sitting on a
+        // dead subscription screen. The invite modal will surface when
+        // the bot finishes.
+        nav.reset('home');
+        return;
+      }
+      // ── TG Stars ────────────────────────────────────────────
+      if (method === 1) {
+        const r = await window.actionCreateStarsInvoice(planDays, tier);
+        if (!r.ok) { alert(r.message || 'Could not create Stars invoice'); return; }
+        const tg = window.Telegram?.WebApp;
+        if (tg && typeof tg.openInvoice === 'function') {
+          tg.openInvoice(r.invoice_link, (status) => {
+            if (status === 'paid') {
+              window.invalidate?.('user');
+              window.invalidate?.('my_invite');
+              // Bot issues invite via postback — poll for it.
+              window.startInvitePolling?.(
+                (link) => nav.openInvite?.(link),
+                () => {},
+              );
+              nav.reset('home');
+            } else if (status === 'failed') {
+              alert('❌ Payment failed');
+            } else if (status === 'cancelled') {
+              // user cancelled — no toast needed
+            }
+          });
+        } else if (tg?.openLink) {
+          tg.openLink(r.invoice_link);
+        }
+        return;
+      }
+      // ── Cryptocloud ─────────────────────────────────────────
+      if (method === 3) {
+        const r = await window.actionStartCryptoCheckout(tier);
+        if (!r.ok) { alert(r.message || 'Could not create crypto invoice'); return; }
+        // Open hosted Cryptocloud page in external browser/WebApp.
+        const tg = window.Telegram?.WebApp;
+        if (tg?.openLink) tg.openLink(r.pay_url);
+        else window.open(r.pay_url, '_blank', 'noopener');
+        // Start polling for the bot-issued invite link.
+        window.startInvitePolling?.(
+          (link) => nav.openInvite?.(link),
+          () => {},
+        );
+        nav.reset('home');
+        return;
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Free trial onClick — guarded by user.trialUsed (also enforced server-side).
+  const onTrial = async () => {
+    if (busy) return;
+    if (user.trialUsed) { alert('You\'ve already used your free trial.'); return; }
+    setBusy(true);
+    try {
+      if (!isInsideTg) { nav.setPro(true); nav.reset('home'); return; }
+      const r = await window.actionStartFreeTrial();
+      if (!r.ok) {
+        if (r.reason === 'trial-used') alert('You\'ve already used your free trial.');
+        else alert(r.message || 'Could not activate trial.');
+        return;
+      }
+      nav.reset('home');
+      if (r.invite_link) setTimeout(() => nav.openInvite?.(r.invite_link), 350);
+      window.invalidate?.('user');
+      window.invalidate?.('my_invite');
+    } finally { setBusy(false); }
+  };
 
   return (
     <Phone>
@@ -206,125 +331,224 @@ function SubscriptionPage({ accent = C.pink }) {
 
       <div style={SCROLL_BODY}>
         {/* Hero */}
-        <div style={{ padding: '20px 18px 8px', textAlign: 'center', position: 'relative' }}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            background: `${C.lime}22`, color: C.lime,
-            padding: '5px 12px', borderRadius: 999,
-            fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase',
-            marginBottom: 12,
-          }}><Ico.sparkle /> Unlock everything</div>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 44, letterSpacing: 1.5, lineHeight: 0.95 }}>
-            Go <span style={{ color: accent }}>PRO.</span>
+        <div style={{ padding: '20px 18px 4px', textAlign: 'center' }}>
+          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, letterSpacing: 1.5 }}>
+            {hasAnySub
+              ? <>You're <span style={{ color: accent }}>Subscribed</span></>
+              : <>Choose <span style={{ color: accent }}>Plan</span></>}
           </div>
-          <div style={{ fontSize: 13, color: C.muted2, marginTop: 8, lineHeight: 1.5, maxWidth: 280, margin: '8px auto 0' }}>
-            Every artist, every drop. First 5 days free, then it's yours.
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
+            {hasAnySub
+              ? (isInfiniteSub ? 'Lifetime access · everything unlocked' : `Current: ${user.daysLeft} days · max 60 total`)
+              : 'Cancel anytime · No auto-renewal'}
           </div>
         </div>
 
-        {/* Perks bento */}
-        <div style={{ padding: '16px 14px 6px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          {perks.map((p, i) => (
-            <div key={i} style={{
-              background: C.dark2, border: `1px solid ${C.border}`,
-              borderRadius: 12, padding: '10px 12px',
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              <span style={{ fontSize: 16 }}>{p.ico}</span>
-              <span style={{ fontSize: 11.5, fontWeight: 500, lineHeight: 1.3 }}>{p.label}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Plans */}
-        <div style={{ padding: '14px 14px 6px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {plans.map(p => {
-            const active = p.id === plan;
+        {/* Tier carousel — 3 cards horizontally scrollable, snap-to */}
+        <div style={{
+          display: 'flex', gap: 12, padding: '14px 14px 6px',
+          overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch',
+        }}>
+          {['plus','pro','elite'].map((id) => {
+            const t = tierMeta[id];
+            const isActive = id === tier;
+            const isSoon = id === 'elite';
+            const onTap = () => { if (!isSoon) setTier(id); };
             return (
-              <div key={p.id} onClick={() => setPlan(p.id)} style={{
+              <div key={id} onClick={onTap} style={{
+                flexShrink: 0, width: 220, scrollSnapAlign: 'center',
+                background: t.gradient,
+                border: `2px solid ${isActive ? t.color : C.border}`,
+                borderRadius: 18,
+                padding: '14px 14px 12px',
+                cursor: isSoon ? 'default' : 'pointer',
+                opacity: isSoon ? 0.65 : 1,
                 position: 'relative',
-                background: active ? `linear-gradient(110deg, ${p.accent}22, transparent 90%)` : C.dark2,
-                border: `1.5px solid ${active ? p.accent : C.border}`,
-                borderRadius: 16, padding: '12px 14px',
-                display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+                boxShadow: isActive ? `0 10px 28px ${t.color}33` : 'none',
+                transition: 'all 200ms',
               }}>
-                {/* radio */}
-                <div style={{
-                  width: 20, height: 20, borderRadius: '50%',
-                  border: `2px solid ${active ? p.accent : C.border2}`,
-                  background: active ? p.accent : 'transparent',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0,
-                }}>
-                  {active && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#000' }} />}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 14, fontWeight: 700 }}>{p.title}</span>
-                    {p.tag && <span style={{ background: p.tagBg, color: '#000', fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 999, letterSpacing: 0.4 }}>{p.tag}</span>}
+                {isSoon && (
+                  <div style={{
+                    position: 'absolute', top: 10, right: 10,
+                    background: t.color, color: '#000',
+                    fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 999, letterSpacing: 0.4,
+                  }}>SOON</div>
+                )}
+                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: t.color, letterSpacing: 1, lineHeight: 1 }}>{t.name}</div>
+                {!isSoon ? (
+                  <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, marginTop: 6, lineHeight: 1 }}>
+                    €{TIER_PRICES[id].eur} <span style={{ fontSize: 11, color: C.muted, fontWeight: 400 }}>/ mo</span>
                   </div>
-                  <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>{p.sub}</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: active ? p.accent : C.text, lineHeight: 1 }}>{p.price}</div>
+                ) : (
+                  <div style={{ fontSize: 11, marginTop: 6, color: 'rgba(255,215,0,0.6)' }}>privateleaks.tv</div>
+                )}
+                <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 5, fontSize: 11, color: 'rgba(255,255,255,0.78)' }}>
+                  {id === 'plus' && (<>
+                    <div>✅ All ASMR videos</div>
+                    <div>✅ Photo galleries</div>
+                    <div>✅ Favorites & playlists</div>
+                  </>)}
+                  {id === 'pro' && (<>
+                    <div>✅ Everything in PLUS</div>
+                    <div>📺 Stream VODs</div>
+                    <div>▶️ YouTube backups</div>
+                    <div>💎 PRO badge</div>
+                  </>)}
+                  {id === 'elite' && (<>
+                    <div>✅ Everything in PRO</div>
+                    <div>🌐 asmrleaks.tv + privateleaks.tv</div>
+                    <div>👑 ELITE badge</div>
+                  </>)}
                 </div>
               </div>
             );
           })}
         </div>
+        {/* Tier dots */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, padding: '4px 0 10px' }}>
+          {['plus','pro','elite'].map((id) => (
+            <span key={id} style={{
+              width: id === tier ? 18 : 6, height: 6, borderRadius: 999,
+              background: id === tier ? tierMeta[id].color : 'rgba(255,255,255,0.18)',
+              transition: 'all 200ms',
+            }} />
+          ))}
+        </div>
 
-        {/* CTA */}
-        <div style={{ padding: '14px 14px 8px' }}>
-          <button onClick={async () => {
-            // In Telegram → real action; outside Telegram → local toggle.
-            if (!(window.isInsideTelegram && window.isInsideTelegram())) {
-              nav.setPro(true); nav.reset('home'); return;
-            }
-            const res = plan === 'week'
-              ? await window.actionStartFreeTrial()
-              : await window.actionStartCryptoCheckout(plan);
-            if (!res.ok) {
-              console.warn('checkout failed:', res);
-              // The backend returns 409 if user.trial_used is True — we
-              // map it to a clear, untechnical message in actionStartFreeTrial.
-              if (res.reason === 'trial-used') {
-                alert('You\'ve already used your free trial.');
-              } else {
-                alert(res.message || 'Checkout unavailable. Try again.');
-              }
-              return;
-            }
-            if (plan === 'week') {
-              // Trial activated server-side. Bounce home and pop the
-              // invite modal so the user lands on their group link.
-              nav.reset('home');
-              if (res.invite_link) {
-                setTimeout(() => nav.openInvite?.(res.invite_link), 350);
-              }
-              // Invalidate caches so the new tier / days_left / invite show
-              // up immediately without a manual refresh.
-              window.invalidate?.('user');
-              window.invalidate?.('my_invite');
-            }
-            // For paid plans Cryptocloud opens external link; the invite
-            // modal will auto-pop on the user's next app open via
-            // actionCheckInvite() in AppShell.
-          }} style={{
-            width: '100%',
-            background: `linear-gradient(135deg, ${accent}, ${C.purple})`,
-            border: 'none', color: '#000',
-            padding: '16px', borderRadius: 16,
-            fontFamily: "'Bebas Neue', sans-serif",
-            fontSize: 18, letterSpacing: 1.2, cursor: 'pointer',
-            boxShadow: `0 8px 24px ${accent}44`,
-          }}>{plan === 'week' ? 'START 5-DAY FREE TRIAL →' : 'CONTINUE →'}</button>
-          <div style={{ textAlign: 'center', fontSize: 10, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>
-            Cancel anytime · No charge during trial · Powered by Tribute
+        {/* Free trial card */}
+        {!user.trialUsed && (
+          <div onClick={onTrial} style={{
+            margin: '4px 14px 10px',
+            background: 'rgba(204,255,68,0.07)',
+            border: '1px solid rgba(204,255,68,0.25)',
+            borderRadius: 12,
+            padding: '12px 14px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+            cursor: 'pointer',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 18 }}>🎁</span>
+              <div>
+                <div style={{ fontSize: 12.5, color: C.lime, fontWeight: 700 }}>New? Try 5 days free</div>
+                <div style={{ fontSize: 10.5, color: C.muted, marginTop: 2 }}>no card · cancel anytime</div>
+              </div>
+            </div>
+            <span style={{
+              background: C.lime, color: '#000',
+              padding: '6px 12px', borderRadius: 999,
+              fontSize: 10.5, fontWeight: 800, letterSpacing: 0.4,
+            }}>{busy ? '…' : 'Try free →'}</span>
+          </div>
+        )}
+
+        {/* Plan card — single 1-month option */}
+        <div style={{ padding: '4px 14px 6px' }}>
+          <div style={{
+            background: C.dark2, border: `1.5px solid ${cur.color}`,
+            borderRadius: 16, padding: '14px 14px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div>
+              <div style={{ fontSize: 9.5, color: cur.color, fontWeight: 800, letterSpacing: 0.7, textTransform: 'uppercase' }}>Most popular</div>
+              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, marginTop: 2, lineHeight: 1 }}>1 Month</div>
+              <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>€{(price/planDays).toFixed(2)}/day · ⭐ {TIER_PRICES[tier].stars} Stars</div>
+            </div>
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 30, color: cur.color, lineHeight: 1 }}>
+              €{price}
+            </div>
           </div>
         </div>
 
-        <div style={{ padding: '4px 14px 16px', textAlign: 'center', fontSize: 11, color: C.muted }}>
-          <span style={{ color: C.text, fontWeight: 600 }}>Restore purchase</span> · Terms · Privacy
+        {/* Payment method section */}
+        <div style={{ padding: '14px 14px 6px' }}>
+          <div style={{ fontSize: 9.5, color: C.muted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Payment method</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {[
+              { i: 0, icon: '💳', name: 'Card',     desc: 'via Tribute' },
+              { i: 1, icon: '⭐', name: 'TG Stars', desc: 'Telegram Stars' },
+              { i: 2, icon: '🏦', name: 'СБП',      desc: 'Russian banks · Tribute' },
+              { i: 3, icon: '₿',  name: 'Crypto',   desc: 'USDT · TON · BTC · ETH' },
+            ].map((m) => {
+              const active = method === m.i;
+              return (
+                <div key={m.i} onClick={() => setMethod(m.i)} style={{
+                  background: active ? `${cur.color}14` : C.dark2,
+                  border: `1.5px solid ${active ? cur.color : C.border}`,
+                  borderRadius: 12, padding: '10px 12px',
+                  display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+                }}>
+                  <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>{m.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>{m.name}</div>
+                    <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{m.desc}</div>
+                  </div>
+                  <span style={{
+                    width: 18, height: 18, borderRadius: '50%',
+                    border: `2px solid ${active ? cur.color : C.border2}`,
+                    background: active ? cur.color : 'transparent',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {active && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#000' }} />}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Promo code */}
+        <div style={{ padding: '12px 14px 4px' }}>
+          <div style={{ fontSize: 9.5, color: C.muted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Promo code</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              value={promo}
+              onChange={(e) => { setPromo(e.target.value.toUpperCase()); setPromoState(''); }}
+              placeholder="Enter promo code"
+              style={{
+                flex: 1, minWidth: 0,
+                background: C.dark2,
+                border: `1px solid ${promoState === 'ok' ? C.lime : promoState === 'bad' ? '#FF6B6B' : C.border}`,
+                color: C.text, padding: '11px 12px', borderRadius: 12,
+                fontSize: 13, outline: 'none', fontFamily: 'inherit',
+              }}
+            />
+            <button onClick={applyPromo} style={{
+              background: 'transparent', color: accent,
+              border: `1px solid ${accent}55`, borderRadius: 12,
+              padding: '0 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}>Apply</button>
+          </div>
+          {promoState === 'ok' && (
+            <div style={{ fontSize: 11, color: C.lime, marginTop: 6 }}>🎉 Promo applied · +7 days bonus</div>
+          )}
+          {promoState === 'bad' && (
+            <div style={{ fontSize: 11, color: '#FF6B6B', marginTop: 6 }}>❌ Invalid promo code</div>
+          )}
+        </div>
+
+        {/* Pay CTA */}
+        <div style={{ padding: '16px 14px 8px' }}>
+          <button onClick={onPay} disabled={busy} style={{
+            width: '100%',
+            background: busy ? 'rgba(255,255,255,0.08)'
+                            : `linear-gradient(135deg, ${cur.color}, ${C.purple})`,
+            color: busy ? C.muted2 : '#000',
+            border: 'none', padding: '16px', borderRadius: 16,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 17, letterSpacing: 1.2,
+            cursor: busy ? 'default' : 'pointer',
+            boxShadow: busy ? 'none' : `0 8px 24px ${cur.color}44`,
+          }}>
+            {busy ? 'PROCESSING…' : `SUBSCRIBE — ${cur.name} €${price}/MO →`}
+          </button>
+          <div style={{ textAlign: 'center', fontSize: 10, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>
+            Cancel anytime · No auto-renewal · Powered by Tribute / Cryptocloud
+          </div>
+        </div>
+
+        <div style={{ padding: '4px 14px 24px', textAlign: 'center', fontSize: 11, color: C.muted }}>
+          Terms · Privacy
         </div>
       </div>
     </Phone>

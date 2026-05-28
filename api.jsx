@@ -958,20 +958,83 @@ async function actionFollow(artistName) {
   return p;
 }
 
-async function actionStartCryptoCheckout(plan = 'year') {
+// Cryptocloud checkout — backend wants { initData, tier } where tier is
+// 'plus'|'pro'|'elite' (matches CRYPTO_USDT_PRICES dict in webhook.py).
+// Returns { pay_url, order_id }. We don't open the link here so callers
+// can run their own UX (modal "waiting for confirmation" etc).
+async function actionStartCryptoCheckout(tier = 'plus') {
   const initData = getInitData();
   if (!initData) {
     return { ok: false, reason: 'no-tg', message: 'Open from Telegram to subscribe' };
   }
   try {
-    const data = await apiPost('/miniapp/cryptocloud/checkout', { initData, plan });
-    if (data.link) {
-      // Open Cryptocloud hosted checkout — Telegram WebApp supports openLink.
-      window.Telegram?.WebApp?.openLink?.(data.link) || window.open(data.link, '_blank');
-      return { ok: true, link: data.link };
+    const data = await apiPost('/miniapp/cryptocloud/checkout', { initData, tier });
+    if (data.pay_url) {
+      return { ok: true, pay_url: data.pay_url, order_id: data.order_id };
     }
-    return { ok: false, error: 'no checkout link' };
-  } catch (e) { return { ok: false, error: e.message }; }
+    return { ok: false, error: data.error || 'no checkout link', message: data.error || 'Could not create invoice' };
+  } catch (e) {
+    return { ok: false, error: e.message, message: 'Could not create invoice. Try again.' };
+  }
+}
+
+// Telegram Stars invoice — POST /miniapp/create_stars_invoice
+// { initData, days, tier } → { invoice_link }. Caller passes the
+// resulting link to tg.openInvoice for the in-Telegram payment flow.
+async function actionCreateStarsInvoice(days = 31, tier = 'plus') {
+  const initData = getInitData();
+  if (!initData) {
+    return { ok: false, reason: 'no-tg', message: 'Open from Telegram to subscribe' };
+  }
+  try {
+    const data = await apiPost('/miniapp/create_stars_invoice', { initData, days, tier });
+    if (data.invoice_link) return { ok: true, invoice_link: data.invoice_link };
+    return { ok: false, error: data.error || 'no invoice', message: data.error || 'Could not create invoice' };
+  } catch (e) {
+    return { ok: false, error: e.message, message: 'Could not create Stars invoice. Try again.' };
+  }
+}
+
+// Tribute checkout — pure client-side: just open the bot-provided URL
+// (per-tier) in Telegram and start polling /miniapp/check_invite so the
+// invite modal pops the moment the bot issues the access link.
+function actionOpenTribute(url, onLink, onTimeout) {
+  if (!url) return { ok: false, message: 'No Tribute URL configured' };
+  const tg = window.Telegram?.WebApp;
+  try {
+    if (tg && typeof tg.openLink === 'function') tg.openLink(url);
+    else window.open(url, '_blank', 'noopener');
+  } catch (_) {
+    window.open(url, '_blank', 'noopener');
+  }
+  startInvitePolling(onLink, onTimeout);
+  return { ok: true };
+}
+
+// 5s polling against /miniapp/check_invite for up to ~6 minutes — the
+// same cadence as the live miniapp. Calls onLink(link) once the bot has
+// issued the invite (Tribute postback verified the payment), or
+// onTimeout() if we never get a link.
+let _invitePollerId = null;
+function startInvitePolling(onLink, onTimeout) {
+  if (_invitePollerId) return;
+  let tries = 0;
+  _invitePollerId = setInterval(async () => {
+    tries++;
+    if (tries > 72) {            // 72 × 5s ≈ 6 min
+      stopInvitePolling();
+      onTimeout && onTimeout();
+      return;
+    }
+    const res = await actionCheckInvite();
+    if (res?.invite_link) {
+      stopInvitePolling();
+      onLink && onLink(res.invite_link);
+    }
+  }, 5000);
+}
+function stopInvitePolling() {
+  if (_invitePollerId) { clearInterval(_invitePollerId); _invitePollerId = null; }
 }
 
 // View counter — fired after the user has watched at least 10s of content.
@@ -1050,7 +1113,7 @@ Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
   useVideos, useVideo, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, userFromTelegram,
-  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionStartCryptoCheckout, actionStartFreeTrial, actionCheckInvite,
+  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionStartCryptoCheckout, actionStartFreeTrial, actionCheckInvite, actionCreateStarsInvoice, actionOpenTribute, startInvitePolling, stopInvitePolling,
   actionCreatePlaylist, actionAddToPlaylist, actionRemoveFromPlaylist, actionDeletePlaylist,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded
