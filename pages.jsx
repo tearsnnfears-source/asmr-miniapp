@@ -100,14 +100,23 @@ function ProfilePage({ accent = C.pink }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ fontSize: 10, color: tierColor, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' }}>Active plan</div>
+                {/* Tier + days. The previous "· LIFETIME" copy was misleading
+                    because our isInfinite heuristic flips true whenever
+                    daysLeft===0 — show plain tier in that case instead. */}
                 <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, color: tierColor, letterSpacing: 1, lineHeight: 1, marginTop: 4 }}>
-                  {tier.toUpperCase()} · {user.isInfinite ? 'lifetime' : `${user.daysLeft} days`}
+                  {tier.toUpperCase()}{user.daysLeft > 0 ? ` · ${user.daysLeft} days` : ''}
                 </div>
-                <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{user.isInfinite ? 'Permanent access' : 'Renews soon · Tribute'}</div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+                  {user.daysLeft > 0 ? 'Subscription active' : 'Subscription inactive'}
+                </div>
               </div>
-              <button onClick={() => nav.go('subscription')} style={{ background: 'transparent', border: `1px solid ${tierColor}`, color: tierColor, padding: '7px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>Manage</button>
+              {/* Hide Manage when there are real days left — we don't want
+                  the user to accidentally re-buy on top of an active sub. */}
+              {!(user.daysLeft > 0) && (
+                <button onClick={() => nav.go('subscription')} style={{ background: 'transparent', border: `1px solid ${tierColor}`, color: tierColor, padding: '7px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>Manage</button>
+              )}
             </div>
-            {!user.isInfinite && (
+            {user.daysLeft > 0 && (
               <div style={{ height: 4, marginTop: 12, background: 'rgba(255,255,255,0.08)', borderRadius: 2 }}>
                 <div style={{ width: `${Math.min(100, (user.daysLeft || 0) * 3)}%`, height: '100%', background: tierColor, borderRadius: 2 }} />
               </div>
