@@ -18,7 +18,12 @@ function ProfilePage({ accent = C.pink }) {
   const followingCount = (followState.data?.artists || []).length;
   const stats = [
     user.isPro
-      ? { val: String(user.daysLeft || 0), unit: 'd', label: 'Days left' }
+      // Lifetime accounts (bot marker: units > 9000) read as a string,
+      // not a number with a 'd' suffix — '9936d' looked like a finite
+      // count and was misleading.
+      ? (user.daysLeft > 9000
+          ? { val: 'Lifetime', label: 'Access' }
+          : { val: String(user.daysLeft || 0), unit: 'd', label: 'Days left' })
       : { val: 'Free', label: 'Plan' },
     { val: String(savedCount), label: 'Saved' },
     { val: String(followingCount), label: 'Following' },

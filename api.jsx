@@ -345,12 +345,25 @@ function useVideos(limit = 500) {
 // Use this on Home so the first paint isn't blocked on the entire DB.
 // items grows as the user taps Load more; hasMore goes false once a page
 // returns < pageSize rows.
+//
+// State is preserved at module level keyed by pageSize, so when the
+// user nav.back()s into Home from VideoPage / ArtistPage / etc the
+// list reappears instantly instead of replaying the initial fetch.
+// Re-fetch on a real refresh (page reload) is intentional — module
+// scope dies with the tab.
+const _paginatedVideosCache = new Map();
 function usePaginatedVideos(pageSize = 30) {
-  const [items, setItems]   = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
-  const [hasMore, setHasMore] = React.useState(true);
-  const [error, setError]   = React.useState(null);
+  const cached = _paginatedVideosCache.get(pageSize);
+  const [items, setItems]     = React.useState(cached?.items   || []);
+  const [hasMore, setHasMore] = React.useState(cached?.hasMore ?? true);
+  const [loading, setLoading] = React.useState(!cached);
+  const [error, setError]     = React.useState(null);
   const inflight = React.useRef(false);
+
+  // Sync local → module cache so the next mount sees them.
+  React.useEffect(() => {
+    _paginatedVideosCache.set(pageSize, { items, hasMore });
+  }, [pageSize, items, hasMore]);
 
   const fetchPage = React.useCallback(async (offset) => {
     if (inflight.current) return;
@@ -370,8 +383,13 @@ function usePaginatedVideos(pageSize = 30) {
     }
   }, [pageSize]);
 
-  // First page on mount. Empty deps so it only fires once.
-  React.useEffect(() => { fetchPage(0); /* eslint-disable-next-line */ }, []);
+  // Only fetch the first page when the module cache is empty. If we
+  // hydrated from cache, skip the round-trip entirely — items are
+  // already there.
+  React.useEffect(() => {
+    if (!cached) fetchPage(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadMore = React.useCallback(() => {
     if (!hasMore || loading) return;
