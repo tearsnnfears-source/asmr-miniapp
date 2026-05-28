@@ -832,10 +832,14 @@ function useUser() {
                  : (typeof rawDays === 'string' && !isNaN(+rawDays) ? +rawDays : 0);
       const INFINITE_THRESHOLD = 9000;
       const tier = (p.tier || 'free').toLowerCase();
-      // A user is "PRO" if they have remaining days OR a non-free tier
-      // (covers lifetime users where days_left isn't returned).
-      const knownTiers = ['plus', 'pro', 'elite', 'vip', 'founder'];
-      const isPro = days > 0 || knownTiers.includes(tier);
+      // A user is "PRO" only when they actually have remaining days.
+      // We don't infer Pro from a non-free tier any more — the tier
+      // column lingers in the DB after a subscription expires, which
+      // would otherwise leave free users with a PLUS badge AND a green
+      // gate through to premium content (where /content/play correctly
+      // 403s and shows "Open from Telegram"). Lifetime users are still
+      // covered: the bot writes a huge units value for them, so days>0.
+      const isPro = days > 0;
       return {
         name: p.full_name || tgFallback.name,
         username: (p.username || tgFallback.username || '').replace(/^@/, ''),
@@ -843,7 +847,11 @@ function useUser() {
         photo: tgFallback.photo, // server doesn't ship it; use Telegram's
         daysLeft: days,
         isPro,
-        isInfinite: days > INFINITE_THRESHOLD || (isPro && days === 0),
+        // Only flip the ∞ flag for genuine lifetime accounts (big units).
+        // The previous "(isPro && days===0)" branch made every 0-day Pro
+        // user look like lifetime, which is what showed PLUS ∞ for an
+        // expired sub.
+        isInfinite: days > INFINITE_THRESHOLD,
         trialUsed: !!p.trial_used,
         tier,
         badges: Array.isArray(p.badges) ? p.badges : (p.badge ? p.badge.split(',').map(s => s.trim()).filter(Boolean) : []),

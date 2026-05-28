@@ -178,8 +178,12 @@ function AppHeader({ user: userProp, accent = C.pink }) {
   const tier = (user.tier || 'free').toLowerCase();
   const tierColor = TIER_COLORS[tier] || accent;
   const daysLabel = user.isInfinite ? '∞' : (user.daysLeft || 0);
-  const showTier = !userLoading && (user.isPro || (tier && tier !== 'free'));
-  const showFree = !userLoading && !user.isPro && tier === 'free';
+  // Tier badge only when the user actually has access (days>0 or
+  // lifetime). The previous fallback on `tier !== 'free'` left expired
+  // subscribers wearing their last tier badge — which conflicts with
+  // the gated /content/play behaviour on the backend.
+  const showTier = !userLoading && user.isPro;
+  const showFree = !userLoading && !user.isPro;
   return (
     <div style={{
       padding: '8px 14px 10px',
