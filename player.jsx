@@ -67,7 +67,19 @@ async function prefetchPlayable(ids, concurrency = 3) {
     while (queue.length) {
       const id = queue.shift();
       if (id == null) continue;
-      try { await fetchPlayableContent(id); } catch (_) {}
+      try {
+        const { url } = await fetchPlayableContent(id);
+        // Touch the playable URL so the browser warms its HTTP cache
+        // (mostly the HLS manifest). When the user actually taps a
+        // tile, the new VideoPlayer instance asks for the same URL and
+        // gets it from disk instead of a fresh CDN round-trip. Don't
+        // await — fire-and-forget. range=0-0 keeps the body tiny.
+        if (url) {
+          try {
+            fetch(url, { method: 'GET', headers: { Range: 'bytes=0-0' }, cache: 'force-cache' }).catch(() => {});
+          } catch (_) {}
+        }
+      } catch (_) {}
     }
   });
   await Promise.all(workers);

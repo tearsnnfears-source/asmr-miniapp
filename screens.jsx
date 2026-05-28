@@ -332,6 +332,19 @@ function ShortsPlayer({ accent = C.pink, allShorts, order, items, pos, setPos, o
   const liveArtist = (artistsState.data || []).find(a => a.name === s?.artist?.name);
   const enrichedArtist = liveArtist ? { ...s?.artist, photo: liveArtist.photo, profilePhoto: liveArtist.profilePhoto } : s?.artist;
 
+  // Prefetch the next 2 shorts whenever the user lands on a new one
+  // so a swipe up doesn't replay the manifest + first-segment fetch.
+  // fetchPlayableContent dedupes via _playableCache so repeats are free.
+  React.useEffect(() => {
+    if (!list.length) return;
+    const ahead = [list[idx + 1], list[idx + 2]]
+      .map(x => x?.raw?.id ?? x?.id)
+      .filter(x => x != null);
+    if (ahead.length && window.prefetchPlayable) {
+      window.prefetchPlayable(ahead, 2);
+    }
+  }, [idx, list]);
+
   // Hooks must run unconditionally — handle the "no short" branch later.
   const contentId = s?.raw?.id ?? s?.id;
   const reactionsState = window.useReactions(contentId);
@@ -454,8 +467,10 @@ function ShortsPlayer({ accent = C.pink, allShorts, order, items, pos, setPos, o
         {/* Bottom scrim for readable overlay text */}
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, transparent 25%, transparent 55%, rgba(0,0,0,0.85) 100%)', pointerEvents: 'none' }} />
 
-        {/* top row: back + counter */}
-        <div style={{ position: 'absolute', top: 'calc(12px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))', left: 12, right: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        {/* top row: back + counter. 4px gap under the Telegram chrome
+            inset so the controls hug the top without overlapping the
+            close cluster. */}
+        <div style={{ position: 'absolute', top: 'calc(4px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))', left: 12, right: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <button onClick={() => onClose && onClose()} style={{
             width: 36, height: 36, borderRadius: '50%',
             background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
