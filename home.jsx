@@ -123,25 +123,29 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
         </div>
 
         {/* Category pills — tap to open Search pre-filled with that tag.
-            Source is /miniapp/tags via useTags(); CATEGORIES is just the
-            fallback for offline preview. */}
+            Source is /miniapp/tags via useTags(); backend sorts by video
+            count DESC so the most popular tag is first. CATEGORIES is
+            just the offline-preview fallback. */}
         <div style={{ padding: '12px 14px 4px' }}>
           <SectionHeader title="Browse" accent={accent} action="" />
         </div>
         <div style={{ display: 'flex', gap: 10, padding: '8px 14px 4px', overflowX: 'auto' }}>
-          {(window.useTags().data || CATEGORIES).slice(0,8).map((c, i) => (
+          {(window.useTags().data || CATEGORIES).slice(0, 10).map((c, i) => (
             <div key={c.id} onClick={() => nav.go('search', { q: c.label })} style={{
               flexShrink: 0,
-              width: 72, height: 72, borderRadius: 16,
+              width: 82, height: 82, borderRadius: 16,
               background: i % 2 === 0
                 ? `linear-gradient(135deg, ${accent}30, ${C.purple}20)`
                 : `linear-gradient(135deg, ${C.lime}30, ${C.blue}20)`,
               border: `1px solid ${C.border2}`,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
               cursor: 'pointer',
             }}>
-              <div style={{ fontSize: 24, color: i % 2 === 0 ? accent : C.lime, fontWeight: 700 }}>{c.icon}</div>
-              <div style={{ fontSize: 10, fontWeight: 600 }}>{c.label}</div>
+              <div style={{ fontSize: 22, color: i % 2 === 0 ? accent : C.lime, fontWeight: 700, lineHeight: 1 }}>{c.icon}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.3, textAlign: 'center', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 4px' }}>{c.label}</div>
+              {typeof c.count === 'number' && c.count > 0 && (
+                <div style={{ fontSize: 9, color: C.muted, fontWeight: 600 }}>{c.count}</div>
+              )}
             </div>
           ))}
         </div>

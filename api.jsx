@@ -456,11 +456,15 @@ function useTags() {
       const data = await apiGet('/miniapp/tags');
       const tags = data.tags || data || [];
       if (!Array.isArray(tags) || !tags.length) throw new Error('empty tags');
+      // Backend already sorts by count DESC — keep that order so the most
+      // popular tag (e.g. Licking) lands first.
       const icons = ['◐','◑','◒','◓','◔','◕','◗','◘'];
-      return tags.slice(0, 8).map((t, i) => ({
-        id: (t.id || t.name || t).toString().toLowerCase(),
+      return tags.map((t, i) => ({
+        id:    (t.id || t.name || t).toString().toLowerCase(),
         label: t.name || t.label || t,
-        icon: icons[i] || '◐',
+        count: typeof t.count === 'number' ? t.count : 0,
+        color: t.color || null,
+        icon:  icons[i % icons.length],
       }));
     },
     window.CATEGORIES || [],
