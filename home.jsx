@@ -96,25 +96,80 @@ function FeedCard({ v, accent, density, featured }) {
 // with Load more taps. No more static slice / mixed FeedCard sandwich.
 function HomeV2({ accent = C.pink, density = 'comfortable' }) {
   const nav = window.useNav();
-  // 60 rows covers the first three Load-more clicks comfortably without
-  // blocking first paint on the 500-row response.
-  const videosState = window.useVideos(60);
-  const videos = videosState.data || [];
+  // 30 rows give a fast first paint while we wait for the full catalog
+  // (500 rows ≈ 10–12s on Railway). Both are warmed by AppShell, so we
+  // just read from cache here. Once the bigger payload lands we upgrade
+  // `videos` in place; the hero stays the same since both lists share
+  // newest-first ordering.
+  const liteState = window.useVideos(30);
+  const fullState = window.useVideos(500);
+  const videos = (fullState.data && fullState.data.length) ? fullState.data : (liteState.data || []);
   const hero = videos[0];
 
-  // Personalised order — shuffle the catalog tail so two opens of the
-  // app don't show the same For-You sequence. Stable per render via
-  // useMemo + videos.length as a cheap key.
+  // Personalisation signals — only relevant for Pro users with some
+  // history. We don't gate the personalisation by isPro itself; the
+  // followed / liked lookups are no-ops outside Telegram anyway.
+  const followsState = window.useFollows();
+  const favState = window.useFavorites();
+
+  // For-you feed:
+  //   · Pro w/ follows → 60% videos from followed artists, 40% shuffled
+  //     rest. Mixed by an alternating zip so the rail still feels
+  //     varied rather than chunked.
+  //   · Pro w/ favorites only → boost artists from liked videos (same
+  //     mechanic but the priming set comes from saves).
+  //   · Otherwise (Pro w/ no signals OR Free user) → straight shuffle
+  //     from the full catalog. Free users get the same surface — they
+  //     can't actually open anything (gate kicks in), but the variety
+  //     helps the upsell.
+  // useMemo keys on the source-list length + signal set sizes so the
+  // shuffle is stable within a single Home open. A fresh open
+  // reshuffles.
   const feed = React.useMemo(() => {
     const tail = videos.slice(1);
     if (tail.length <= 1) return tail;
-    const out = tail.slice();
-    for (let i = out.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [out[i], out[j]] = [out[j], out[i]];
+    const shuffle = (arr) => {
+      const out = arr.slice();
+      for (let i = out.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [out[i], out[j]] = [out[j], out[i]];
+      }
+      return out;
+    };
+
+    // Collect names of artists the user has signalled affinity for.
+    const followedNames = new Set((followsState.data?.artists || []).map(a => a.name));
+    const likedNames = new Set();
+    for (const v of (favState.data?.videos || [])) {
+      if (v.artist?.name) likedNames.add(v.artist.name);
+    }
+    const signalNames = followedNames.size ? followedNames
+                       : likedNames.size    ? likedNames
+                       : null;
+
+    if (!signalNames) return shuffle(tail);
+
+    // Split tail into hits (from signal artists) and rest, shuffle each
+    // half independently, then interleave 3:2 so the rail feels like a
+    // mix instead of a wall of one creator.
+    const hits = [], rest = [];
+    for (const v of tail) {
+      if (signalNames.has(v.artist?.name)) hits.push(v);
+      else rest.push(v);
+    }
+    if (!hits.length) return shuffle(rest);
+    if (!rest.length) return shuffle(hits);
+    const sHits = shuffle(hits);
+    const sRest = shuffle(rest);
+    // Interleave: 3 hits, 2 rest, repeat. Roughly 60/40.
+    const out = [];
+    let hi = 0, ri = 0;
+    while (hi < sHits.length || ri < sRest.length) {
+      for (let k = 0; k < 3 && hi < sHits.length; k++) out.push(sHits[hi++]);
+      for (let k = 0; k < 2 && ri < sRest.length; k++) out.push(sRest[ri++]);
     }
     return out;
-  }, [videos.length]);
+  }, [videos.length, followsState.data?.artists?.length, favState.data?.videos?.length]);
 
   const [visible, setVisible] = React.useState(8);
   const shown = feed.slice(0, visible);

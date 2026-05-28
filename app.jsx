@@ -79,12 +79,18 @@ function AppShell() {
   // demand via useVideo(id) (GET /miniapp/video/{id}), so the catalog can
   // be unlimited without slowing down launch.
   window.useVideos(30);
+  // Full catalog warmed in the background — the shuffled "For you" feed
+  // on Home wants a 500-row pool so free users get variety instead of
+  // the latest 60 on loop. ~10-12s on Railway; splash doesn't wait for
+  // it (only :30 is gating), so this is cost-free in perceived load.
+  window.useVideos(500);
   // Must match SHORTS_LIMIT in screens.jsx — otherwise ShortsTab and the warm
   // cache would have different keys and the player would index into the wrong
   // array.
   const shortsState = window.useShorts(300);
   const artistsState = window.useArtists();
   window.useFavorites();
+  window.useFollows();
 
   // Prefetch playable URLs for the first batch of shorts so tile previews
   // come up almost instantly when the user opens the Shorts tab.
