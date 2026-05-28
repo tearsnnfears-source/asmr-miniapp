@@ -587,23 +587,23 @@ function SubscriptionPage({ accent = C.pink }) {
           </div>
         </div>
 
-        <div style={{ padding: '4px 14px 24px', textAlign: 'center', fontSize: 11, color: C.muted }}>
-          Terms · Privacy
-        </div>
       </div>
     </Phone>
   );
 }
 
 // ── FAQ PAGE ──────────────────────────────────────────────────
+// Q&A copied from the live miniapp so answers stay consistent across
+// both versions. If you change the live FAQ, mirror it here.
 const FAQ_ITEMS = [
-  { q: 'How do I cancel my subscription?', a: 'Go to Profile → Active plan → Manage. Cancel anytime — you keep access until the period ends.' },
-  { q: 'Can I download videos?', a: 'PRO subscribers can save unlimited videos and photos for offline viewing on iOS and Android.' },
-  { q: 'What payment methods do you accept?', a: 'We use Tribute — cards, Apple Pay, Google Pay, and crypto. Trial requires no card.' },
-  { q: 'How often is new content added?', a: '20–40 new videos and 500+ photos every week. Subscribe to artists for instant drop notifications.' },
-  { q: 'Is my data safe?', a: 'We never share your Telegram ID with creators. Your activity is private and end-to-end encrypted.' },
-  { q: 'Can I request specific artists?', a: 'Yes — drop a request via Support. We add 2–3 new artists per month based on votes.' },
+  { q: 'How do I access the group?', a: "After subscribing, you'll receive an invite link automatically. Just click it to join." },
+  { q: 'Does it auto-renew?',         a: 'Yes! Your subscription will automatically renew on the day it expires. You can cancel anytime.' },
+  { q: 'Can I try for free?',         a: 'Yes! New users get 5 free days. Just tap "Try Free" in the main menu.' },
+  { q: 'I paid but no access?',       a: 'Contact support — we usually fix it within minutes.' },
 ];
+// Telegram handle for the support chat — same one the live miniapp
+// uses (openTelegramChat('sonnnnnua') → https://t.me/sonnnnnua).
+const SUPPORT_TG_USERNAME = 'sonnnnnua';
 function FAQPage({ accent = C.pink }) {
   const nav = window.useNav();
   const [open, setOpen] = React.useState(0);
@@ -620,32 +620,6 @@ function FAQPage({ accent = C.pink }) {
             How can we <span style={{ color: accent }}>help?</span>
           </div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Most answers live here · still stuck? Ping support below.</div>
-        </div>
-
-        {/* Quick search */}
-        <div style={{ padding: '14px 14px 6px' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: C.dark2, border: `1px solid ${C.border}`,
-            borderRadius: 12, padding: '11px 12px',
-          }}>
-            <span style={{ color: C.muted }}><Ico.search /></span>
-            <input placeholder="Search…" style={{ flex: 1, background: 'transparent', border: 'none', color: C.text, fontSize: 13, outline: 'none', fontFamily: 'inherit' }}/>
-          </div>
-        </div>
-
-        {/* Quick categories */}
-        <div style={{ padding: '8px 14px 4px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-          {[
-            { ico: '💳', label: 'Billing' },
-            { ico: '🎬', label: 'Content' },
-            { ico: '⚙️', label: 'Account' },
-          ].map((c, i) => (
-            <div key={i} style={{ background: C.dark2, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 8px', textAlign: 'center', cursor: 'pointer' }}>
-              <div style={{ fontSize: 22 }}>{c.ico}</div>
-              <div style={{ fontSize: 11, fontWeight: 600, marginTop: 6 }}>{c.label}</div>
-            </div>
-          ))}
         </div>
 
         {/* Accordion */}
@@ -689,10 +663,18 @@ function FAQPage({ accent = C.pink }) {
               <div style={{ fontSize: 13, fontWeight: 700 }}>Still need help?</div>
               <div style={{ fontSize: 11, color: C.muted2, marginTop: 4 }}>Avg reply in 2 hours · 24/7</div>
             </div>
-            <button style={{
+            <button onClick={() => {
+              // Open support chat in Telegram. Same handle as the live miniapp.
+              const url = `https://t.me/${SUPPORT_TG_USERNAME}`;
+              const tg = window.Telegram?.WebApp;
+              if (tg && typeof tg.openTelegramLink === 'function') tg.openTelegramLink(url);
+              else if (tg && typeof tg.openLink === 'function') tg.openLink(url);
+              else window.open(url, '_blank', 'noopener');
+            }} style={{
               background: accent, color: '#000', border: 'none',
               padding: '9px 14px', borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: 'pointer',
               display: 'inline-flex', alignItems: 'center', gap: 6,
+              fontFamily: 'inherit',
             }}>💬 Chat</button>
           </div>
         </div>
