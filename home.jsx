@@ -96,15 +96,11 @@ function FeedCard({ v, accent, density, featured }) {
 // with Load more taps. No more static slice / mixed FeedCard sandwich.
 function HomeV2({ accent = C.pink, density = 'comfortable' }) {
   const nav = window.useNav();
-  // 30 rows give a fast first paint while we wait for the full catalog
-  // (10000 is an effective "all videos" cap — DB has nowhere near).
-  // Both are warmed by AppShell so we just read from cache. Once the
-  // bigger payload lands we upgrade `videos` in place; the hero stays
-  // the same since both lists share newest-first ordering. Backend
-  // /miniapp/videos now also filters out rows tagged 'shorts'.
-  const liteState = window.useVideos(30);
-  const fullState = window.useVideos(10000);
-  const videos = (fullState.data && fullState.data.length) ? fullState.data : (liteState.data || []);
+  // Incremental pagination — first page (30 rows) lands fast, the rest
+  // streams in only when the user actually taps Load more. Bye-bye the
+  // 10s+ wait that the previous useVideos(10000) caused.
+  const videosPage = window.usePaginatedVideos(30);
+  const videos = videosPage.items;
   const hero = videos[0];
 
   // Personalisation signals — only relevant for Pro users with some
@@ -253,14 +249,34 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
         <div style={{ padding: '6px 14px 8px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           {shown.map(v => <CompactRow key={v.id} v={v} accent={accent} />)}
         </div>
-        {feed.length > visible && (
+        {/* Load more drives two phases:
+              · if visible < feed.length → just reveal next 8 from the
+                pages we already fetched (no network).
+              · if visible >= feed.length → tell the paginator to fetch
+                the next page, which will repopulate `feed` via the
+                useMemo above and the next render exposes the new rows. */}
+        {(feed.length > visible || videosPage.hasMore) && (
           <div style={{ padding: '4px 14px 18px' }}>
-            <button onClick={() => setVisible(n => n + 8)} style={{
-              width: '100%', background: 'transparent', color: accent,
-              border: `1px solid ${accent}55`, borderRadius: 12,
-              padding: '12px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}>Load more ({feed.length - visible} left)</button>
+            <button
+              disabled={videosPage.loading}
+              onClick={() => {
+                if (feed.length > visible) setVisible(n => n + 8);
+                else videosPage.loadMore();
+              }}
+              style={{
+                width: '100%', background: 'transparent', color: accent,
+                border: `1px solid ${accent}55`, borderRadius: 12,
+                padding: '12px', fontSize: 13, fontWeight: 700,
+                cursor: videosPage.loading ? 'default' : 'pointer',
+                opacity: videosPage.loading ? 0.5 : 1,
+                fontFamily: 'inherit',
+              }}>
+              {videosPage.loading
+                ? 'Loading…'
+                : feed.length > visible
+                  ? `Load more (${feed.length - visible} left)`
+                  : 'Load more'}
+            </button>
           </div>
         )}
       </div>

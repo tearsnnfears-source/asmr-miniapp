@@ -611,14 +611,14 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
         <div style={{ width: 36 }} />
       </div>
 
-      <VideoPageBody v={v} queueRest={queueRest} recItems={recOrFallback} accent={accent} queue={queue} queueIdx={queueIdx} />
+      <VideoPageBody v={v} queueRest={queueRest} recItems={recOrFallback} recLoading={recState.loading && !recItems.length} accent={accent} queue={queue} queueIdx={queueIdx} />
     </Phone>
   );
 }
 
 // Body extracted so it can use hooks on `v.id` cleanly without making the
 // outer fallback resolution noisy. Re-mounts when v.id changes via key.
-function VideoPageBody({ v, queueRest, recItems, accent, queue, queueIdx }) {
+function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queueIdx }) {
   const nav = window.useNav();
   // Pull the live artist record so we get the real photo + counts (not the
   // bare {name, handle, 0, 0} stub embedded on each video row).
@@ -800,7 +800,7 @@ function VideoPageBody({ v, queueRest, recItems, accent, queue, queueIdx }) {
 
       {/* Up Next — always rendered below the queue. Capped at 5, Load more
           reveals another 5. */}
-      <UpNextSection items={recItems} accent={accent} />
+      <UpNextSection items={recItems} loading={recLoading} accent={accent} />
 
       {/* Playlist picker modal */}
       {showPlaylistPicker && (
@@ -816,8 +816,25 @@ function VideoPageBody({ v, queueRest, recItems, accent, queue, queueIdx }) {
 
 // Pagination-aware Up Next list. Lives outside VideoPageBody so it keeps its
 // `visible` state when the body re-renders (e.g. like state changes).
-function UpNextSection({ items, accent }) {
+function UpNextSection({ items, loading, accent }) {
   const [visible, setVisible] = React.useState(5);
+  // Don't flash the catalog fallback during the initial /recommended
+  // round-trip — show 5 grey skeleton rows so the section is reserved
+  // but no fake content is exposed.
+  if (loading) {
+    return (
+      <React.Fragment>
+        <div style={{ padding: '14px 14px 4px' }}>
+          <SectionHeader title="Up next" accent={accent} action="" />
+        </div>
+        <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <UpNextSkeleton key={i} />
+          ))}
+        </div>
+      </React.Fragment>
+    );
+  }
   if (!items || !items.length) return null;
   const shown = items.slice(0, visible);
   return (
@@ -841,6 +858,25 @@ function UpNextSection({ items, accent }) {
         </div>
       )}
     </React.Fragment>
+  );
+}
+
+// Skeleton row — same footprint as CompactRow so the section height is
+// stable when the real list lands.
+function UpNextSkeleton() {
+  return (
+    <div style={{ display: 'flex', gap: 10 }}>
+      <div style={{
+        width: 140, aspectRatio: '16/9', borderRadius: 8,
+        background: 'rgba(255,255,255,0.04)',
+        flexShrink: 0,
+      }} />
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6, padding: '2px 0' }}>
+        <div style={{ height: 12, borderRadius: 4, background: 'rgba(255,255,255,0.06)', width: '85%' }} />
+        <div style={{ height: 12, borderRadius: 4, background: 'rgba(255,255,255,0.06)', width: '60%' }} />
+        <div style={{ height: 10, borderRadius: 4, background: 'rgba(255,255,255,0.04)', width: '40%', marginTop: 4 }} />
+      </div>
+    </div>
   );
 }
 

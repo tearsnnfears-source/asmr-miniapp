@@ -60,9 +60,11 @@
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
     gap: 26px;
-    /* Keep logo + spinner clear of the floating Telegram close button. */
-    padding-top: var(--tg-safe-top, 0px);
-    padding-bottom: var(--tg-safe-bottom, 0px);
+    /* No padding-top here on purpose: it was being driven by
+       --tg-safe-top, which is empty on the very first paint and gets
+       backfilled once Telegram replies — causing the logo to jump
+       downward mid-load. Logo is centered, the chrome doesn't overlap
+       the middle, so we don't need the reservation. */
     transition: opacity 250ms ease-out;
   }
   #static-splash.is-leaving { opacity: 0; pointer-events: none; }

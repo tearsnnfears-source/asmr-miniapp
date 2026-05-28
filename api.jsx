@@ -341,6 +341,46 @@ function useVideos(limit = 500) {
   );
 }
 
+// Incremental paged catalog — backed by /miniapp/videos?offset=N&limit=M.
+// Use this on Home so the first paint isn't blocked on the entire DB.
+// items grows as the user taps Load more; hasMore goes false once a page
+// returns < pageSize rows.
+function usePaginatedVideos(pageSize = 30) {
+  const [items, setItems]   = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [hasMore, setHasMore] = React.useState(true);
+  const [error, setError]   = React.useState(null);
+  const inflight = React.useRef(false);
+
+  const fetchPage = React.useCallback(async (offset) => {
+    if (inflight.current) return;
+    inflight.current = true;
+    setLoading(true);
+    try {
+      const data = await apiGet('/miniapp/videos', { limit: pageSize, offset });
+      const fresh = (data.videos || []).map(normalizeVideo).filter(v => v.id != null);
+      setItems(prev => offset === 0 ? fresh : [...prev, ...fresh]);
+      if (fresh.length < pageSize) setHasMore(false);
+      setError(null);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setLoading(false);
+      inflight.current = false;
+    }
+  }, [pageSize]);
+
+  // First page on mount. Empty deps so it only fires once.
+  React.useEffect(() => { fetchPage(0); /* eslint-disable-next-line */ }, []);
+
+  const loadMore = React.useCallback(() => {
+    if (!hasMore || loading) return;
+    fetchPage(items.length);
+  }, [items.length, hasMore, loading, fetchPage]);
+
+  return { items, loading, hasMore, loadMore, error };
+}
+
 // useVideo(id) — fetch a single video by id. Works for ANY id in the DB,
 // independent of how big /miniapp/videos?limit=N gets. Used by VideoPage
 // as the second-choice source (after nav.params.video) so deep-links and
@@ -1132,7 +1172,7 @@ initTelegram();
 Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
-  useVideos, useVideo, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, userFromTelegram,
+  useVideos, useVideo, usePaginatedVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, userFromTelegram,
   actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionStartCryptoCheckout, actionStartFreeTrial, actionCheckInvite, actionCreateStarsInvoice, actionOpenTribute, startInvitePolling, stopInvitePolling,
   actionCreatePlaylist, actionAddToPlaylist, actionRemoveFromPlaylist, actionDeletePlaylist,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,

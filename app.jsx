@@ -79,13 +79,9 @@ function AppShell() {
   // demand via useVideo(id) (GET /miniapp/video/{id}), so the catalog can
   // be unlimited without slowing down launch.
   window.useVideos(30);
-  // Full catalog warmed in the background — the shuffled "For you" feed
-  // on Home wants the whole pool so free users (and paid users without
-  // signals) get real variety instead of the same newest slice on loop.
-  // limit=10000 is an effective "no cap" — DB has nowhere near that.
-  // Splash doesn't wait for it (only :30 is gating), so the long
-  // response is cost-free in perceived load.
-  window.useVideos(10000);
+  // Home now uses usePaginatedVideos (offset/limit chunks of 30) so we
+  // don't try to warm the whole DB at boot any more — that was making
+  // first paint wait on a 10s+ response while the splash sat.
   // Must match SHORTS_LIMIT in screens.jsx — otherwise ShortsTab and the warm
   // cache would have different keys and the player would index into the wrong
   // array.
