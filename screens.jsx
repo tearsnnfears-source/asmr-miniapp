@@ -359,7 +359,8 @@ function ShortsPlayer({ accent = C.pink, allShorts, order, items, pos, setPos, o
   // state follows the favorite, since that's the user-personal side; the
   // count tracks public reactions.
   const [likeOverride, setLikeOverride] = React.useState({});
-  const [followed, setFollowed] = React.useState(false);
+  // Follow used to be wired here but the button was removed from the
+  // shorts player UI — users follow from ArtistPage instead.
 
   const localLiked = likeOverride[contentId];
   const isLiked = localLiked != null ? localLiked : (favStatus.favorited || serverHearted);
@@ -385,12 +386,6 @@ function ShortsPlayer({ accent = C.pink, allShorts, order, items, pos, setPos, o
         setLikeOverride(o => ({ ...o, [contentId]: !next }));
         console.warn('[like]', { react: r1, fav: r2 });
       }
-    });
-  };
-  const onFollow = () => {
-    setFollowed(f => !f);
-    window.actionFollow(s.artist.name).then(r => {
-      if (!r.ok) { setFollowed(f => !f); console.warn('[follow]', r); }
     });
   };
 
@@ -480,9 +475,11 @@ function ShortsPlayer({ accent = C.pink, allShorts, order, items, pos, setPos, o
           <div style={{ width: 36 }} />
         </div>
 
-        {/* right-side action stack (heart + save only) */}
+        {/* right-side action stack (heart only). Aligned to bottom-right
+            on the same baseline as the artist row so the like button
+            sits visually next to the avatar instead of floating above it. */}
         <div style={{
-          position: 'absolute', right: 12, bottom: 110,
+          position: 'absolute', right: 12, bottom: 24,
           display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center',
         }}>
           {actionButtons.map((b, i) => (
@@ -497,23 +494,15 @@ function ShortsPlayer({ accent = C.pink, allShorts, order, items, pos, setPos, o
           ))}
         </div>
 
-        {/* bottom info card — Follow sits in the same row as name, tight to handle */}
+        {/* bottom info card — avatar + name + handle. Follow button
+            removed: it didn't earn its space in this layout and was
+            crowding the artist's name. Users can still follow from the
+            ArtistPage. */}
         <div style={{ position: 'absolute', left: 14, right: 78, bottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <Avatar artist={enrichedArtist} size={40} ring={accent} />
             <div style={{ minWidth: 0, flex: '0 1 auto' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140 }}>{s.artist.name}</div>
-                <button onClick={onFollow} style={{
-                  background: followed ? 'transparent' : accent,
-                  color: followed ? accent : '#000',
-                  border: followed ? `1px solid ${accent}` : 'none',
-                  padding: '4px 12px', borderRadius: 999,
-                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                  flexShrink: 0,
-                  fontFamily: 'inherit',
-                }}>{followed ? 'Following' : 'Follow'}</button>
-              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>{s.artist.name}</div>
               <div style={{ fontSize: 11, color: C.muted2, marginTop: 2 }}>{s.artist.handle}</div>
             </div>
           </div>
@@ -639,8 +628,12 @@ function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queu
   const followStatus = window.useFollowStatus(liveArtist?.name);
 
   // Optimistic state for actions. Like ≠ Save here: Like is the public
-  // reaction (counter goes up for everyone), Save adds to a playlist.
+  // reaction (counter goes up for everyone). Save toggles the video
+  // into the user's favorites — same data source that powers Saved →
+  // Saved videos. PlaylistPicker is still available via long-tap on
+  // the Save pill.
   const [localLike, setLocalLike] = React.useState(null);
+  const [localSaved, setLocalSaved] = React.useState(null);
   const [localFollow, setLocalFollow] = React.useState(null);
   const [replay, setReplay] = React.useState(false);
   const [autoplay, setAutoplay] = React.useState(() => {
@@ -656,6 +649,7 @@ function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queu
   }, [autoplay]);
   const [showPlaylistPicker, setShowPlaylistPicker] = React.useState(false);
   const isLiked = localLike != null ? localLike : serverHearted;
+  const isSaved = localSaved != null ? localSaved : !!favStatus.favorited;
   const heartCount = serverHeartCount + (
     localLike == null ? 0 :
     localLike && !serverHearted ? 1 :
@@ -669,6 +663,21 @@ function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queu
     window.actionReact(contentId, '❤️').then(r => {
       if (!r.ok) { setLocalLike(!next); console.warn('[like]', r); }
     });
+  };
+  const onSave = () => {
+    // Toggle into the user's favorites — shows up in Saved → Saved videos.
+    const next = !isSaved;
+    setLocalSaved(next);
+    window.actionFavoriteToggle(contentId).then(r => {
+      if (!r.ok) { setLocalSaved(!next); console.warn('[save]', r); }
+    });
+  };
+  // Long-press shortcut: open the playlist picker so you can still
+  // file the video into a specific list without losing the simple
+  // tap-to-favorite path.
+  const onSaveLong = (e) => {
+    e?.preventDefault?.();
+    setShowPlaylistPicker(true);
   };
   const onFollow = () => {
     const next = !isFollowing;
@@ -755,10 +764,11 @@ function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queu
           onClick={onLike}
         />
         <ActionPill
-          active={false} accent={accent}
+          active={isSaved} accent={accent}
           icon={<Ico.bookmark />}
-          label="Save"
-          onClick={() => setShowPlaylistPicker(true)}
+          label={isSaved ? 'Saved' : 'Save'}
+          onClick={onSave}
+          onContextMenu={onSaveLong}
         />
         <ActionPill
           active={replay} accent={accent}
@@ -913,9 +923,9 @@ function UpNextSkeleton() {
 }
 
 // Compact action pill used in the VideoPage action row.
-function ActionPill({ icon, label, active, accent, onClick }) {
+function ActionPill({ icon, label, active, accent, onClick, onContextMenu }) {
   return (
-    <button onClick={onClick} style={{
+    <button onClick={onClick} onContextMenu={onContextMenu} style={{
       background: active ? `${accent}22` : C.dark3,
       border: active ? `1px solid ${accent}` : `1px solid ${C.border}`,
       color: active ? accent : C.text,

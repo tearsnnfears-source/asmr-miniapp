@@ -217,10 +217,10 @@ function SavedPage({ accent = C.pink, initialTab = 'videos' }) {
   const favPhotos = favState.data?.photos || [];
   const playlists = playlistsState.data?.playlists || [];
   const tabs = [
-    { id: 'videos', label: 'Liked videos', count: favVideos.length },
+    { id: 'videos', label: 'Saved videos', count: favVideos.length },
     { id: 'playlists', label: 'Playlists', count: playlists.length },
-    { id: 'shorts', label: 'Liked shorts', count: favShorts.length },
-    { id: 'photos', label: 'Liked photos', count: favPhotos.length },
+    { id: 'shorts', label: 'Saved shorts', count: favShorts.length },
+    { id: 'photos', label: 'Saved photos', count: favPhotos.length },
   ];
 
   return (

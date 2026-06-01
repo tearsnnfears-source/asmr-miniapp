@@ -287,17 +287,12 @@ function AppShell() {
     try { history.pushState({ stackLen: 1 }, ''); } catch (_) {}
   }, []);
 
-  // Telegram fires this when the user tries to close the app via swipe-down
-  // or the OS back gesture. On non-Home screens, intercept and nav.back().
+  // Closing confirmation kept OFF: we have no unsaved state, so the
+  // 'Changes you made may not be saved' dialog from Telegram is just
+  // noise on every close gesture. Disable once at mount.
   React.useEffect(() => {
-    const tg = window.Telegram?.WebApp;
-    if (!tg) return;
-    if (stack.length > 1) {
-      tg.enableClosingConfirmation?.();
-    } else {
-      tg.disableClosingConfirmation?.();
-    }
-  }, [stack.length]);
+    try { window.Telegram?.WebApp?.disableClosingConfirmation?.(); } catch (_) {}
+  }, []);
 
 
   return (
