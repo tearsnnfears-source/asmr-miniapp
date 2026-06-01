@@ -87,7 +87,7 @@ function AppShell() {
   // Must match SHORTS_LIMIT in screens.jsx — otherwise ShortsTab and the warm
   // cache would have different keys and the player would index into the wrong
   // array.
-  const shortsState = window.useShorts(300);
+  const shortsState = window.useShorts(1000);
   const artistsState = window.useArtists();
   window.useFavorites();
   window.useFollows();
