@@ -325,6 +325,10 @@ function AppShell() {
         <div style={{
           position: 'fixed', inset: 0, zIndex: 200,
           background: '#000',
+          // Reserve Telegram chrome + device notch so the player's own
+          // top toolbar (back + counter) doesn't need to repeat the
+          // math — same model as PhoneStage in the embedded path.
+          paddingTop: 'var(--tg-safe-top, env(safe-area-inset-top, 0px))',
         }}>
           <window.ShortsPlayerOverlay
             items={shortsPlayer.items}

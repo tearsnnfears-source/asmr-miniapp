@@ -462,10 +462,12 @@ function ShortsPlayer({ accent = C.pink, allShorts, order, items, pos, setPos, o
         {/* Bottom scrim for readable overlay text */}
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, transparent 25%, transparent 55%, rgba(0,0,0,0.85) 100%)', pointerEvents: 'none' }} />
 
-        {/* top row: back + counter. 4px gap under the Telegram chrome
-            inset so the controls hug the top without overlapping the
-            close cluster. */}
-        <div style={{ position: 'absolute', top: 'calc(4px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))', left: 12, right: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        {/* top row: back + counter. NO safe-area math here — the global
+            overlay wrapper (app.jsx) and the in-Phone path (PhoneStage)
+            both already reserve the inset, so adding it again here was
+            double-padding (visible as a 'phantom header' gap above the
+            controls). Just hug the top with 4px. */}
+        <div style={{ position: 'absolute', top: 4, left: 12, right: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <button onClick={() => onClose && onClose()} style={{
             width: 36, height: 36, borderRadius: '50%',
             background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
@@ -478,42 +480,46 @@ function ShortsPlayer({ accent = C.pink, allShorts, order, items, pos, setPos, o
         {/* right-side action stack (heart only). Aligned to bottom-right
             on the same baseline as the artist row so the like button
             sits visually next to the avatar instead of floating above it. */}
+        {/* Bottom row: artist info on the left, heart action on the
+            right, vertically centered together. Single flex row at
+            bottom: 24 instead of two separately-positioned absolutes
+            so the heart and the avatar are guaranteed to share a
+            baseline. */}
         <div style={{
-          position: 'absolute', right: 12, bottom: 24,
-          display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center',
+          position: 'absolute', left: 14, right: 14, bottom: 24,
+          display: 'flex', alignItems: 'center', gap: 12,
         }}>
-          {actionButtons.map((b, i) => (
-            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <button onClick={b.onClick} style={{
-                width: 46, height: 46, borderRadius: '50%',
-                background: 'rgba(0,0,0,0.55)', border: 'none',
-                color: b.color, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-              }}>{b.icon}</button>
-              <div style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{b.label}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+              <Avatar artist={enrichedArtist} size={40} ring={accent} />
+              <div style={{ minWidth: 0, flex: '0 1 auto' }}>
+                <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>{s.artist.name}</div>
+                <div style={{ fontSize: 11, color: C.muted2, marginTop: 2 }}>{s.artist.handle}</div>
+              </div>
             </div>
-          ))}
-        </div>
-
-        {/* bottom info card — avatar + name + handle. Follow button
-            removed: it didn't earn its space in this layout and was
-            crowding the artist's name. Users can still follow from the
-            ArtistPage. */}
-        <div style={{ position: 'absolute', left: 14, right: 78, bottom: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <Avatar artist={enrichedArtist} size={40} ring={accent} />
-            <div style={{ minWidth: 0, flex: '0 1 auto' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>{s.artist.name}</div>
-              <div style={{ fontSize: 11, color: C.muted2, marginTop: 2 }}>{s.artist.handle}</div>
-            </div>
+            {s.label && (
+              <div style={{ fontSize: 13, lineHeight: 1.35, marginBottom: 4 }}>{s.label}</div>
+            )}
+            {s.duration && (
+              <div style={{ fontSize: 10, color: C.muted, fontWeight: 600, letterSpacing: 0.5 }}>
+                {s.duration}
+              </div>
+            )}
           </div>
-          {s.label && (
-            <div style={{ fontSize: 13, lineHeight: 1.35, marginBottom: 6 }}>{s.label}</div>
-          )}
-          {s.duration && (
-            <div style={{ fontSize: 10, color: C.muted, fontWeight: 600, letterSpacing: 0.5 }}>
-              {s.duration}
-            </div>
-          )}
+          {/* Action stack — same flex row, so it auto-aligns to the
+              vertical center of the artist block. */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center', flexShrink: 0 }}>
+            {actionButtons.map((b, i) => (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <button onClick={b.onClick} style={{
+                  width: 46, height: 46, borderRadius: '50%',
+                  background: 'rgba(0,0,0,0.55)', border: 'none',
+                  color: b.color, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                }}>{b.icon}</button>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{b.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
