@@ -259,26 +259,104 @@ const iconBtn = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
 };
 
-// Bell that surfaces the user's group invite link. Reads it lazily from
-// /miniapp/my_invite (read-only, never consumes). Tap → opens the
-// InviteModal via nav.openInvite. Dot only shows when there's a real link.
+// Bell → notifications panel. Reads invite link from /miniapp/my_invite
+// and surfaces it as a notification entry (so the user can always come
+// back to the link even after dismissing the post-checkout celebration).
+// Future notification sources (new videos from followed artists, etc.)
+// plug into the same `notifications` array.
+//
+// Pink "unread" dot is driven by localStorage:
+//   asmr.notifications.seenAt = last-opened timestamp (ms)
+//   asmr.notifications.firstSeen[<key>] = when we first saw that notif
+// On open we stamp seenAt = now, so the dot only re-lights when a newer
+// notification appears.
+const NOTIF_SEEN_KEY = 'asmr.notifications.seenAt';
+const NOTIF_FIRST_SEEN_KEY = 'asmr.notifications.firstSeen';
+
+function _lsGetJson(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (_) { return fallback; }
+}
+function _lsSetJson(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
+}
+function _getNotifSeenAt() {
+  try { return Number(localStorage.getItem(NOTIF_SEEN_KEY) || 0) || 0; }
+  catch (_) { return 0; }
+}
+function _setNotifSeenAt(ts) {
+  try { localStorage.setItem(NOTIF_SEEN_KEY, String(ts)); } catch (_) {}
+}
+// Returns ms epoch of when we first observed this notif key. Persists so
+// "Subscription active · Jun 1" stays Jun 1 even if the user reopens it
+// on Jun 5. Auto-records on first call.
+function _firstSeenAt(key) {
+  const map = _lsGetJson(NOTIF_FIRST_SEEN_KEY, {});
+  if (map[key]) return map[key];
+  map[key] = Date.now();
+  _lsSetJson(NOTIF_FIRST_SEEN_KEY, map);
+  return map[key];
+}
+
 function AppHeaderBell({ accent = C.pink }) {
-  const nav = useNav();
   const myInvite = window.useMyInvite ? window.useMyInvite() : { data: { invite_link: null } };
   const link = myInvite.data?.invite_link;
+
+  // Build the notifications array. Newest first. Each item:
+  //   { id, kind, createdAt, render({ accent, onClose }) => ReactNode }
+  // For now only the invite-link entry exists; new kinds slot in here.
+  const notifications = React.useMemo(() => {
+    const out = [];
+    if (link) {
+      const createdAt = _firstSeenAt('invite:' + link);
+      out.push({
+        id: 'invite:' + link,
+        kind: 'invite',
+        createdAt,
+        link,
+      });
+    }
+    // Sort newest first.
+    out.sort((a, b) => b.createdAt - a.createdAt);
+    return out;
+  }, [link]);
+
+  // Bump on every open so we re-read seenAt from storage after stamping.
+  const [openTick, setOpenTick] = React.useState(0);
+  const seenAt = React.useMemo(() => _getNotifSeenAt(), [openTick]);
+  const hasUnread = notifications.some(n => n.createdAt > seenAt);
+
+  const [open, setOpen] = React.useState(false);
   const onTap = () => {
-    if (link) nav.openInvite?.(link);
+    // Mark seen the moment the panel opens — the dot should clear even
+    // if the user just glances at the panel and dismisses it.
+    _setNotifSeenAt(Date.now());
+    setOpenTick(t => t + 1);
+    setOpen(true);
   };
+  const onClose = () => setOpen(false);
+
   return (
-    <button onClick={onTap} style={iconBtn} title={link ? 'Your group link' : ''}>
-      <Ico.bell />
-      {link && (
-        <span style={{
-          position: 'absolute', top: 6, right: 7,
-          width: 8, height: 8, borderRadius: '50%', background: accent,
-        }} />
+    <React.Fragment>
+      <button onClick={onTap} style={iconBtn} title="Notifications">
+        <Ico.bell />
+        {hasUnread && (
+          <span style={{
+            position: 'absolute', top: 6, right: 7,
+            width: 8, height: 8, borderRadius: '50%', background: accent,
+          }} />
+        )}
+      </button>
+      {open && (
+        <NotificationsPanel
+          notifications={notifications}
+          accent={accent}
+          onClose={onClose}
+        />
       )}
-    </button>
+    </React.Fragment>
   );
 }
 
@@ -832,6 +910,198 @@ function InviteModal({ link, onClose, accent = C.pink }) {
   );
 }
 
+// ── NotificationsPanel ────────────────────────────────────────
+// Slide-down sheet opened by the AppHeader bell. Lists user-facing
+// events — currently just the "subscription active" entry that holds
+// the private-group invite link. Designed to grow: new kinds register
+// in AppHeaderBell's `notifications` builder and render here.
+function NotificationsPanel({ notifications, accent = C.pink, onClose }) {
+  const items = Array.isArray(notifications) ? notifications : [];
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 9700,
+      background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
+      display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+      padding: '0 14px',
+      paddingTop: 'calc(64px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))',
+      paddingBottom: 'calc(24px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))',
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 380,
+        background: C.dark2,
+        border: `1px solid ${C.border2}`,
+        borderRadius: 20,
+        boxShadow: '0 18px 60px rgba(0,0,0,0.55)',
+        overflow: 'hidden',
+        display: 'flex', flexDirection: 'column',
+        maxHeight: 'calc(100vh - 120px)',
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '14px 16px',
+          borderBottom: `1px solid ${C.border}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div style={{
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 20, letterSpacing: 1.2, lineHeight: 1,
+          }}>Notifications</div>
+          <button onClick={onClose} style={{
+            background: 'transparent', border: 'none', color: C.muted2,
+            fontSize: 20, lineHeight: 1, cursor: 'pointer', padding: 4,
+          }}>×</button>
+        </div>
+        {/* Body */}
+        <div style={{
+          padding: '12px 14px 14px',
+          overflowY: 'auto',
+          display: 'flex', flexDirection: 'column', gap: 10,
+          WebkitOverflowScrolling: 'touch',
+        }}>
+          {items.length === 0 && <NotificationsEmpty />}
+          {items.map(n => {
+            if (n.kind === 'invite') {
+              return (
+                <NotifInviteCard key={n.id}
+                  link={n.link} createdAt={n.createdAt}
+                  accent={accent} onClose={onClose}
+                />
+              );
+            }
+            return null;
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NotificationsEmpty() {
+  return (
+    <div style={{
+      padding: '32px 12px',
+      textAlign: 'center',
+      color: C.muted,
+    }}>
+      <div style={{ fontSize: 28, marginBottom: 8 }}>🔕</div>
+      <div style={{ fontSize: 13 }}>No notifications yet</div>
+      <div style={{ fontSize: 11, marginTop: 4, color: C.muted }}>
+        Subscription updates and new drops from artists you follow will show up here.
+      </div>
+    </div>
+  );
+}
+
+// Human-readable "Jun 1" / "Today" / "Yesterday" for the notification
+// timestamp. Keeps the panel compact without bringing in a date lib.
+function _formatNotifDate(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const now = new Date();
+  const day = (x) => Math.floor(x.getTime() / 86400000);
+  const diff = day(now) - day(d);
+  if (diff <= 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  // "Jun 1" — fall back to "1/6" if locale lookup chokes inside the
+  // Telegram WebView.
+  try {
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  } catch (_) {
+    return `${d.getDate()}/${d.getMonth() + 1}`;
+  }
+}
+
+// Invite-link card — the visual is similar to InviteModal but compacted
+// into a row that lives inside the panel. Tap "Join" to open the group;
+// "Copy" lifts the URL onto the clipboard.
+function NotifInviteCard({ link, createdAt, accent = C.pink, onClose }) {
+  const [copied, setCopied] = React.useState(false);
+  const openLink = (e) => {
+    e?.preventDefault?.();
+    if (!link) return;
+    const tg = window.Telegram?.WebApp;
+    const isTg = /^https?:\/\/(t\.me|telegram\.me)\//i.test(link) || /^tg:\/\//i.test(link);
+    if (isTg && tg && typeof tg.openTelegramLink === 'function') {
+      tg.openTelegramLink(link);
+    } else if (tg && typeof tg.openLink === 'function') {
+      tg.openLink(link);
+    } else {
+      window.open(link, '_blank', 'noopener');
+    }
+    onClose && onClose();
+  };
+  const copy = async (e) => {
+    e?.stopPropagation?.();
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch (_) {
+      const ta = document.createElement('textarea');
+      ta.value = link; document.body.appendChild(ta);
+      ta.select(); try { document.execCommand('copy'); } catch (_) {}
+      ta.remove();
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1400);
+  };
+  return (
+    <div style={{
+      background: `linear-gradient(160deg, ${accent}1c, ${C.dark3} 70%)`,
+      border: `1px solid ${accent}55`,
+      borderRadius: 16,
+      padding: '12px 12px 12px',
+      display: 'flex', flexDirection: 'column', gap: 10,
+    }}>
+      {/* Title row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: `linear-gradient(135deg, ${accent}, ${C.purple})`,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 18, flexShrink: 0,
+        }}>🎉</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: 14, fontWeight: 700, color: C.text, lineHeight: 1.2,
+          }}>Subscription active</div>
+          <div style={{ fontSize: 11, color: C.muted2, marginTop: 2 }}>
+            {_formatNotifDate(createdAt)} · Tap to open your private group
+          </div>
+        </div>
+      </div>
+      {/* Link preview */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: 'rgba(0,0,0,0.4)', border: `1px solid ${C.border}`,
+        borderRadius: 10, padding: '8px 10px',
+      }}>
+        <div style={{
+          flex: 1, minWidth: 0,
+          fontSize: 11, color: C.muted2, fontFamily: 'monospace',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>{link || '—'}</div>
+        <button onClick={copy} style={{
+          background: 'transparent', border: `1px solid ${C.border2}`,
+          color: copied ? accent : C.muted2,
+          padding: '4px 10px', borderRadius: 999,
+          fontSize: 10, fontWeight: 700, cursor: 'pointer',
+          fontFamily: 'inherit', flexShrink: 0,
+        }}>{copied ? 'Copied' : 'Copy'}</button>
+      </div>
+      {/* CTA */}
+      <button onClick={openLink} disabled={!link} style={{
+        background: link ? `linear-gradient(135deg, ${accent}, ${C.purple})` : 'rgba(255,255,255,0.08)',
+        color: link ? '#000' : C.muted2,
+        border: 'none', borderRadius: 12,
+        padding: '11px 14px',
+        fontFamily: "'Bebas Neue', sans-serif",
+        fontSize: 15, letterSpacing: 1.1,
+        cursor: link ? 'pointer' : 'default',
+        boxShadow: link ? `0 6px 18px ${accent}44` : 'none',
+      }}>JOIN GROUP →</button>
+    </div>
+  );
+}
+
 // ── Paywall: BlurLock + PaywallSheet ─────────────────────────
 // BlurLock wraps a tile so non-Pro users see a blurred preview with a
 // padlock badge. PaywallSheet is the bottom-of-screen "subscribe to
@@ -916,4 +1186,4 @@ function PaywallSheet({ accent = C.pink, onClose }) {
   );
 }
 
-Object.assign(window, { C, tagColor, Phone, Ico, Thumb, Avatar, AppHeader, BottomNav, StatsStrip, PromoBanner, Chip, SectionHeader, TickerBanner, TickerSlides, TIER_COLORS, InviteModal, BlurLock, PaywallSheet });
+Object.assign(window, { C, tagColor, Phone, Ico, Thumb, Avatar, AppHeader, BottomNav, StatsStrip, PromoBanner, Chip, SectionHeader, TickerBanner, TickerSlides, TIER_COLORS, InviteModal, NotificationsPanel, BlurLock, PaywallSheet });
