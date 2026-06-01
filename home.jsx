@@ -92,8 +92,8 @@ function FeedCard({ v, accent, density, featured }) {
 }
 
 // ── HOME V2 — Editorial ───────────────────────────────────────
-// Newest drop on top, Browse tags, then a personalised feed that grows
-// with Load more taps. No more static slice / mixed FeedCard sandwich.
+// Featured pick on top (videos[0] from the shuffled For-You source),
+// Browse tags, then a personalised feed that grows with Load more.
 function HomeV2({ accent = C.pink, density = 'comfortable' }) {
   const nav = window.useNav();
   // Incremental pagination — first page (30 rows) lands fast, the rest
@@ -202,7 +202,7 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
               position: 'absolute', left: 12, top: 12,
               background: accent, color: '#000', fontWeight: 700,
               fontSize: 10, padding: '4px 8px', borderRadius: 999, letterSpacing: 0.6, textTransform: 'uppercase',
-            }}>Newest drop</span>
+            }}>Featured Video</span>
             <div style={{ position: 'absolute', left: 14, right: 14, bottom: 12 }}>
               <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25, marginBottom: 6 }}>{hero.title}</div>
               <HeroArtistLine artist={hero.artist} age={hero.age} />
