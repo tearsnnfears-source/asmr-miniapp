@@ -498,7 +498,7 @@ function SectionHeader({ title, accent = C.pink, action = 'See all ›', icon })
 // ── TICKER BANNER ─────────────────────────────────────────────
 // Auto-rotating lime panel that cycles between: free trial, content stats, custom ads.
 // Swipeable, dots indicator, 5s auto-advance.
-function TickerBanner({ accent = C.pink, lime = C.lime, slides, interval = 5000 }) {
+function TickerBanner({ accent = C.pink, lime = C.lime, slides, interval = 10000 /* was 5000 — slides need more dwell time so users can read the CTA */ }) {
   const [idx, setIdx] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
   const total = slides.length;

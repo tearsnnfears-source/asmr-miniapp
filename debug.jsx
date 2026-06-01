@@ -84,8 +84,13 @@ function DebugFab() {
     });
   }, []);
 
-  // Always-on for now (we'll gate behind ?debug=1 once it's stable).
-  // const isDebug = new URLSearchParams(location.search).get('debug') === '1';
+  // Gated behind ?debug=1 — prod users shouldn't see a bug emoji
+  // floating in the corner. Tweaks panel uses the same mechanism.
+  const isDebug = (() => {
+    try { return new URLSearchParams(location.search).get('debug') === '1'; }
+    catch (_) { return false; }
+  })();
+  if (!isDebug) return null;
 
   const entries = window.__debugLog.get().slice().reverse();
   const errors = entries.filter(e => !e.ok).length;
