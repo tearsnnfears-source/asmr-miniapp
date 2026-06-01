@@ -1,0 +1,1266 @@
+// api.jsx — thin layer over the live Railway backend.
+// All hooks return { data, loading, error } and fall back to window.* mocks
+// when running outside Telegram (preview URLs in a regular browser).
+//
+// Loaded after mock-data.jsx so window.ARTISTS/VIDEOS/SHORTS exist as fallback.
+
+// Backend selection. The miniapp is served from two Vercel deployments:
+//   • main domain (production)            → @asmrleaksbot       → prod backend
+//   • -git-<branch>-… preview deployments → @privateleakstvbot  → staging backend
+//
+// Telegram signs initData with the bot's token, so the backend MUST be
+// the one whose env holds the *matching* token — otherwise HMAC fails
+// and every request 403s with "Cannot parse user".
+//
+// We auto-detect by hostname so a freshly merged redesign-v2 → main
+// flips to prod with zero edits.
+//
+// Overrides (any of them wins):
+//   ?api=staging | ?api=prod | ?api=<https://…>
+//   window.__MINIAPP_API_BASE__
+const API_BASE = (function () {
+  const PROD    = 'https://asmr-bot-production.up.railway.app';
+  const STAGING = 'https://test-bot-production-e824.up.railway.app';
+
+  if (window.__MINIAPP_API_BASE__) return window.__MINIAPP_API_BASE__;
+  try {
+    const override = new URLSearchParams(location.search).get('api');
+    if (override === 'staging') return STAGING;
+    if (override === 'prod')    return PROD;
+    if (override && override.startsWith('http')) return override;
+  } catch (_) {}
+
+  // Hostname-based default. Vercel preview deployments include
+  // "-git-" in the subdomain (e.g. asmr-miniapp-7x7b-git-redesign-v2-…
+  // .vercel.app). Anything else — bare custom domain, main vercel
+  // domain, telegram-internal proxy — counts as production.
+  try {
+    const h = location.hostname || '';
+    if (h.includes('-git-')) return STAGING;
+  } catch (_) {}
+  return PROD;
+})();
+
+// ── Telegram bootstrap ────────────────────────────────────────
+// Call once at app start. Idempotent.
+//
+// Fullscreen mode (Bot API 8.0+) hides Telegram's bot-name bar so the
+// miniapp owns the whole viewport like a native app. In fullscreen the
+// system close/menu buttons float over the top-right corner, so we MUST
+// reserve a top inset (Telegram exposes it via contentSafeAreaInset).
+// We mirror both safeAreaInset (device notch / home indicator) and
+// contentSafeAreaInset (Telegram chrome overlay) into CSS variables so
+// every screen can opt in with a single `padding-top: var(--tg-safe-top)`.
+function initTelegram() {
+  const tg = window.Telegram?.WebApp;
+  if (!tg) {
+    // Outside Telegram (preview URL in a browser): set zero insets so the
+    // CSS vars are always defined.
+    applySafeAreaVars(null);
+    return null;
+  }
+  try {
+    tg.ready();
+    tg.expand();
+  } catch (_) {}
+  // Fullscreen — guarded because older Telegram clients don't have it.
+  try { tg.requestFullscreen && tg.requestFullscreen(); } catch (_) {}
+  // Disable the swipe-down-to-close gesture so users don't accidentally
+  // dismiss the app when scrolling. With BackButton wired up they still
+  // have an explicit way out.
+  try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (_) {}
+  // Initial safe-area var write + retry pattern: TG sometimes reports 0
+  // insets right after setHeaderColor / requestFullscreen even though the
+  // OS status bar + close-button cluster are visible. Re-applying on the
+  // next paint and at 120/420ms catches the corrected values.
+  refreshSafeAreasSoon(tg);
+  try {
+    tg.onEvent && tg.onEvent('safeAreaChanged',         () => applySafeAreaVars(tg));
+    tg.onEvent && tg.onEvent('contentSafeAreaChanged',  () => applySafeAreaVars(tg));
+    tg.onEvent && tg.onEvent('fullscreenChanged',       () => refreshSafeAreasSoon(tg));
+    tg.onEvent && tg.onEvent('viewportChanged',         () => applySafeAreaVars(tg));
+  } catch (_) {}
+  return tg;
+}
+
+// Write `--tg-safe-{top,bottom,left,right}` CSS vars on <html> from the
+// combined Telegram insets (device + content). The TOP inset must clear
+// BOTH the device notch/status bar AND the floating close-button cluster
+// in fullscreen, so we SUM safeAreaInset.top + contentSafeAreaInset.top
+// (not max — they're stacked, not overlapping) and enforce a per-platform
+// floor because some TG clients return 0 right after requestFullscreen()
+// even though the chrome is still painting on top of the WebView.
+function applySafeAreaVars(tg) {
+  const safe    = tg?.safeAreaInset        || { top: 0, bottom: 0, left: 0, right: 0 };
+  const content = tg?.contentSafeAreaInset || { top: 0, bottom: 0, left: 0, right: 0 };
+  let top    = (safe.top    || 0) + (content.top    || 0);
+  let bottom = (safe.bottom || 0) + (content.bottom || 0);
+  const left   = (safe.left  || 0) + (content.left  || 0);
+  const right  = (safe.right || 0) + (content.right || 0);
+  // Platform floor — gentle minimum so content never slides under the
+  // close-row even when the SDK lies about the inset. Pulled from the
+  // podpivo.tv miniapp which battle-tested these numbers on real devices.
+  const platform = String(tg?.platform || '').toLowerCase();
+  let topFloor = 0;
+  if (platform.startsWith('android')) topFloor = 82;
+  else if (platform === 'ios')        topFloor = 76;
+  else if (platform === 'macos')      topFloor = 48;
+  // tdesktop / weba / webk / web / unknown → 0 (native TG chrome lives
+  // outside the WebView on desktop, so we don't need to reserve space).
+  if (tg && top < topFloor) top = topFloor;
+  const root = document.documentElement;
+  if (!root) return;
+  root.style.setProperty('--tg-safe-top',    top    + 'px');
+  root.style.setProperty('--tg-safe-bottom', bottom + 'px');
+  root.style.setProperty('--tg-safe-left',   left   + 'px');
+  root.style.setProperty('--tg-safe-right',  right  + 'px');
+}
+function refreshSafeAreasSoon(tg) {
+  applySafeAreaVars(tg);
+  try { requestAnimationFrame(() => applySafeAreaVars(tg)); } catch (_) {}
+  setTimeout(() => applySafeAreaVars(tg), 120);
+  setTimeout(() => applySafeAreaVars(tg), 420);
+}
+function getInitData() {
+  return window.Telegram?.WebApp?.initData || '';
+}
+function getTelegramUser() {
+  return window.Telegram?.WebApp?.initDataUnsafe?.user || null;
+}
+function isInsideTelegram() {
+  return !!(window.Telegram?.WebApp && getInitData());
+}
+
+// ── Low-level fetch helpers ───────────────────────────────────
+async function apiGet(path, query = {}) {
+  const qs = new URLSearchParams(query).toString();
+  const url = `${API_BASE}${path}${qs ? '?' + qs : ''}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    const err = new Error(`GET ${path} → ${res.status}: ${text.slice(0, 240)}`);
+    err.status = res.status;
+    err.body = text;
+    throw err;
+  }
+  return await res.json();
+}
+async function apiPost(path, body = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    const err = new Error(`POST ${path} → ${res.status}: ${text.slice(0, 240)}`);
+    err.status = res.status;
+    err.body = text;
+    throw err;
+  }
+  return await res.json();
+}
+
+// ── Module-level cache ────────────────────────────────────────
+// Survives screen remounts: once a key is fetched, subsequent useFetch(key)
+// calls return the cached value synchronously without a loading flash.
+// Pending promises are deduped so simultaneous mounts don't hit the API twice.
+const _apiCache = new Map(); // key → { data?: any, promise?: Promise, ts?: number }
+// Subscribers per key — so a late-arriving fetch wakes all mounted hooks.
+const _apiSubs = new Map(); // key → Set<(state) => void>
+
+function _emit(key, state) {
+  const subs = _apiSubs.get(key);
+  if (subs) subs.forEach(fn => fn(state));
+}
+
+function _getOrFetch(key, fetcher, fallback) {
+  const entry = _apiCache.get(key);
+  if (entry?.data !== undefined) return entry; // hit
+  if (entry?.promise) return entry; // in flight
+  const promise = fetcher()
+    .then(data => {
+      _apiCache.set(key, { data, ts: Date.now() });
+      _emit(key, { data, loading: false, error: null });
+      return data;
+    })
+    .catch(err => {
+      console.warn('[api]', key, err.message);
+      // Cache the fallback so we don't refetch on every screen mount; the user
+      // can still refresh by reload. Mark error so callers can detect it.
+      _apiCache.set(key, { data: fallback, ts: Date.now(), error: err });
+      _emit(key, { data: fallback, loading: false, error: err });
+      throw err;
+    });
+  const inflight = { promise };
+  _apiCache.set(key, inflight);
+  return inflight;
+}
+
+// Invalidate a key — next useFetch refetches.
+function invalidate(key) {
+  _apiCache.delete(key);
+  _emit(key, { data: undefined, loading: true, error: null });
+}
+
+// ── Generic data hook ─────────────────────────────────────────
+function useFetch(key, fetcher, fallback, deps = []) {
+  // Seed synchronously from cache if available — no flicker.
+  const cached = _apiCache.get(key);
+  const initial = cached?.data !== undefined
+    ? { data: cached.data, loading: false, error: cached.error || null }
+    : { data: fallback, loading: true, error: null };
+  const [state, setState] = React.useState(initial);
+
+  React.useEffect(() => {
+    let alive = true;
+    // Subscribe so a fetch finishing elsewhere wakes us.
+    if (!_apiSubs.has(key)) _apiSubs.set(key, new Set());
+    const sub = (s) => {
+      if (!alive) return;
+      // Invalidation signal: cache was cleared, kick off a fresh fetch
+      // for this hook instance and surface a loading state in the UI.
+      if (s.data === undefined && s.loading) {
+        setState({ data: fallback, loading: true, error: null });
+        _getOrFetch(key, fetcher, fallback);
+        return;
+      }
+      setState(s);
+    };
+    _apiSubs.get(key).add(sub);
+
+    const entry = _getOrFetch(key, fetcher, fallback);
+    if (entry.data !== undefined && state.data !== entry.data) {
+      setState({ data: entry.data, loading: false, error: entry.error || null });
+    }
+    return () => {
+      alive = false;
+      _apiSubs.get(key)?.delete(sub);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+
+  return state;
+}
+
+// ── Normalizers ───────────────────────────────────────────────
+// Real backend returns server-style records; UI expects mock-shaped objects.
+// We bridge the difference here so screens stay clean.
+
+const THUMB_PALETTES = window.THUMB_PALETTES || [
+  ['#FF7EC8', '#C86BFF', '#44C8FF'],
+  ['#CCFF00', '#44C8FF', '#0E0E0F'],
+  ['#FF9F44', '#FF7EC8', '#1E1E20'],
+  ['#44C8FF', '#C86BFF', '#161617'],
+  ['#FF7EC8', '#FF9F44', '#252527'],
+  ['#CCFF00', '#FF7EC8', '#1E1E20'],
+  ['#C86BFF', '#FF7EC8', '#161617'],
+  ['#FF9F44', '#CCFF00', '#0E0E0F'],
+];
+function paletteThumb(seed) {
+  const p = THUMB_PALETTES[Math.abs(seed | 0) % THUMB_PALETTES.length];
+  return { bg: `linear-gradient(135deg, ${p[0]} 0%, ${p[1]} 55%, ${p[2]} 100%)`, dot: p[0] };
+}
+function thumbFor(v) {
+  // Real thumb URL → image background; otherwise palette gradient.
+  if (v.thumbnail_url) {
+    return {
+      bg: `linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.5)), url('${v.thumbnail_url}') center/cover no-repeat`,
+      dot: '#FF7EC8',
+      src: v.thumbnail_url,
+    };
+  }
+  return paletteThumb(v.id || 0);
+}
+function relativeAge(iso) {
+  if (!iso) return '';
+  const t = new Date(iso).getTime();
+  const diff = Date.now() - t;
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} hours ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d} days ago`;
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+function compactViews(n) {
+  n = +n || 0;
+  if (n < 1000) return String(n);
+  if (n < 10000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  if (n < 1_000_000) return Math.round(n / 1000) + 'K';
+  return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+}
+
+// Coerce backend id into a clean integer. Some payloads ship the id as
+// "12345" string, others as 12345 number. We need an integer for the
+// /miniapp/content/play call — the backend does int(content_id) and will
+// throw "invalid literal for int" on anything non-numeric.
+function coerceId(...candidates) {
+  for (const c of candidates) {
+    if (c == null) continue;
+    if (typeof c === 'number' && Number.isFinite(c)) return c;
+    if (typeof c === 'string' && /^\d+$/.test(c)) return parseInt(c, 10);
+  }
+  return null;
+}
+
+function normalizeVideo(v, idx = 0) {
+  const artistName = v.artist_name || v.artistName || 'Unknown';
+  const artistId = 'a-' + (v.artist_id || artistName.toLowerCase().replace(/\W+/g, ''));
+  const rawId = coerceId(v.id, v.content_id);
+  return {
+    id: rawId,
+    title: v.title || 'Untitled',
+    duration: v.duration || '',
+    age: relativeAge(v.created_at),
+    views: compactViews(v.views || v.view_count || 0),
+    thumb: thumbFor(v),
+    raw: v,
+    artist: {
+      id: artistId,
+      name: artistName,
+      handle: '@' + artistName.toLowerCase().replace(/\s+/g, ''),
+      tag: ['pink', 'lime', 'blue', 'purple', 'orange'][Math.abs((idx | 0)) % 5],
+      videos: 0, photos: 0,
+      fresh: idx < 3,
+    },
+  };
+}
+function normalizeShort(s, idx = 0) {
+  const artistName = s.artist_name || s.artistName || s.artist || 'Unknown';
+  const rawId = coerceId(s.id, s.content_id);
+  return {
+    id: rawId,
+    label: s.title || s.label || '',
+    duration: s.duration || '',         // no '0:30' fallback — UI hides empty
+    views: compactViews(s.views || 0),
+    thumb: thumbFor(s),
+    raw: s,
+    artist: {
+      id: 'a-' + artistName.toLowerCase().replace(/\W+/g, ''),
+      name: artistName,
+      handle: '@' + artistName.toLowerCase().replace(/\s+/g, ''),
+    },
+  };
+}
+
+// ── Hooks ─────────────────────────────────────────────────────
+
+function useVideos(limit = 500) {
+  return useFetch(
+    `videos:${limit}`,
+    async () => {
+      const data = await apiGet('/miniapp/videos', { limit });
+      // Drop entries without a real backend id — they'd open the wrong video
+      // when tapped (mismatch on content_id during /content/play lookup).
+      const list = (data.videos || []).map(normalizeVideo).filter(v => v.id != null);
+      if (!list.length) throw new Error('empty videos');
+      return list;
+    },
+    window.VIDEOS || [],
+    [limit],
+  );
+}
+
+// Incremental paged catalog — backed by /miniapp/videos?offset=N&limit=M.
+// Use this on Home so the first paint isn't blocked on the entire DB.
+// items grows as the user taps Load more; hasMore goes false once a page
+// returns < pageSize rows.
+//
+// State is preserved at module level keyed by pageSize, so when the
+// user nav.back()s into Home from VideoPage / ArtistPage / etc the
+// list reappears instantly instead of replaying the initial fetch.
+// Re-fetch on a real refresh (page reload) is intentional — module
+// scope dies with the tab.
+const _paginatedVideosCache = new Map();
+function usePaginatedVideos(pageSize = 30) {
+  const cached = _paginatedVideosCache.get(pageSize);
+  const [items, setItems]     = React.useState(cached?.items   || []);
+  const [hasMore, setHasMore] = React.useState(cached?.hasMore ?? true);
+  const [loading, setLoading] = React.useState(!cached);
+  const [error, setError]     = React.useState(null);
+  const inflight = React.useRef(false);
+
+  // Sync local → module cache so the next mount sees them.
+  React.useEffect(() => {
+    _paginatedVideosCache.set(pageSize, { items, hasMore });
+  }, [pageSize, items, hasMore]);
+
+  const fetchPage = React.useCallback(async (offset) => {
+    if (inflight.current) return;
+    inflight.current = true;
+    setLoading(true);
+    try {
+      const data = await apiGet('/miniapp/videos', { limit: pageSize, offset });
+      const fresh = (data.videos || []).map(normalizeVideo).filter(v => v.id != null);
+      setItems(prev => offset === 0 ? fresh : [...prev, ...fresh]);
+      if (fresh.length < pageSize) setHasMore(false);
+      setError(null);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setLoading(false);
+      inflight.current = false;
+    }
+  }, [pageSize]);
+
+  // Only fetch the first page when the module cache is empty. If we
+  // hydrated from cache, skip the round-trip entirely — items are
+  // already there.
+  React.useEffect(() => {
+    if (!cached) fetchPage(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const loadMore = React.useCallback(() => {
+    if (!hasMore || loading) return;
+    fetchPage(items.length);
+  }, [items.length, hasMore, loading, fetchPage]);
+
+  return { items, loading, hasMore, loadMore, error };
+}
+
+// useVideo(id) — fetch a single video by id. Works for ANY id in the DB,
+// independent of how big /miniapp/videos?limit=N gets. Used by VideoPage
+// as the second-choice source (after nav.params.video) so deep-links and
+// catalog-too-big situations all just work.
+function useVideo(contentId) {
+  return useFetch(
+    `video:${contentId}`,
+    async () => {
+      if (contentId == null) throw new Error('no id');
+      const data = await apiGet(`/miniapp/video/${encodeURIComponent(contentId)}`);
+      return normalizeVideo(data, 0);
+    },
+    null,
+    [contentId],
+  );
+}
+
+function useShorts(limit = 10) {
+  return useFetch(
+    `shorts:${limit}`,
+    async () => {
+      const data = await apiGet('/miniapp/shorts', { limit });
+      const list = (data.shorts || []).map(normalizeShort).filter(s => s.id != null);
+      if (!list.length) throw new Error('empty shorts');
+      return list;
+    },
+    window.SHORTS || [],
+    [limit],
+  );
+}
+
+// Normalize an artist record from /miniapp/artists into the UI shape.
+function normalizeArtist(a, idx = 0) {
+  const tags = ['pink', 'lime', 'blue', 'purple', 'orange'];
+  return {
+    id: 'a-' + String(a.name || '').toLowerCase().replace(/\W+/g, ''),
+    name: a.name || 'Unknown',
+    handle: '@' + String(a.name || '').toLowerCase().replace(/\s+/g, ''),
+    tag: tags[idx % tags.length],
+    videos: a.videos || 0,
+    photos: a.photos || 0,
+    shorts: a.shorts || 0,
+    photo: a.photo_url && a.photo_url.trim() ? a.photo_url : '',
+    profilePhoto: a.profile_photo_url && a.profile_photo_url.trim() ? a.profile_photo_url : '',
+    fresh: !!a.tag_new,
+    hot: !!a.tag_hot,
+    promoted: !!a.tag_prom,
+    ready: !!a.tag_ready,
+    topicUrl: a.topic_url || '',
+    hasProfile: !!a.has_profile,
+    raw: a,
+  };
+}
+
+// Sort priority matches the live miniapp's renderArtistsGrid():
+//   READY (▶ IN APP) → 3
+//   NEW              → 2
+//   HOT              → 1
+//   none             → 0
+// Within the same tier, more content (photos + videos) comes first.
+function artistTagPriority(a) {
+  if (a.ready) return 3;
+  if (a.fresh) return 2; // tag_new
+  if (a.hot) return 1;
+  return 0;
+}
+function artistTotalContent(a) {
+  return (a.photos || 0) + (a.videos || 0);
+}
+
+function useArtists() {
+  return useFetch(
+    'artists',
+    async () => {
+      const data = await apiGet('/miniapp/artists');
+      const list = (data.artists || []).map(normalizeArtist);
+      if (!list.length) throw new Error('empty artists');
+      // Sort: READY > NEW > HOT > by content count.
+      list.sort((a, b) => {
+        const pa = artistTagPriority(a);
+        const pb = artistTagPriority(b);
+        if (pa !== pb) return pb - pa;
+        return artistTotalContent(b) - artistTotalContent(a);
+      });
+      return list;
+    },
+    window.ARTISTS || [],
+    [],
+  );
+}
+
+// Aggregate stats (photos / videos / artists) from the artist list, matching
+// what the original miniapp does — no separate /stats endpoint exists.
+function useStats() {
+  const a = useArtists();
+  const data = React.useMemo(() => {
+    const list = a.data || [];
+    let photos = 0, videos = 0;
+    for (const it of list) {
+      photos += +it.photos || 0;
+      videos += +it.videos || 0;
+    }
+    if (!list.length) return window.STATS || { photos: 0, videos: 0, artists: 0 };
+    return { photos, videos, artists: list.length };
+  }, [a.data]);
+  return { data, loading: a.loading, error: a.error };
+}
+
+function useTags() {
+  return useFetch(
+    'tags',
+    async () => {
+      const data = await apiGet('/miniapp/tags');
+      const tags = data.tags || data || [];
+      if (!Array.isArray(tags) || !tags.length) throw new Error('empty tags');
+      // Backend already sorts by count DESC — keep that order so the most
+      // popular tag (e.g. Licking) lands first.
+      const icons = ['◐','◑','◒','◓','◔','◕','◗','◘'];
+      return tags.map((t, i) => ({
+        id:    (t.id || t.name || t).toString().toLowerCase(),
+        label: t.name || t.label || t,
+        count: typeof t.count === 'number' ? t.count : 0,
+        color: t.color || null,
+        icon:  icons[i % icons.length],
+      }));
+    },
+    window.CATEGORIES || [],
+    [],
+  );
+}
+
+// Build a "best we can" user from Telegram WebApp data alone (no server).
+// Used as the fallback shape so even if /miniapp/profile dies the header
+// still shows the right name/username from initDataUnsafe.user.
+function userFromTelegram() {
+  const tgUser = getTelegramUser();
+  if (!tgUser) {
+    return {
+      name: 'You', username: '', telegramId: 0, photo: '',
+      daysLeft: 0, isPro: false, isInfinite: false, trialUsed: false, tier: 'free',
+      badges: [], tributeProUrl: '', tributePlusUrl: '',
+      raw: null,
+    };
+  }
+  const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ');
+  return {
+    name: fullName || tgUser.username || 'You',
+    username: (tgUser.username || '').replace(/^@/, ''),
+    telegramId: tgUser.id || 0,
+    // photo_url is provided by Telegram when the user has a public profile photo
+    photo: tgUser.photo_url || '',
+    daysLeft: 0,
+    isPro: false,
+    isInfinite: false,
+    trialUsed: false,
+    tier: 'free',
+    badges: [],
+    tributeProUrl: '',
+    tributePlusUrl: '',
+    raw: null,
+  };
+}
+
+// Follows — POST /miniapp/follows → { artists: [{name, photo_url, profile_photo_url}] }
+function useFollows() {
+  return useFetch(
+    'follows',
+    async () => {
+      const initData = getInitData();
+      if (!initData) throw new Error('no initData');
+      const data = await apiPost('/miniapp/follows', { initData });
+      const list = (data.artists || []).map((a, i) => normalizeArtist({
+        name: a.name,
+        photo_url: a.photo_url,
+        profile_photo_url: a.profile_photo_url,
+        photos: 0, videos: 0,
+      }, i));
+      return { artists: list, names: new Set(list.map(a => a.name)) };
+    },
+    { artists: [], names: new Set() },
+    [],
+  );
+}
+
+// Cheap derived hook: is the current user following this artist?
+function useFollowStatus(artistName) {
+  const follows = useFollows();
+  const isF = artistName && follows.data?.names?.has(artistName);
+  return { following: !!isF, loading: follows.loading };
+}
+
+// Artist content — GET /miniapp/artist_content?name=X&type=Y&offset=O
+// Without `type` returns the initial mixed payload (videos/shorts/photos +
+// *_more flags). Cached per artist+type+offset.
+function useArtistContent(artistName, type = '', offset = 0) {
+  return useFetch(
+    `artist_content:${artistName}:${type || 'all'}:${offset}`,
+    async () => {
+      if (!artistName) throw new Error('no artist');
+      const query = { name: artistName };
+      if (type) query.type = type;
+      if (offset) query.offset = String(offset);
+      const data = await apiGet('/miniapp/artist_content', query);
+      // Server returns either {videos, shorts, photos, *_more} or
+      // {type, items, has_more, offset}. Normalize each item to our shape.
+      const norm = (it, i) => {
+        const v = normalizeVideo({
+          id: it.id, title: it.title,
+          thumbnail_url: it.thumbnail_url, artist_name: it.artist_name || artistName,
+          duration: it.duration, created_at: it.created_at, views: it.views || 0,
+        }, i);
+        v.url = it.url || '';
+        v.contentType = it.content_type || '';
+        return v;
+      };
+      if (type) {
+        return {
+          type, offset: data.offset || 0, has_more: !!data.has_more,
+          items: (data.items || []).map(norm),
+        };
+      }
+      return {
+        artist: data.artist,
+        videos: (data.videos || []).map(norm),
+        videos_more: !!data.videos_more,
+        photos: (data.photos || []).map(norm),
+        photos_more: !!data.photos_more,
+        shorts: (data.shorts || []).map(norm),
+        shorts_more: !!data.shorts_more,
+      };
+    },
+    type ? { type, offset, has_more: false, items: [] }
+         : { artist: artistName, videos: [], videos_more: false, photos: [], photos_more: false, shorts: [], shorts_more: false },
+    [artistName, type, offset],
+  );
+}
+
+// useArtistContentList — paginated list of one content type for one artist.
+// Seeds from the mixed initial /artist_content response (first page) so the
+// first render is instant, then fetches subsequent offsets on loadMore.
+function useArtistContentList(artistName, type /* 'video' | 'short' | 'photo' */) {
+  const initial = useArtistContent(artistName);
+  const key = type === 'video' ? 'videos' : type === 'short' ? 'shorts' : 'photos';
+  const moreKey = key + '_more';
+  const initialItems = initial.data?.[key] || [];
+  const initialHasMore = !!initial.data?.[moreKey];
+
+  // Extra pages appended by loadMore. Keyed by artist+type so the state
+  // doesn't leak when the user navigates between artists.
+  const [extra, setExtra] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [hasMore, setHasMore] = React.useState(initialHasMore);
+  const lastKey = React.useRef('');
+  React.useEffect(() => {
+    const k = `${artistName}:${type}`;
+    if (lastKey.current !== k) {
+      setExtra([]);
+      setHasMore(initialHasMore);
+      lastKey.current = k;
+    } else if (extra.length === 0) {
+      // Same artist/type, but initial has-more flag refreshed.
+      setHasMore(initialHasMore);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [artistName, type, initialHasMore]);
+
+  const items = React.useMemo(() => [...initialItems, ...extra], [initialItems, extra]);
+
+  const loadMore = React.useCallback(async () => {
+    if (loading || !hasMore || !artistName) return;
+    setLoading(true);
+    try {
+      const offset = items.length;
+      const data = await apiGet('/miniapp/artist_content', { name: artistName, type, offset: String(offset) });
+      const norm = (it, i) => {
+        const v = normalizeVideo({
+          id: it.id, title: it.title,
+          thumbnail_url: it.thumbnail_url, artist_name: it.artist_name || artistName,
+          duration: it.duration, created_at: it.created_at, views: it.views || 0,
+        }, i);
+        v.url = it.url || '';
+        v.contentType = it.content_type || '';
+        return v;
+      };
+      const newItems = (data.items || []).map(norm);
+      setExtra(prev => [...prev, ...newItems]);
+      setHasMore(!!data.has_more);
+    } catch (e) {
+      console.warn('[artist_content loadMore]', e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [artistName, type, items.length, loading, hasMore]);
+
+  return { items, hasMore, loading: loading || initial.loading, loadMore };
+}
+
+// Playlists — POST /miniapp/playlists with initData
+// Returns { playlists: [{id, name, item_count, created_at}] }
+function useUserPlaylists() {
+  return useFetch(
+    'playlists',
+    async () => {
+      const initData = getInitData();
+      if (!initData) throw new Error('no initData');
+      const data = await apiPost('/miniapp/playlists', { initData });
+      return { playlists: data.playlists || [] };
+    },
+    { playlists: [] },
+    [],
+  );
+}
+
+// Items of one playlist — POST /miniapp/playlists/items { initData, playlist_id }
+function usePlaylistItems(playlistId) {
+  return useFetch(
+    `playlist_items:${playlistId}`,
+    async () => {
+      if (playlistId == null) throw new Error('no playlistId');
+      const initData = getInitData();
+      if (!initData) throw new Error('no initData');
+      const data = await apiPost('/miniapp/playlists/items', { initData, playlist_id: playlistId });
+      return { items: (data.items || []).map((it, i) => normalizeVideo({
+        id: it.content_id || it.id, title: it.title,
+        thumbnail_url: it.thumbnail_url, artist_name: it.artist_name,
+        duration: it.duration, created_at: it.created_at,
+      }, i)) };
+    },
+    { items: [] },
+    [playlistId],
+  );
+}
+
+async function actionCreatePlaylist(name, contentId = null) {
+  const initData = getInitData();
+  if (!initData || !name) return { ok: false, reason: 'bad-input' };
+  try {
+    const res = await apiPost('/miniapp/playlists/create', { initData, name, content_id: contentId });
+    invalidate('playlists');
+    return { ok: true, ...res };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+async function actionAddToPlaylist(playlistId, contentId) {
+  const initData = getInitData();
+  if (!initData) return { ok: false, reason: 'no-tg' };
+  try {
+    const res = await apiPost('/miniapp/playlists/add_item', { initData, playlist_id: playlistId, content_id: contentId });
+    invalidate('playlists');
+    invalidate(`playlist_items:${playlistId}`);
+    return { ok: true, ...res };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+async function actionRemoveFromPlaylist(playlistId, contentId) {
+  const initData = getInitData();
+  if (!initData) return { ok: false, reason: 'no-tg' };
+  try {
+    const res = await apiPost('/miniapp/playlists/remove_item', { initData, playlist_id: playlistId, content_id: contentId });
+    invalidate(`playlist_items:${playlistId}`);
+    return { ok: true, ...res };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+async function actionDeletePlaylist(playlistId) {
+  const initData = getInitData();
+  if (!initData) return { ok: false, reason: 'no-tg' };
+  try {
+    const res = await apiPost('/miniapp/playlists/delete', { initData, playlist_id: playlistId });
+    invalidate('playlists');
+    return { ok: true, ...res };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+// Recommended videos for the VideoPage Up Next rail.
+function useRecommended(contentId, limit = 8) {
+  return useFetch(
+    `recommended:${contentId}:${limit}`,
+    async () => {
+      if (contentId == null) return { items: [] };
+      const data = await apiGet('/miniapp/recommended', { content_id: contentId, limit: String(limit) });
+      return { items: (data.items || []).map((it, i) => normalizeVideo(it, i)) };
+    },
+    { items: [] },
+    [contentId, limit],
+  );
+}
+
+// Search — GET /miniapp/search?q=&limit=
+function useSearch(q, limit = 20) {
+  const enabled = q && q.length >= 2;
+  return useFetch(
+    `search:${q}:${limit}`,
+    async () => {
+      if (!enabled) return { results: [] };
+      const data = await apiGet('/miniapp/search', { q, limit: String(limit) });
+      return { results: (data.results || []).map((v, i) => normalizeVideo(v, i)) };
+    },
+    { results: [] },
+    [q, limit, enabled],
+  );
+}
+
+// Favorites — POST /miniapp/favorites with initData → list of saved items.
+// Server returns { count, items: [{content_id, title, thumbnail_url, artist_name, content_type, ...}] }
+// We split into videos vs shorts using the new content_type field (backend
+// patch from 2026-05). Items without content_type land in `videos` for
+// backward compat.
+function useFavorites() {
+  return useFetch(
+    'favorites',
+    async () => {
+      const initData = getInitData();
+      if (!initData) throw new Error('no initData');
+      const data = await apiPost('/miniapp/favorites', { initData });
+      const raw = data.items || data.favorites || [];
+      // Dedupe by content_id — the backend has historical duplicates in some
+      // users' favorites (race where a double-tap created two rows). Keep
+      // the most recently saved one (raw is already newest-first).
+      const seen = new Set();
+      const unique = [];
+      for (const it of raw) {
+        const cid = String(it.content_id ?? it.id ?? '');
+        if (!cid || seen.has(cid)) continue;
+        seen.add(cid);
+        unique.push(it);
+      }
+      const all = unique.map((it, i) => {
+        const norm = normalizeVideo({
+          id: it.content_id || it.id,
+          title: it.title,
+          thumbnail_url: it.thumbnail_url,
+          artist_name: it.artist_name,
+          duration: it.duration,
+          created_at: it.saved_at || it.created_at,
+          views: it.views || 0,
+        }, i);
+        // Preserve content_type so consumers can split.
+        norm.contentType = (it.content_type || '').toLowerCase();
+        return norm;
+      });
+      // Split by content_type. Photos are their own tab so they don't show
+      // up in the "Liked videos" list. Anything else (including legacy
+      // entries with no content_type) goes to videos for back-compat.
+      const photos = all.filter(it => it.contentType === 'photo');
+      const shorts = all.filter(it => it.contentType === 'short');
+      const videos = all.filter(it => it.contentType !== 'photo' && it.contentType !== 'short');
+      return {
+        items: all,          // back-compat: full list
+        videos,              // neither photo nor short
+        shorts,              // content_type === 'short'
+        photos,              // content_type === 'photo'
+        count: data.count != null ? data.count : all.length,
+      };
+    },
+    { items: [], videos: [], shorts: [], count: 0 },
+    [],
+  );
+}
+
+// Read mock override from URL: ?mock=pro / ?mock=elite / ?mock=vip.
+// Lets us preview the PRO-side UI without a working backend session.
+function getMockTier() {
+  try {
+    const m = (new URLSearchParams(location.search).get('mock') || '').toLowerCase();
+    if (['plus', 'pro', 'elite', 'vip', 'founder'].includes(m)) return m;
+    return '';
+  } catch (_) { return ''; }
+}
+
+// User profile drives isPro / centerMode / days-left in the header.
+function useUser() {
+  return useFetch(
+    'user',
+    async () => {
+      const initData = getInitData();
+      const mockTier = getMockTier();
+      if (mockTier) {
+        // Force-PRO preview without hitting the backend.
+        const tg = userFromTelegram();
+        return { ...tg, tier: mockTier, isPro: true, isInfinite: true, daysLeft: 99999, badges: [mockTier, 'preview'] };
+      }
+      if (!initData) throw new Error('no initData');
+      const p = await apiPost('/miniapp/profile', { initData });
+      const tgFallback = userFromTelegram();
+      // days_left can come back as number, string, or be absent. Coerce.
+      const rawDays = p.days_left;
+      const days = typeof rawDays === 'number' ? rawDays
+                 : (typeof rawDays === 'string' && !isNaN(+rawDays) ? +rawDays : 0);
+      const INFINITE_THRESHOLD = 9000;
+      const tier = (p.tier || 'free').toLowerCase();
+      // A user is "PRO" only when they actually have remaining days.
+      // We don't infer Pro from a non-free tier any more — the tier
+      // column lingers in the DB after a subscription expires, which
+      // would otherwise leave free users with a PLUS badge AND a green
+      // gate through to premium content (where /content/play correctly
+      // 403s and shows "Open from Telegram"). Lifetime users are still
+      // covered: the bot writes a huge units value for them, so days>0.
+      const isPro = days > 0;
+      // Grace period (Tribute only): the scheduler keeps units at
+      // -1..-6 for up to 7 days after expiry so the user can renew
+      // before getting kicked. Backend still 403s /content/play in
+      // this window, so isPro stays false — but the UI surfaces a
+      // distinct 'Grace Nd' badge + Renew CTA instead of the bare
+      // FREE state so the user knows they're a tap away from coming
+      // back, not a stranger.
+      const GRACE_WINDOW = 7;
+      const isGrace = days < 0 && days > -GRACE_WINDOW;
+      const graceDaysLeft = isGrace ? (GRACE_WINDOW - Math.abs(days)) : 0;
+      return {
+        name: p.full_name || tgFallback.name,
+        username: (p.username || tgFallback.username || '').replace(/^@/, ''),
+        telegramId: p.telegram_id || tgFallback.telegramId,
+        photo: tgFallback.photo, // server doesn't ship it; use Telegram's
+        daysLeft: days,
+        isPro,
+        isGrace,
+        graceDaysLeft,
+        // Only flip the ∞ flag for genuine lifetime accounts (big units).
+        // The previous "(isPro && days===0)" branch made every 0-day Pro
+        // user look like lifetime, which is what showed PLUS ∞ for an
+        // expired sub.
+        isInfinite: days > INFINITE_THRESHOLD,
+        trialUsed: !!p.trial_used,
+        tier,
+        badges: Array.isArray(p.badges) ? p.badges : (p.badge ? p.badge.split(',').map(s => s.trim()).filter(Boolean) : []),
+        tributeProUrl: p.tribute_pro_url || '',
+        tributePlusUrl: p.tribute_plus_url || '',
+        raw: p,
+      };
+    },
+    // Fallback: real Telegram identity when available, generic outside Telegram.
+    userFromTelegram(),
+    [],
+  );
+}
+
+// ── Reactions (❤️ likes etc) ─────────────────────────────────
+// Backend: GET /miniapp/video/{id}/reactions → { counts, user_reactions, allowed, max_per_user }
+// Backend: POST /miniapp/video/{id}/react { initData, emoji } → { counts, user_reactions }
+function useReactions(contentId) {
+  return useFetch(
+    `reactions:${contentId}`,
+    async () => {
+      if (contentId == null) throw new Error('no contentId');
+      const initData = getInitData();
+      const qs = initData ? `?initData=${encodeURIComponent(initData)}` : '';
+      const res = await fetch(`${API_BASE}/miniapp/video/${contentId}/reactions${qs}`);
+      if (!res.ok) throw new Error(`reactions → ${res.status}`);
+      return await res.json();
+    },
+    { counts: {}, user_reactions: [], allowed: [], max_per_user: 3 },
+    [contentId],
+  );
+}
+
+async function actionReact(contentId, emoji = '❤️') {
+  const initData = getInitData();
+  if (!initData || contentId == null) return { ok: false, reason: 'no-tg' };
+  try {
+    const data = await apiPost(`/miniapp/video/${contentId}/react`, { initData, emoji });
+    // Optimistic cache update so the UI flips before refetch.
+    const key = `reactions:${contentId}`;
+    const entry = _apiCache.get(key);
+    if (entry?.data) {
+      _apiCache.set(key, { data: { ...entry.data, counts: data.counts || {}, user_reactions: data.user_reactions || [] } });
+      _emit(key, { data: _apiCache.get(key).data, loading: false, error: null });
+    }
+    return { ok: true, ...data };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+// ── Favorite status (is this content already saved?) ──────────
+// We reuse the favorites list (cache key 'favorites') instead of hitting
+// /favorites/check per item — one round-trip, instant UI for any tile.
+function useFavoriteStatus(contentId) {
+  const favState = useFavorites();
+  const isFav = React.useMemo(() => {
+    if (contentId == null) return false;
+    const items = favState.data?.items || [];
+    return items.some(it => Number(it.raw?.content_id ?? it.id) === Number(contentId)
+                          || Number(it.id) === Number(contentId));
+  }, [favState.data, contentId]);
+  return { favorited: isFav, loading: favState.loading };
+}
+
+// ── Actions (no React state — fire-and-forget POSTs) ──────────
+
+// Per-content lock so a fast double-tap doesn't fire two toggle POSTs
+// (which the backend currently turns into duplicate Favorite rows).
+const _favToggleLocks = new Map();
+async function actionFavoriteToggle(contentId) {
+  const initData = getInitData();
+  if (!initData) return { ok: false, reason: 'no-tg' };
+  // If a toggle for this content is already in flight, await it instead of
+  // launching a second one.
+  const inflight = _favToggleLocks.get(contentId);
+  if (inflight) return inflight;
+  const p = (async () => {
+    try {
+      const res = await apiPost('/miniapp/favorites/toggle', { initData, content_id: contentId });
+      invalidate('favorites');
+      return { ok: true, ...res };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    } finally {
+      _favToggleLocks.delete(contentId);
+    }
+  })();
+  _favToggleLocks.set(contentId, p);
+  return p;
+}
+
+// Per-artist lock to coalesce fast double-taps into one follow request.
+const _followLocks = new Map();
+async function actionFollow(artistName) {
+  const initData = getInitData();
+  if (!initData || !artistName) return { ok: false, reason: 'no-tg' };
+  const inflight = _followLocks.get(artistName);
+  if (inflight) return inflight;
+  const p = (async () => {
+    try {
+      // Backend wants `artist_name`, not `artist` — earlier we shipped the
+      // wrong field and follow silently did nothing.
+      const res = await apiPost('/miniapp/follow', { initData, artist_name: artistName });
+      invalidate('follows');
+      return { ok: true, ...res };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    } finally {
+      _followLocks.delete(artistName);
+    }
+  })();
+  _followLocks.set(artistName, p);
+  return p;
+}
+
+// Cryptocloud checkout — backend wants { initData, tier } where tier is
+// 'plus'|'pro'|'elite' (matches CRYPTO_USDT_PRICES dict in webhook.py).
+// Returns { pay_url, order_id }. We don't open the link here so callers
+// can run their own UX (modal "waiting for confirmation" etc).
+async function actionStartCryptoCheckout(tier = 'plus') {
+  const initData = getInitData();
+  if (!initData) {
+    return { ok: false, reason: 'no-tg', message: 'Open from Telegram to subscribe' };
+  }
+  try {
+    const data = await apiPost('/miniapp/cryptocloud/checkout', { initData, tier });
+    if (data.pay_url) {
+      return { ok: true, pay_url: data.pay_url, order_id: data.order_id };
+    }
+    return { ok: false, error: data.error || 'no checkout link', message: data.error || 'Could not create invoice' };
+  } catch (e) {
+    return { ok: false, error: e.message, message: 'Could not create invoice. Try again.' };
+  }
+}
+
+// Telegram Stars invoice — POST /miniapp/create_stars_invoice
+// { initData, days, tier } → { invoice_link }. Caller passes the
+// resulting link to tg.openInvoice for the in-Telegram payment flow.
+async function actionCreateStarsInvoice(days = 31, tier = 'plus') {
+  const initData = getInitData();
+  if (!initData) {
+    return { ok: false, reason: 'no-tg', message: 'Open from Telegram to subscribe' };
+  }
+  try {
+    const data = await apiPost('/miniapp/create_stars_invoice', { initData, days, tier });
+    if (data.invoice_link) return { ok: true, invoice_link: data.invoice_link };
+    return { ok: false, error: data.error || 'no invoice', message: data.error || 'Could not create invoice' };
+  } catch (e) {
+    return { ok: false, error: e.message, message: 'Could not create Stars invoice. Try again.' };
+  }
+}
+
+// Tribute checkout — pure client-side: just open the bot-provided URL
+// (per-tier) in Telegram and start polling /miniapp/check_invite so the
+// invite modal pops the moment the bot issues the access link.
+function actionOpenTribute(url, onLink, onTimeout) {
+  if (!url) return { ok: false, message: 'No Tribute URL configured' };
+  const tg = window.Telegram?.WebApp;
+  try {
+    if (tg && typeof tg.openLink === 'function') tg.openLink(url);
+    else window.open(url, '_blank', 'noopener');
+  } catch (_) {
+    window.open(url, '_blank', 'noopener');
+  }
+  startInvitePolling(onLink, onTimeout);
+  return { ok: true };
+}
+
+// 5s polling against /miniapp/check_invite for up to ~6 minutes — the
+// same cadence as the live miniapp. Calls onLink(link) once the bot has
+// issued the invite (Tribute postback verified the payment), or
+// onTimeout() if we never get a link.
+let _invitePollerId = null;
+function startInvitePolling(onLink, onTimeout) {
+  if (_invitePollerId) return;
+  let tries = 0;
+  _invitePollerId = setInterval(async () => {
+    tries++;
+    if (tries > 72) {            // 72 × 5s ≈ 6 min
+      stopInvitePolling();
+      onTimeout && onTimeout();
+      return;
+    }
+    const res = await actionCheckInvite();
+    if (res?.invite_link) {
+      stopInvitePolling();
+      onLink && onLink(res.invite_link);
+    }
+  }, 5000);
+}
+function stopInvitePolling() {
+  if (_invitePollerId) { clearInterval(_invitePollerId); _invitePollerId = null; }
+}
+
+// View counter — fired after the user has watched at least 10s of content.
+// Backend dedupes per (user, content) so re-fires are harmless.
+async function actionRegisterView(contentId) {
+  const initData = getInitData();
+  if (!initData || contentId == null) return { ok: false, reason: 'no-tg' };
+  try {
+    const res = await apiPost('/miniapp/view', { initData, content_id: contentId });
+    // Broadcast so the UI for this video can bump its counter immediately
+    // (the cached /miniapp/videos payload still reports the stale number
+    //  until the next refetch).
+    try {
+      window.dispatchEvent(new CustomEvent('miniapp:view', {
+        detail: { contentId, counted: !!res.counted, views: res.views },
+      }));
+    } catch (_) {}
+    return { ok: true, ...res };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+async function actionStartFreeTrial() {
+  const initData = getInitData();
+  if (!initData) return { ok: false, reason: 'no-tg', message: 'Open from Telegram to activate trial' };
+  try {
+    const res = await apiPost('/miniapp/free_trial', { initData });
+    return { ok: true, ...res };
+  } catch (e) {
+    // Backend returns 409 Conflict when user.trial_used is already True —
+    // we want a friendly message here, not the raw HTTP error.
+    if (e.status === 409) {
+      return { ok: false, reason: 'trial-used', message: 'You\'ve already used your free trial.' };
+    }
+    return { ok: false, error: e.message, message: 'Could not activate trial. Try again.' };
+  }
+}
+
+// One-shot: returns the user's pending invite link and marks the row as
+// "used" on the backend. Called once at AppShell boot — if a checkout
+// happened between sessions, the auto-modal pops here.
+async function actionCheckInvite() {
+  const initData = getInitData();
+  if (!initData) return { ok: false, reason: 'no-tg' };
+  try {
+    const res = await apiPost('/miniapp/check_invite', { initData });
+    return { ok: true, invite_link: res.invite_link || null };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+// Recent videos from the artists the current user follows. Empty
+// {videos: []} when nothing matches — Home uses that to drop the
+// whole "Followed" rail.
+function useFollowedFeed() {
+  return useFetch(
+    'followed_feed',
+    async () => {
+      const initData = getInitData();
+      if (!initData) return { videos: [] };
+      const data = await apiPost('/miniapp/followed_feed', { initData });
+      const list = (data.videos || []).map((v, i) => normalizeVideo(v, i)).filter(v => v.id != null);
+      return { videos: list };
+    },
+    { videos: [] },
+    [],
+  );
+}
+
+// Toggle the bot's "X days before expiry" reminder. Bot honours the
+// flag in scheduler.py — we just flip it.
+async function actionSetNotifyExpiry(enabled) {
+  const initData = getInitData();
+  if (!initData) return { ok: false, reason: 'no-tg' };
+  try {
+    await apiPost('/miniapp/set_notify_expiry', { initData, notify_expiry: !!enabled });
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+// User-submitted artist suggestion → backend stores in artist_suggestions
+// and pings admins via the bot.
+async function actionSuggestArtist(name) {
+  const initData = getInitData();
+  if (!initData) return { ok: false, reason: 'no-tg' };
+  const trimmed = (name || '').trim();
+  if (!trimmed) return { ok: false, error: 'empty', message: 'Type an artist name first' };
+  try {
+    await apiPost('/miniapp/suggest_artist', { initData, artist_name: trimmed });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message, message: 'Could not send. Try again.' };
+  }
+}
+
+// Read-only: returns the newest invite link without consuming the row.
+// Powers the AppHeader bell so the user can reopen the link any time.
+function useMyInvite() {
+  return useFetch(
+    'my_invite',
+    async () => {
+      const initData = getInitData();
+      if (!initData) return { invite_link: null };
+      try {
+        const data = await apiPost('/miniapp/my_invite', { initData });
+        return { invite_link: data.invite_link || null };
+      } catch (_) {
+        return { invite_link: null };
+      }
+    },
+    { invite_link: null },
+    [],
+  );
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+initTelegram();
+
+// Expose everything on window so screens can pull what they need without
+// per-file imports (this codebase uses globals).
+Object.assign(window, {
+  API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
+  apiGet, apiPost, useFetch, invalidate,
+  useVideos, useVideo, usePaginatedVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, useFollowedFeed, userFromTelegram,
+  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionStartCryptoCheckout, actionStartFreeTrial, actionCheckInvite, actionCreateStarsInvoice, actionOpenTribute, actionSetNotifyExpiry, actionSuggestArtist, startInvitePolling, stopInvitePolling,
+  actionCreatePlaylist, actionAddToPlaylist, actionRemoveFromPlaylist, actionDeletePlaylist,
+  normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
+  // For SplashScreen to peek at whether everything is loaded
+  _apiCache,
+});
