@@ -1037,6 +1037,36 @@ function PlaylistPicker({ contentId, accent, onClose, isSaved, onUnsave }) {
 
         {/* Existing playlists */}
         <div style={{ overflowY: 'auto', flex: 1, marginBottom: 12 }}>
+          {state.loading && playlists.length === 0 && (
+            // Skeleton rows so the picker doesn't read as 'no playlists'
+            // for the first ~400ms while /miniapp/playlists is in flight.
+            <React.Fragment>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                  background: 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 12, padding: '10px 12px',
+                  marginBottom: 8,
+                  opacity: 0.6,
+                  animation: 'skel-pulse 1.2s ease-in-out infinite',
+                  animationDelay: `${i * 0.12}s`,
+                }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.06)' }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ height: 12, borderRadius: 4, background: 'rgba(255,255,255,0.08)', width: '60%' }} />
+                    <div style={{ height: 10, borderRadius: 4, background: 'rgba(255,255,255,0.05)', width: '35%', marginTop: 6 }} />
+                  </div>
+                </div>
+              ))}
+              <style>{`
+                @keyframes skel-pulse {
+                  0%, 100% { opacity: 0.4; }
+                  50%      { opacity: 0.75; }
+                }
+              `}</style>
+            </React.Fragment>
+          )}
           {playlists.length === 0 && !state.loading && (
             <div style={{ padding: '20px 4px', color: C.muted, fontSize: 13, textAlign: 'center' }}>
               You don't have any playlists yet.
