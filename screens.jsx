@@ -665,19 +665,26 @@ function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queu
     });
   };
   const onSave = () => {
-    // Toggle into the user's favorites — shows up in Saved → Saved videos.
-    const next = !isSaved;
-    setLocalSaved(next);
-    window.actionFavoriteToggle(contentId).then(r => {
-      if (!r.ok) { setLocalSaved(!next); console.warn('[save]', r); }
-    });
-  };
-  // Long-press shortcut: open the playlist picker so you can still
-  // file the video into a specific list without losing the simple
-  // tap-to-favorite path.
-  const onSaveLong = (e) => {
-    e?.preventDefault?.();
+    // Single-action Save: if not already saved, drop it into the user's
+    // favorites first, then open the playlist picker so they can
+    // optionally file it into a specific list. The picker shows the
+    // current Saved status up top with an Unsave button.
+    if (!isSaved) {
+      setLocalSaved(true);
+      window.actionFavoriteToggle(contentId).then(r => {
+        if (!r.ok) { setLocalSaved(false); console.warn('[save]', r); }
+      });
+    }
     setShowPlaylistPicker(true);
+  };
+  // Direct unsave from inside the picker — flips favorite state off
+  // without closing the modal.
+  const onUnsave = () => {
+    if (!isSaved) return;
+    setLocalSaved(false);
+    window.actionFavoriteToggle(contentId).then(r => {
+      if (!r.ok) { setLocalSaved(true); console.warn('[unsave]', r); }
+    });
   };
   const onFollow = () => {
     const next = !isFollowing;
@@ -768,7 +775,6 @@ function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queu
           icon={<Ico.bookmark />}
           label={isSaved ? 'Saved' : 'Save'}
           onClick={onSave}
-          onContextMenu={onSaveLong}
         />
         <ActionPill
           active={replay} accent={accent}
@@ -849,6 +855,8 @@ function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queu
         <PlaylistPicker
           contentId={contentId}
           accent={accent}
+          isSaved={isSaved}
+          onUnsave={onUnsave}
           onClose={() => setShowPlaylistPicker(false)}
         />
       )}
@@ -939,7 +947,7 @@ function ActionPill({ icon, label, active, accent, onClick, onContextMenu }) {
 }
 
 // Modal picker: pick an existing playlist OR create a new one for this video.
-function PlaylistPicker({ contentId, accent, onClose }) {
+function PlaylistPicker({ contentId, accent, onClose, isSaved, onUnsave }) {
   const state = window.useUserPlaylists();
   const playlists = state.data?.playlists || [];
   const [busy, setBusy] = React.useState(false);
@@ -976,6 +984,43 @@ function PlaylistPicker({ contentId, accent, onClose }) {
         padding: '16px 16px calc(20px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))',
         maxHeight: '70vh', display: 'flex', flexDirection: 'column',
       }}>
+        {/* Saved-status banner. Tells the user the tap already worked
+            and gives them one-tap Unsave if it was unintentional. */}
+        {typeof isSaved === 'boolean' && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            background: isSaved ? `${accent}1c` : 'rgba(255,255,255,0.04)',
+            border: `1px solid ${isSaved ? `${accent}55` : C.border}`,
+            borderRadius: 12, padding: '10px 12px', marginBottom: 12,
+          }}>
+            <span style={{
+              width: 26, height: 26, borderRadius: '50%',
+              background: isSaved ? accent : 'rgba(255,255,255,0.1)',
+              color: isSaved ? '#000' : C.muted,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 14, fontWeight: 800, flexShrink: 0,
+            }}>{isSaved ? '✓' : '–'}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: isSaved ? accent : C.muted2 }}>
+                {isSaved ? 'Saved to your library' : 'Removed from your library'}
+              </div>
+              <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+                {isSaved
+                  ? 'Find it under Saved → Saved videos'
+                  : 'Tap Save again on the video to re-add'}
+              </div>
+            </div>
+            {isSaved && onUnsave && (
+              <button onClick={onUnsave} disabled={busy} style={{
+                background: 'transparent', border: `1px solid ${accent}55`,
+                color: accent, padding: '6px 10px', borderRadius: 999,
+                fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                fontFamily: 'inherit', flexShrink: 0,
+              }}>Unsave</button>
+            )}
+          </div>
+        )}
+
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, letterSpacing: 1 }}>Add to playlist</div>
           <button onClick={onClose} style={{
