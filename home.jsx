@@ -123,13 +123,30 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
   // shuffle is stable within a single Home open. A fresh open
   // reshuffles.
   const feed = React.useMemo(() => {
+    // Backend now serves /miniapp/videos?order=random&seed=… so the raw
+    // catalog is already shuffled across all uploads, not just newest.
+    // We just need to (a) optionally boost signal artists for Pro users
+    // and (b) artist-spread the final list so no creator runs back to
+    // back. Hero (videos[0]) is excluded from the rail.
     const tail = videos.slice(1);
     if (tail.length <= 1) return tail;
-    const shuffle = (arr) => {
-      const out = arr.slice();
-      for (let i = out.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [out[i], out[j]] = [out[j], out[i]];
+
+    // Greedy artist-spread: when the next slot would repeat the
+    // previous artist, look ahead for the first different one and
+    // swap. Falls back to in-order push if everything left is the
+    // same person.
+    const spread = (arr) => {
+      const out = [];
+      const pool = arr.slice();
+      while (pool.length) {
+        const last = out.length ? out[out.length - 1].artist?.name : null;
+        let pickIdx = 0;
+        if (last) {
+          const diff = pool.findIndex(v => v.artist?.name !== last);
+          if (diff > -1) pickIdx = diff;
+        }
+        out.push(pool[pickIdx]);
+        pool.splice(pickIdx, 1);
       }
       return out;
     };
@@ -144,28 +161,27 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
                        : likedNames.size    ? likedNames
                        : null;
 
-    if (!signalNames) return shuffle(tail);
+    if (!signalNames) return spread(tail);
 
-    // Split tail into hits (from signal artists) and rest, shuffle each
-    // half independently, then interleave 3:2 so the rail feels like a
-    // mix instead of a wall of one creator.
+    // Split tail into hits (from signal artists) and rest. Don't
+    // reshuffle each — backend already did. Just interleave 3:2 so
+    // the rail feels like a mix instead of a wall of one creator,
+    // then artist-spread the result so even within "hits" two videos
+    // from the same followed artist don't sit next to each other.
     const hits = [], rest = [];
     for (const v of tail) {
       if (signalNames.has(v.artist?.name)) hits.push(v);
       else rest.push(v);
     }
-    if (!hits.length) return shuffle(rest);
-    if (!rest.length) return shuffle(hits);
-    const sHits = shuffle(hits);
-    const sRest = shuffle(rest);
-    // Interleave: 3 hits, 2 rest, repeat. Roughly 60/40.
+    if (!hits.length) return spread(rest);
+    if (!rest.length) return spread(hits);
     const out = [];
     let hi = 0, ri = 0;
-    while (hi < sHits.length || ri < sRest.length) {
-      for (let k = 0; k < 3 && hi < sHits.length; k++) out.push(sHits[hi++]);
-      for (let k = 0; k < 2 && ri < sRest.length; k++) out.push(sRest[ri++]);
+    while (hi < hits.length || ri < rest.length) {
+      for (let k = 0; k < 3 && hi < hits.length; k++) out.push(hits[hi++]);
+      for (let k = 0; k < 2 && ri < rest.length; k++) out.push(rest[ri++]);
     }
-    return out;
+    return spread(out);
   }, [videos.length, followsState.data?.artists?.length, favState.data?.videos?.length]);
 
   const [visible, setVisible] = React.useState(8);

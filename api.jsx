@@ -375,6 +375,12 @@ function useVideos(limit = 500) {
 // Re-fetch on a real refresh (page reload) is intentional — module
 // scope dies with the tab.
 const _paginatedVideosCache = new Map();
+// A fresh seed per app open — passed to /miniapp/videos?order=random
+// so the For-You feed walks the WHOLE catalog (not just newest), and
+// pagination over the same seed never serves a duplicate. Two app
+// opens get two different orders. Module-level (not state) so the
+// seed survives back-nav into Home without reshuffling mid-session.
+const _forYouSeed = Math.floor(Math.random() * 2_000_000_000);
 function usePaginatedVideos(pageSize = 30) {
   const cached = _paginatedVideosCache.get(pageSize);
   const [items, setItems]     = React.useState(cached?.items   || []);
@@ -393,7 +399,12 @@ function usePaginatedVideos(pageSize = 30) {
     inflight.current = true;
     setLoading(true);
     try {
-      const data = await apiGet('/miniapp/videos', { limit: pageSize, offset });
+      const data = await apiGet('/miniapp/videos', {
+        limit: pageSize,
+        offset,
+        order: 'random',
+        seed:  _forYouSeed,
+      });
       const fresh = (data.videos || []).map(normalizeVideo).filter(v => v.id != null);
       setItems(prev => offset === 0 ? fresh : [...prev, ...fresh]);
       if (fresh.length < pageSize) setHasMore(false);
