@@ -1082,11 +1082,25 @@ async function actionStartCryptoCheckout(tier = 'plus') {
   try {
     const data = await apiPost('/miniapp/cryptocloud/checkout', { initData, tier });
     if (data.pay_url) {
-      return { ok: true, pay_url: data.pay_url, order_id: data.order_id };
+      return { ok: true, pay_url: data.pay_url, order_id: data.order_id, invoice_uuid: data.invoice_uuid };
     }
     return { ok: false, error: data.error || 'no checkout link', message: data.error || 'Could not create invoice' };
   } catch (e) {
     return { ok: false, error: e.message, message: 'Could not create invoice. Try again.' };
+  }
+}
+
+// Pollable Cryptocloud verifier. This lets the miniapp recover even if the
+// provider postback URL is misconfigured or delayed: backend queries
+// CryptoCloud merchant/info, credits once, then returns the invite link.
+async function actionCheckCryptoCheckout(orderId) {
+  const initData = getInitData();
+  if (!initData || !orderId) return { ok: false, reason: 'missing-data' };
+  try {
+    const data = await apiPost('/miniapp/cryptocloud/status', { initData, order_id: orderId });
+    return { ok: true, ...data };
+  } catch (e) {
+    return { ok: false, error: e.message };
   }
 }
 
@@ -1147,6 +1161,29 @@ function startInvitePolling(onLink, onTimeout) {
 }
 function stopInvitePolling() {
   if (_invitePollerId) { clearInterval(_invitePollerId); _invitePollerId = null; }
+}
+
+let _cryptoPollerId = null;
+function startCryptoCheckoutPolling(orderId, onPaid, onTimeout) {
+  if (!orderId) return;
+  if (_cryptoPollerId) stopCryptoCheckoutPolling();
+  let tries = 0;
+  _cryptoPollerId = setInterval(async () => {
+    tries++;
+    if (tries > 80) {            // 80 x 6s ~= 8 min
+      stopCryptoCheckoutPolling();
+      onTimeout && onTimeout();
+      return;
+    }
+    const res = await actionCheckCryptoCheckout(orderId);
+    if (res?.paid || res?.status === 'confirmed') {
+      stopCryptoCheckoutPolling();
+      onPaid && onPaid(res);
+    }
+  }, 6000);
+}
+function stopCryptoCheckoutPolling() {
+  if (_cryptoPollerId) { clearInterval(_cryptoPollerId); _cryptoPollerId = null; }
 }
 
 // View counter — fired after the user has watched at least 10s of content.
@@ -1269,7 +1306,7 @@ Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
   useVideos, useVideo, usePaginatedVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, useFollowedFeed, userFromTelegram,
-  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionStartCryptoCheckout, actionStartFreeTrial, actionCheckInvite, actionCreateStarsInvoice, actionOpenTribute, actionSetNotifyExpiry, actionSuggestArtist, startInvitePolling, stopInvitePolling,
+  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionStartCryptoCheckout, actionCheckCryptoCheckout, actionStartFreeTrial, actionCheckInvite, actionCreateStarsInvoice, actionOpenTribute, actionSetNotifyExpiry, actionSuggestArtist, startInvitePolling, stopInvitePolling, startCryptoCheckoutPolling, stopCryptoCheckoutPolling,
   actionCreatePlaylist, actionAddToPlaylist, actionRemoveFromPlaylist, actionDeletePlaylist,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded

@@ -396,7 +396,22 @@ function SubscriptionPage({ accent = C.pink }) {
         else window.open(r.pay_url, '_blank', 'noopener');
         // Start polling for the bot-issued invite link.
         window.startInvitePolling?.(
-          (link) => nav.openInvite?.(link),
+          (link) => {
+            window.stopCryptoCheckoutPolling?.();
+            window.invalidate?.('user');
+            window.invalidate?.('my_invite');
+            nav.openInvite?.(link);
+          },
+          () => {},
+        );
+        window.startCryptoCheckoutPolling?.(
+          r.order_id,
+          (res) => {
+            window.stopInvitePolling?.();
+            window.invalidate?.('user');
+            window.invalidate?.('my_invite');
+            if (res?.invite_link) nav.openInvite?.(res.invite_link);
+          },
           () => {},
         );
         nav.reset('home');
