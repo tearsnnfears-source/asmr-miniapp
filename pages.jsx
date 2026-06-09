@@ -285,7 +285,7 @@ function ExpiryReminderRow({ user, accent }) {
 
 // ── SUBSCRIPTION PAGE ─────────────────────────────────────────
 // ── Subscription page — 1:1 port of the live miniapp flow ──────
-// Tiers PLUS / PRO / ELITE (ELITE = SOON, disabled); one monthly plan
+// Tiers PLUS / PRO / ELITE; one monthly plan
 // (31 days). Payment methods: Card via Tribute / TG Stars / SBP via
 // Tribute / Crypto via Cryptocloud. Trial card up top calls
 // actionStartFreeTrial. After paid checkout the AppShell-level
@@ -303,26 +303,58 @@ function SubscriptionPage({ accent = C.pink }) {
   const hasAnySub = user.isPro;
   const isInfiniteSub = user.isInfinite;
 
-  // Tier carousel state. ELITE is "SOON" and cannot be picked.
+  // Tier carousel state.
   const [tier, setTier] = React.useState('plus');
   // Payment method: 0=Card 1=Stars 2=SBP 3=Crypto
   const [method, setMethod] = React.useState(0);
   const [busy, setBusy] = React.useState(false);
 
-  // Promo: local-only ASMR2026 = +7 days note (matches live miniapp).
+  // Promo is activated on the backend and consumed by the next paid checkout.
   const [promo, setPromo] = React.useState('');
   const [promoState, setPromoState] = React.useState(''); // 'ok' | 'bad' | ''
-  const applyPromo = () => {
+  const [promoBusy, setPromoBusy] = React.useState(false);
+  const [promoMsg, setPromoMsg] = React.useState('');
+  const [appliedPromo, setAppliedPromo] = React.useState(null);
+  const applyPromo = async () => {
     const code = promo.trim().toUpperCase();
-    if (!code) { setPromoState('bad'); return; }
-    if (code === 'ASMR2026') { setPromoState('ok'); }
-    else { setPromoState('bad'); }
+    if (!code || promoBusy) {
+      setPromoState('bad');
+      setPromoMsg('Enter a promo code');
+      setAppliedPromo(null);
+      return null;
+    }
+    if (!isInsideTg) {
+      setPromoState('bad');
+      setPromoMsg('Open from Telegram to apply promo');
+      setAppliedPromo(null);
+      return null;
+    }
+    setPromoBusy(true);
+    try {
+      const res = await window.actionApplyPromo(code);
+      if (res.ok) {
+        const applied = { code: res.code || code, days: Number(res.days || 31) };
+        setAppliedPromo(applied);
+        setPromo(applied.code);
+        setPromoState('ok');
+        setPromoMsg(`Promo applied · ${applied.days} days after payment`);
+        return applied;
+      }
+      setAppliedPromo(null);
+      setPromoState('bad');
+      setPromoMsg(res.message || 'Invalid promo code');
+      return null;
+    } finally {
+      setPromoBusy(false);
+    }
   };
 
   // Match live miniapp's per-tier Tribute URLs (provided via /miniapp/profile).
-  const tributeUrl = tier === 'pro'
-    ? (user.tributeProUrl || 'https://t.me/tribute/app?startapp=sT5D')
-    : (user.tributePlusUrl || 'https://t.me/tribute/app?startapp=sQSn');
+  const tributeUrl = tier === 'elite'
+    ? (user.tributeEliteUrl || 'https://t.me/tribute/app?startapp=sT5E')
+    : tier === 'pro'
+      ? (user.tributeProUrl || 'https://t.me/tribute/app?startapp=sT5D')
+      : (user.tributePlusUrl || 'https://t.me/tribute/app?startapp=sQSn');
 
   const planDays = 31;
   const tierMeta = {
@@ -343,6 +375,9 @@ function SubscriptionPage({ accent = C.pink }) {
     try {
       // ── Card / SBP via Tribute ──────────────────────────────
       if (method === 0 || method === 2) {
+        let promoForPay = appliedPromo;
+        if (!promoForPay && promo.trim()) promoForPay = await applyPromo();
+        if (promo.trim() && !promoForPay) return;
         const r = window.actionOpenTribute(tributeUrl,
           (link) => {
             // Bot issued the invite — pop the modal and reset caches.
@@ -361,7 +396,10 @@ function SubscriptionPage({ accent = C.pink }) {
       }
       // ── TG Stars ────────────────────────────────────────────
       if (method === 1) {
-        const r = await window.actionCreateStarsInvoice(planDays, tier);
+        let promoForPay = appliedPromo;
+        if (!promoForPay && promo.trim()) promoForPay = await applyPromo();
+        if (promo.trim() && !promoForPay) return;
+        const r = await window.actionCreateStarsInvoice(planDays, tier, promoForPay?.code || '');
         if (!r.ok) { alert(r.message || 'Could not create Stars invoice'); return; }
         const tg = window.Telegram?.WebApp;
         if (tg && typeof tg.openInvoice === 'function') {
@@ -388,7 +426,10 @@ function SubscriptionPage({ accent = C.pink }) {
       }
       // ── Cryptocloud ─────────────────────────────────────────
       if (method === 3) {
-        const r = await window.actionStartCryptoCheckout(tier);
+        let promoForPay = appliedPromo;
+        if (!promoForPay && promo.trim()) promoForPay = await applyPromo();
+        if (promo.trim() && !promoForPay) return;
+        const r = await window.actionStartCryptoCheckout(tier, promoForPay?.code || '');
         if (!r.ok) { alert(r.message || 'Could not create crypto invoice'); return; }
         // Open hosted Cryptocloud page in external browser/WebApp.
         const tg = window.Telegram?.WebApp;
@@ -447,7 +488,7 @@ function SubscriptionPage({ accent = C.pink }) {
       {/* Slim header */}
       <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.dark2, borderBottom: `1px solid ${C.border}` }}>
         <button onClick={() => nav.back()} style={{ ...iconBtn, border: 'none' }}><Ico.chevL /></button>
-        <span style={{ fontSize: 13, fontWeight: 700 }}>Get PRO</span>
+        <span style={{ fontSize: 13, fontWeight: 700 }}>Get Sub</span>
         <button onClick={() => nav.back()} style={{ ...iconBtn, border: 'none', fontSize: 18, color: C.muted }}>×</button>
       </div>
 
@@ -475,7 +516,7 @@ function SubscriptionPage({ accent = C.pink }) {
             const t = tierMeta[id];
             const isActive = id === tier;
             const isSoon = id === 'elite';
-            const onTap = () => { if (!isSoon) setTier(id); };
+            const onTap = isSoon ? undefined : () => setTier(id);
             return (
               <div key={id} onClick={onTap} style={{
                 flexShrink: 0, width: 220, scrollSnapAlign: 'center',
@@ -484,7 +525,7 @@ function SubscriptionPage({ accent = C.pink }) {
                 borderRadius: 18,
                 padding: '14px 14px 12px',
                 cursor: isSoon ? 'default' : 'pointer',
-                opacity: isSoon ? 0.65 : 1,
+                opacity: isSoon ? 0.58 : 1,
                 position: 'relative',
                 boxShadow: isActive ? `0 10px 28px ${t.color}33` : 'none',
                 transition: 'all 200ms',
@@ -624,7 +665,12 @@ function SubscriptionPage({ accent = C.pink }) {
           <div style={{ display: 'flex', gap: 6 }}>
             <input
               value={promo}
-              onChange={(e) => { setPromo(e.target.value.toUpperCase()); setPromoState(''); }}
+              onChange={(e) => {
+                setPromo(e.target.value.toUpperCase());
+                setPromoState('');
+                setPromoMsg('');
+                setAppliedPromo(null);
+              }}
               placeholder="Enter promo code"
               style={{
                 flex: 1, minWidth: 0,
@@ -634,18 +680,19 @@ function SubscriptionPage({ accent = C.pink }) {
                 fontSize: 13, outline: 'none', fontFamily: 'inherit',
               }}
             />
-            <button onClick={applyPromo} style={{
+            <button onClick={applyPromo} disabled={promoBusy} style={{
               background: 'transparent', color: accent,
               border: `1px solid ${accent}55`, borderRadius: 12,
-              padding: '0 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              padding: '0 16px', fontSize: 12, fontWeight: 700, cursor: promoBusy ? 'default' : 'pointer',
               fontFamily: 'inherit',
-            }}>Apply</button>
+              opacity: promoBusy ? 0.65 : 1,
+            }}>{promoBusy ? '…' : 'Apply'}</button>
           </div>
           {promoState === 'ok' && (
-            <div style={{ fontSize: 11, color: C.lime, marginTop: 6 }}>🎉 Promo applied · +7 days bonus</div>
+            <div style={{ fontSize: 11, color: C.lime, marginTop: 6 }}>🎉 {promoMsg || 'Promo applied'}</div>
           )}
           {promoState === 'bad' && (
-            <div style={{ fontSize: 11, color: '#FF6B6B', marginTop: 6 }}>❌ Invalid promo code</div>
+            <div style={{ fontSize: 11, color: '#FF6B6B', marginTop: 6 }}>❌ {promoMsg || 'Invalid promo code'}</div>
           )}
         </div>
 

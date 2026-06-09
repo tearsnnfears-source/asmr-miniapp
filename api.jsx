@@ -1070,19 +1070,44 @@ async function actionFollow(artistName) {
   return p;
 }
 
+// Promo code activation — backend stores it as a pending promo for the
+// Telegram user. The next successful Tribute / Stars / Crypto payment
+// consumes it and credits the promo days.
+async function actionApplyPromo(code) {
+  const initData = getInitData();
+  const promoCode = String(code || '').trim().toUpperCase();
+  if (!initData) {
+    return { ok: false, reason: 'no-tg', message: 'Open from Telegram to apply promo' };
+  }
+  if (!promoCode) {
+    return { ok: false, reason: 'empty', message: 'Enter a promo code' };
+  }
+  try {
+    const data = await apiPost('/miniapp/promo/activate', { initData, promo_code: promoCode });
+    return { ok: true, ...data };
+  } catch (e) {
+    let message = 'Invalid promo code';
+    try {
+      const body = JSON.parse(e.body || '{}');
+      message = body.error || message;
+    } catch (_) {}
+    return { ok: false, error: e.message, status: e.status, message };
+  }
+}
+
 // Cryptocloud checkout — backend wants { initData, tier } where tier is
 // 'plus'|'pro'|'elite' (matches CRYPTO_USDT_PRICES dict in webhook.py).
 // Returns { pay_url, order_id }. We don't open the link here so callers
 // can run their own UX (modal "waiting for confirmation" etc).
-async function actionStartCryptoCheckout(tier = 'plus') {
+async function actionStartCryptoCheckout(tier = 'plus', promoCode = '') {
   const initData = getInitData();
   if (!initData) {
     return { ok: false, reason: 'no-tg', message: 'Open from Telegram to subscribe' };
   }
   try {
-    const data = await apiPost('/miniapp/cryptocloud/checkout', { initData, tier });
+    const data = await apiPost('/miniapp/cryptocloud/checkout', { initData, tier, promo_code: promoCode || undefined });
     if (data.pay_url) {
-      return { ok: true, pay_url: data.pay_url, order_id: data.order_id, invoice_uuid: data.invoice_uuid };
+      return { ok: true, pay_url: data.pay_url, order_id: data.order_id, invoice_uuid: data.invoice_uuid, promo_code: data.promo_code, promo_days: data.promo_days, days: data.days };
     }
     return { ok: false, error: data.error || 'no checkout link', message: data.error || 'Could not create invoice' };
   } catch (e) {
@@ -1107,14 +1132,14 @@ async function actionCheckCryptoCheckout(orderId) {
 // Telegram Stars invoice — POST /miniapp/create_stars_invoice
 // { initData, days, tier } → { invoice_link }. Caller passes the
 // resulting link to tg.openInvoice for the in-Telegram payment flow.
-async function actionCreateStarsInvoice(days = 31, tier = 'plus') {
+async function actionCreateStarsInvoice(days = 31, tier = 'plus', promoCode = '') {
   const initData = getInitData();
   if (!initData) {
     return { ok: false, reason: 'no-tg', message: 'Open from Telegram to subscribe' };
   }
   try {
-    const data = await apiPost('/miniapp/create_stars_invoice', { initData, days, tier });
-    if (data.invoice_link) return { ok: true, invoice_link: data.invoice_link };
+    const data = await apiPost('/miniapp/create_stars_invoice', { initData, days, tier, promo_code: promoCode || undefined });
+    if (data.invoice_link) return { ok: true, invoice_link: data.invoice_link, promo_code: data.promo_code, promo_days: data.promo_days, days: data.days };
     return { ok: false, error: data.error || 'no invoice', message: data.error || 'Could not create invoice' };
   } catch (e) {
     return { ok: false, error: e.message, message: 'Could not create Stars invoice. Try again.' };
@@ -1306,7 +1331,7 @@ Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
   useVideos, useVideo, usePaginatedVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, useFollowedFeed, userFromTelegram,
-  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionStartCryptoCheckout, actionCheckCryptoCheckout, actionStartFreeTrial, actionCheckInvite, actionCreateStarsInvoice, actionOpenTribute, actionSetNotifyExpiry, actionSuggestArtist, startInvitePolling, stopInvitePolling, startCryptoCheckoutPolling, stopCryptoCheckoutPolling,
+  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionApplyPromo, actionStartCryptoCheckout, actionCheckCryptoCheckout, actionStartFreeTrial, actionCheckInvite, actionCreateStarsInvoice, actionOpenTribute, actionSetNotifyExpiry, actionSuggestArtist, startInvitePolling, stopInvitePolling, startCryptoCheckoutPolling, stopCryptoCheckoutPolling,
   actionCreatePlaylist, actionAddToPlaylist, actionRemoveFromPlaylist, actionDeletePlaylist,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded
