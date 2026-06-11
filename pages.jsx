@@ -812,6 +812,49 @@ function FAQPage({ accent = C.pink }) {
   );
 }
 
+// CompactRow-shaped placeholder used while a list of videos is in
+// flight — same thumb width / row height so the layout doesn't jump
+// when the real data lands. Uses the `skel-pulse` keyframe that ships
+// with PlaylistPicker; we inject it here too in case the picker hasn't
+// mounted yet on this session.
+function CompactRowSkeleton({ delay = 0 }) {
+  return (
+    <div style={{
+      display: 'flex', gap: 10,
+      animation: 'skel-pulse 1.3s ease-in-out infinite',
+      animationDelay: `${delay}s`,
+    }}>
+      <div style={{
+        width: 140, aspectRatio: '16/9', borderRadius: 8,
+        background: 'rgba(255,255,255,0.06)',
+        flexShrink: 0,
+      }} />
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6, padding: '2px 0' }}>
+        <div style={{ height: 12, borderRadius: 4, background: 'rgba(255,255,255,0.07)', width: '85%' }} />
+        <div style={{ height: 12, borderRadius: 4, background: 'rgba(255,255,255,0.07)', width: '60%' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+          <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(255,255,255,0.07)' }} />
+          <div style={{ height: 10, borderRadius: 4, background: 'rgba(255,255,255,0.05)', width: 90 }} />
+        </div>
+        <div style={{ height: 9, borderRadius: 4, background: 'rgba(255,255,255,0.04)', width: 60, marginTop: 2 }} />
+      </div>
+    </div>
+  );
+}
+
+// One global keyframe definition so any skeleton anywhere in pages.jsx
+// can drive itself off `skel-pulse` without re-declaring it.
+function SkelPulseKeyframes() {
+  return (
+    <style>{`
+      @keyframes skel-pulse {
+        0%, 100% { opacity: 0.45; }
+        50%      { opacity: 0.85; }
+      }
+    `}</style>
+  );
+}
+
 // ── SEARCH PAGE ───────────────────────────────────────────────
 // Single-screen search across artists + videos. Opened from AppHeader's
 // magnifier icon and from Home's Browse pills (with the tag pre-filled).
@@ -966,19 +1009,26 @@ function SearchPage({ accent = C.pink }) {
                 display: 'inline-flex', alignItems: 'center', gap: 6,
               }}>
                 <Ico.flame />
-                Latest {newestVideos.length ? `· ${newestVideos.length}` : ''}
+                Latest {!newestState.loading && newestVideos.length ? `· ${newestVideos.length}` : ''}
               </div>
             </div>
-            {newestState.loading && newestVideos.length === 0 && (
-              <div style={{ padding: '20px 14px', textAlign: 'center', color: C.muted, fontSize: 12 }}>
-                Loading…
+            {/* useFetch hands back window.VIDEOS (mock) as its fallback
+                while the real request is in flight, so gating purely on
+                `loading` keeps the mock list off-screen and shows skeleton
+                rows instead — much cleaner than fake titles + gradient
+                thumbs flashing for half a second. */}
+            {newestState.loading ? (
+              <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <SkelPulseKeyframes />
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <CompactRowSkeleton key={i} delay={i * 0.1} />
+                ))}
               </div>
-            )}
-            {newestVideos.length > 0 && (
+            ) : newestVideos.length > 0 ? (
               <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {newestVideos.map(v => <CompactRow key={v.id} v={v} accent={accent} />)}
               </div>
-            )}
+            ) : null}
           </React.Fragment>
         )}
 
