@@ -821,18 +821,28 @@ function useRecommended(contentId, limit = 8) {
   );
 }
 
-// Search — GET /miniapp/search?q=&limit=
-function useSearch(q, limit = 20) {
+// Search — GET /miniapp/search?q=&limit=&order=&seed=
+// Pass a positive `seed` to request a random shuffle (used by the
+// Home → Browse category page so each tap on a tag pill / Refresh
+// button surfaces a different sample). seed=0 keeps the newest-first
+// behaviour expected by the free-text search input.
+function useSearch(q, limit = 20, seed = 0) {
   const enabled = q && q.length >= 2;
+  const useRandom = enabled && seed > 0;
   return useFetch(
-    `search:${q}:${limit}`,
+    `search:${q}:${limit}:${useRandom ? 'r' + seed : 'n'}`,
     async () => {
       if (!enabled) return { results: [] };
-      const data = await apiGet('/miniapp/search', { q, limit: String(limit) });
+      const params = { q, limit: String(limit) };
+      if (useRandom) {
+        params.order = 'random';
+        params.seed = String(seed);
+      }
+      const data = await apiGet('/miniapp/search', params);
       return { results: (data.results || []).map((v, i) => normalizeVideo(v, i)) };
     },
     { results: [] },
-    [q, limit, enabled],
+    [q, limit, enabled, useRandom, seed],
   );
 }
 

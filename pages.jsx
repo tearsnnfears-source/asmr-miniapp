@@ -828,8 +828,21 @@ function FAQPage({ accent = C.pink }) {
 function SearchPage({ accent = C.pink }) {
   const nav = window.useNav();
   const initialQ = nav.params?.q || '';
+  // Tag mode: opened from a Browse pill on Home. Behaves the same as
+  // free-text search except results come back in a random order (seeded)
+  // and a Refresh button on top re-rolls the seed. Switches off if the
+  // user starts typing a different query — at that point we're back to
+  // newest-first relevance behaviour.
+  const initialTagMode = nav.params?.mode === 'tag';
   const [q, setQ] = React.useState(initialQ);
   const [deferredQ, setDeferredQ] = React.useState(initialQ);
+  const [tagMode, setTagMode] = React.useState(initialTagMode);
+  // Seed = 0 keeps the old "newest-first" path on the backend, anything
+  // positive triggers the md5 shuffle. We mint a fresh random seed on
+  // mount so the very first open of a tag is already a random sample.
+  const [seed, setSeed] = React.useState(() =>
+    initialTagMode ? Math.floor(Math.random() * 1e9) + 1 : 0
+  );
   const inputRef = React.useRef(null);
 
   // Debounce backend search — local artist filter responds instantly so
@@ -839,17 +852,35 @@ function SearchPage({ accent = C.pink }) {
     return () => clearTimeout(id);
   }, [q]);
 
-  // Focus the input on mount so the keyboard pops automatically.
+  // Exit tag mode the moment the user edits the query away from what
+  // the tag pill sent in. Typing "asmr massage" shouldn't return random
+  // results — relevance + newest-first is what's expected.
   React.useEffect(() => {
+    if (tagMode && q !== initialQ) {
+      setTagMode(false);
+      setSeed(0);
+    }
+  }, [q, tagMode, initialQ]);
+
+  // Focus the input on mount so the keyboard pops automatically — but
+  // skip in tag mode, otherwise the keyboard pops over the random feed
+  // the user came here to browse.
+  React.useEffect(() => {
+    if (initialTagMode) return;
     const t = setTimeout(() => { try { inputRef.current?.focus(); } catch (_) {} }, 80);
     return () => clearTimeout(t);
-  }, []);
+  }, [initialTagMode]);
 
   const tagsState  = window.useTags();
   const tags       = (tagsState.data || []);
   const artistsAll = (window.useArtists().data || []);
-  const searchState = window.useSearch(deferredQ, 24);
+  const searchState = window.useSearch(deferredQ, 24, seed);
   const videoResults = searchState.data?.results || [];
+
+  // Refresh = new seed → useFetch sees a new cache key and refetches.
+  const onRefresh = () => {
+    setSeed(Math.floor(Math.random() * 1e9) + 1);
+  };
 
   // Local artist match — case-insensitive contains. Cap to a sensible
   // number so the rail stays scrollable rather than overwhelming.
@@ -960,15 +991,36 @@ function SearchPage({ accent = C.pink }) {
               </React.Fragment>
             )}
 
-            <div style={{ padding: '14px 14px 4px' }}>
+            <div style={{
+              padding: '14px 14px 4px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+            }}>
               <div style={{ fontSize: 10, color: C.muted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
                 Videos {videoResults.length ? `· ${videoResults.length}` : ''}
               </div>
+              {tagMode && (
+                <button onClick={onRefresh} disabled={isLoading} style={{
+                  background: 'transparent', color: accent,
+                  border: `1px solid ${accent}55`, borderRadius: 999,
+                  padding: '5px 11px', fontSize: 11, fontWeight: 700,
+                  fontFamily: 'inherit',
+                  cursor: isLoading ? 'default' : 'pointer',
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  opacity: isLoading ? 0.55 : 1,
+                }}>
+                  <span style={{
+                    display: 'inline-block',
+                    transition: 'transform 0.4s ease',
+                    transform: isLoading ? 'rotate(360deg)' : 'rotate(0deg)',
+                  }}>↻</span>
+                  Refresh
+                </button>
+              )}
             </div>
 
             {isLoading && (
               <div style={{ padding: '20px 14px', textAlign: 'center', color: C.muted, fontSize: 12 }}>
-                Searching…
+                {tagMode ? 'Shuffling…' : 'Searching…'}
               </div>
             )}
 

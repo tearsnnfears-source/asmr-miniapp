@@ -234,7 +234,7 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
         </div>
         <div style={{ display: 'flex', gap: 10, padding: '8px 14px 4px', overflowX: 'auto' }}>
           {(window.useTags().data || CATEGORIES).slice(0, 10).map((c, i) => (
-            <div key={c.id} onClick={() => nav.go('search', { q: c.label })} style={{
+            <div key={c.id} onClick={() => nav.go('search', { q: c.label, mode: 'tag' })} style={{
               flexShrink: 0,
               width: 82, height: 82, borderRadius: 16,
               background: i % 2 === 0
