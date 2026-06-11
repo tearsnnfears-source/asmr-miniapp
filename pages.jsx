@@ -834,9 +834,15 @@ function SearchPage({ accent = C.pink }) {
   // user starts typing a different query — at that point we're back to
   // newest-first relevance behaviour.
   const initialTagMode = nav.params?.mode === 'tag';
+  // Newest mode: opened from the "NEW" sentinel pill on Home. Bypasses
+  // the search index entirely and just lists the 24 most recent rows
+  // from /miniapp/videos. Switches off the moment the user starts
+  // typing — same UX as tag mode.
+  const initialNewestMode = nav.params?.mode === 'newest';
   const [q, setQ] = React.useState(initialQ);
   const [deferredQ, setDeferredQ] = React.useState(initialQ);
   const [tagMode, setTagMode] = React.useState(initialTagMode);
+  const [newestMode, setNewestMode] = React.useState(initialNewestMode);
   // Seed = 0 keeps the old "newest-first" path on the backend, anything
   // positive triggers the md5 shuffle. We mint a fresh random seed on
   // mount so the very first open of a tag is already a random sample.
@@ -852,29 +858,37 @@ function SearchPage({ accent = C.pink }) {
     return () => clearTimeout(id);
   }, [q]);
 
-  // Exit tag mode the moment the user edits the query away from what
-  // the tag pill sent in. Typing "asmr massage" shouldn't return random
-  // results — relevance + newest-first is what's expected.
+  // Exit tag / newest mode the moment the user edits the query — typing
+  // anything turns this back into a normal text search (relevance +
+  // newest-first).
   React.useEffect(() => {
     if (tagMode && q !== initialQ) {
       setTagMode(false);
       setSeed(0);
     }
-  }, [q, tagMode, initialQ]);
+    if (newestMode && q.length > 0) {
+      setNewestMode(false);
+    }
+  }, [q, tagMode, newestMode, initialQ]);
 
   // Focus the input on mount so the keyboard pops automatically — but
-  // skip in tag mode, otherwise the keyboard pops over the random feed
-  // the user came here to browse.
+  // skip in tag / newest mode, otherwise the keyboard pops over the
+  // feed the user came here to browse.
   React.useEffect(() => {
-    if (initialTagMode) return;
+    if (initialTagMode || initialNewestMode) return;
     const t = setTimeout(() => { try { inputRef.current?.focus(); } catch (_) {} }, 80);
     return () => clearTimeout(t);
-  }, [initialTagMode]);
+  }, [initialTagMode, initialNewestMode]);
 
   const tagsState  = window.useTags();
   const tags       = (tagsState.data || []);
   const artistsAll = (window.useArtists().data || []);
   const searchState = window.useSearch(deferredQ, 24, seed);
+  // Newest mode pulls straight from the videos endpoint — the search
+  // index has no "empty q + newest" path. 24 lines up with the count
+  // promised on the pill.
+  const newestState = window.useVideos(24);
+  const newestVideos = newestMode ? (newestState.data || []).slice(0, 24) : [];
   const videoResults = searchState.data?.results || [];
 
   // Refresh = new seed → useFetch sees a new cache key and refetches.
@@ -944,7 +958,31 @@ function SearchPage({ accent = C.pink }) {
       </div>
 
       <div style={SCROLL_BODY}>
-        {!showResults && (
+        {newestMode && (
+          <React.Fragment>
+            <div style={{ padding: '14px 14px 4px' }}>
+              <div style={{
+                fontSize: 10, color: C.lime, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase',
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+              }}>
+                <Ico.flame />
+                Latest {newestVideos.length ? `· ${newestVideos.length}` : ''}
+              </div>
+            </div>
+            {newestState.loading && newestVideos.length === 0 && (
+              <div style={{ padding: '20px 14px', textAlign: 'center', color: C.muted, fontSize: 12 }}>
+                Loading…
+              </div>
+            )}
+            {newestVideos.length > 0 && (
+              <div style={{ padding: '6px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {newestVideos.map(v => <CompactRow key={v.id} v={v} accent={accent} />)}
+              </div>
+            )}
+          </React.Fragment>
+        )}
+
+        {!newestMode && !showResults && (
           <React.Fragment>
             <div style={{ padding: '18px 14px 6px' }}>
               <div style={{ fontSize: 10, color: C.muted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Browse</div>
@@ -966,7 +1004,7 @@ function SearchPage({ accent = C.pink }) {
           </React.Fragment>
         )}
 
-        {showResults && (
+        {!newestMode && showResults && (
           <React.Fragment>
             {matchedArtists.length > 0 && (
               <React.Fragment>

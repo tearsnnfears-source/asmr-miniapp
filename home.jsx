@@ -233,6 +233,29 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
           <SectionHeader title="Browse" accent={accent} action="" />
         </div>
         <div style={{ display: 'flex', gap: 10, padding: '8px 14px 4px', overflowX: 'auto' }}>
+          {/* "New" sentinel pill — opens SearchPage in newest mode, which
+              skips the tag-shuffle and just lists the 24 most recently
+              added videos. Visually amped so it pulls focus from the
+              tag pills (stronger gradient + lime glow). */}
+          <div onClick={() => nav.go('search', { mode: 'newest' })} style={{
+            flexShrink: 0,
+            width: 82, height: 82, borderRadius: 16,
+            background: `linear-gradient(135deg, ${C.lime}66, ${accent}33 60%, ${C.purple}22)`,
+            border: `1px solid ${C.lime}aa`,
+            boxShadow: `0 0 0 1px ${C.lime}22 inset, 0 6px 18px ${C.lime}33`,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+            cursor: 'pointer',
+            position: 'relative',
+          }}>
+            <div style={{ color: C.lime, fontWeight: 700, lineHeight: 1, display: 'inline-flex' }}>
+              <Ico.flame width="22" height="22" />
+            </div>
+            <div style={{
+              fontSize: 11, fontWeight: 800, letterSpacing: 0.6, textAlign: 'center',
+              color: C.text,
+            }}>NEW</div>
+            <div style={{ fontSize: 9, color: C.lime, fontWeight: 700 }}>Latest 24</div>
+          </div>
           {(window.useTags().data || CATEGORIES).slice(0, 10).map((c, i) => (
             <div key={c.id} onClick={() => nav.go('search', { q: c.label, mode: 'tag' })} style={{
               flexShrink: 0,
