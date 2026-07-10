@@ -1105,26 +1105,6 @@ async function actionApplyPromo(code) {
   }
 }
 
-// Cryptocloud checkout — backend wants { initData, tier } where tier is
-// 'plus'|'pro'|'elite' (matches CRYPTO_USDT_PRICES dict in webhook.py).
-// Returns { pay_url, order_id }. We don't open the link here so callers
-// can run their own UX (modal "waiting for confirmation" etc).
-async function actionStartCryptoCheckout(tier = 'plus', promoCode = '') {
-  const initData = getInitData();
-  if (!initData) {
-    return { ok: false, reason: 'no-tg', message: 'Open from Telegram to subscribe' };
-  }
-  try {
-    const data = await apiPost('/miniapp/cryptocloud/checkout', { initData, tier, promo_code: promoCode || undefined });
-    if (data.pay_url) {
-      return { ok: true, pay_url: data.pay_url, order_id: data.order_id, invoice_uuid: data.invoice_uuid, promo_code: data.promo_code, promo_days: data.promo_days, days: data.days };
-    }
-    return { ok: false, error: data.error || 'no checkout link', message: data.error || 'Could not create invoice' };
-  } catch (e) {
-    return { ok: false, error: e.message, message: 'Could not create invoice. Try again.' };
-  }
-}
-
 const CRYPTO_SUPPORT_USERNAME = 'sonnnnnua';
 const CRYPTO_SUPPORT_TEXT = 'I want to buy subscription with cryptocurrency';
 
@@ -1178,23 +1158,7 @@ async function actionOpenCryptoSupport({ tier = 'plus', promoCode = '' } = {}) {
   }
 }
 
-// Pollable Cryptocloud verifier. This lets the miniapp recover even if the
-// provider postback URL is misconfigured or delayed: backend queries
-// CryptoCloud merchant/info, credits once, then returns the invite link.
-async function actionCheckCryptoCheckout(orderId) {
-  const initData = getInitData();
-  if (!initData || !orderId) return { ok: false, reason: 'missing-data' };
-  try {
-    const data = await apiPost('/miniapp/cryptocloud/status', { initData, order_id: orderId });
-    return { ok: true, ...data };
-  } catch (e) {
-    return { ok: false, error: e.message };
-  }
-}
-
-// Telegram Stars invoice — POST /miniapp/create_stars_invoice
-// { initData, days, tier } → { invoice_link }. Caller passes the
-// resulting link to tg.openInvoice for the in-Telegram payment flow.
+// Telegram Stars invoice - POST /miniapp/create_stars_invoice
 async function actionCreateStarsInvoice(days = 31, tier = 'plus', promoCode = '') {
   const initData = getInitData();
   if (!initData) {
@@ -1203,15 +1167,13 @@ async function actionCreateStarsInvoice(days = 31, tier = 'plus', promoCode = ''
   try {
     const data = await apiPost('/miniapp/create_stars_invoice', { initData, days, tier, promo_code: promoCode || undefined });
     if (data.invoice_link) return { ok: true, invoice_link: data.invoice_link, promo_code: data.promo_code, promo_days: data.promo_days, days: data.days };
-    return { ok: false, error: data.error || 'no invoice', message: data.error || 'Could not create invoice' };
+    return { ok: false, error: data.error || 'no invoice', message: data.error || 'Could not create Stars invoice' };
   } catch (e) {
     return { ok: false, error: e.message, message: 'Could not create Stars invoice. Try again.' };
   }
 }
 
-// Tribute checkout — pure client-side: just open the bot-provided URL
-// (per-tier) in Telegram and start polling /miniapp/check_invite so the
-// invite modal pops the moment the bot issues the access link.
+// Tribute checkout - open the bot-provided URL and poll for the invite link.
 function actionOpenTribute(url, onLink, onTimeout) {
   if (!url) return { ok: false, message: 'No Tribute URL configured' };
   const tg = window.Telegram?.WebApp;
@@ -1225,17 +1187,13 @@ function actionOpenTribute(url, onLink, onTimeout) {
   return { ok: true };
 }
 
-// 5s polling against /miniapp/check_invite for up to ~6 minutes — the
-// same cadence as the live miniapp. Calls onLink(link) once the bot has
-// issued the invite (Tribute postback verified the payment), or
-// onTimeout() if we never get a link.
 let _invitePollerId = null;
 function startInvitePolling(onLink, onTimeout) {
   if (_invitePollerId) return;
   let tries = 0;
   _invitePollerId = setInterval(async () => {
     tries++;
-    if (tries > 72) {            // 72 × 5s ≈ 6 min
+    if (tries > 72) {
       stopInvitePolling();
       onTimeout && onTimeout();
       return;
@@ -1249,29 +1207,6 @@ function startInvitePolling(onLink, onTimeout) {
 }
 function stopInvitePolling() {
   if (_invitePollerId) { clearInterval(_invitePollerId); _invitePollerId = null; }
-}
-
-let _cryptoPollerId = null;
-function startCryptoCheckoutPolling(orderId, onPaid, onTimeout) {
-  if (!orderId) return;
-  if (_cryptoPollerId) stopCryptoCheckoutPolling();
-  let tries = 0;
-  _cryptoPollerId = setInterval(async () => {
-    tries++;
-    if (tries > 80) {            // 80 x 6s ~= 8 min
-      stopCryptoCheckoutPolling();
-      onTimeout && onTimeout();
-      return;
-    }
-    const res = await actionCheckCryptoCheckout(orderId);
-    if (res?.paid || res?.status === 'confirmed') {
-      stopCryptoCheckoutPolling();
-      onPaid && onPaid(res);
-    }
-  }, 6000);
-}
-function stopCryptoCheckoutPolling() {
-  if (_cryptoPollerId) { clearInterval(_cryptoPollerId); _cryptoPollerId = null; }
 }
 
 // View counter — fired after the user has watched at least 10s of content.
@@ -1394,7 +1329,7 @@ Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
   useVideos, useVideo, usePaginatedVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, useFollowedFeed, userFromTelegram,
-  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionApplyPromo, actionStartCryptoCheckout, actionCheckCryptoCheckout, actionOpenCryptoSupport, actionStartFreeTrial, actionCheckInvite, actionCreateStarsInvoice, actionOpenTribute, actionSetNotifyExpiry, actionSuggestArtist, startInvitePolling, stopInvitePolling, startCryptoCheckoutPolling, stopCryptoCheckoutPolling,
+  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionApplyPromo, actionOpenCryptoSupport, actionStartFreeTrial, actionCheckInvite, actionCreateStarsInvoice, actionOpenTribute, actionSetNotifyExpiry, actionSuggestArtist, startInvitePolling, stopInvitePolling,
   actionCreatePlaylist, actionAddToPlaylist, actionRemoveFromPlaylist, actionDeletePlaylist,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded

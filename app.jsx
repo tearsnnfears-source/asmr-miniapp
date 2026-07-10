@@ -129,7 +129,7 @@ function AppShell() {
   const [paywallOpen, setPaywallOpen] = React.useState(false);
 
   // One-shot check at boot: if there's a pending invite (user returned
-  // from Cryptocloud, or simply re-opened after a free-trial activation),
+  // from a paid checkout, or simply re-opened after a free-trial activation),
   // pop the modal right after the splash hides. Consumes the row server-
   // side so we don't re-pop on every nav action — the bell affordance
   // (useMyInvite) takes over for persistent access afterwards.
