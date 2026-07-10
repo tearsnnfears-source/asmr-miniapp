@@ -1125,6 +1125,59 @@ async function actionStartCryptoCheckout(tier = 'plus', promoCode = '') {
   }
 }
 
+const CRYPTO_SUPPORT_USERNAME = 'sonnnnnua';
+const CRYPTO_SUPPORT_TEXT = 'I want to buy subscription with cryptocurrency';
+
+async function copyTextToClipboard(text) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (_) {}
+  try {
+    const el = document.createElement('textarea');
+    el.value = text;
+    el.setAttribute('readonly', '');
+    el.style.position = 'fixed';
+    el.style.left = '-9999px';
+    document.body.appendChild(el);
+    el.select();
+    const copied = document.execCommand('copy');
+    document.body.removeChild(el);
+    return copied;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function actionOpenCryptoSupport({ tier = 'plus', promoCode = '' } = {}) {
+  const safeTier = String(tier || 'plus').toUpperCase();
+  const safePromo = String(promoCode || '').trim().toUpperCase();
+  const lines = [
+    CRYPTO_SUPPORT_TEXT,
+    `Tier: ${safeTier}`,
+  ];
+  if (safePromo) lines.push(`Promo code: ${safePromo}`);
+  const message = lines.join('\n');
+  const copied = await copyTextToClipboard(message);
+  const url = `https://t.me/${CRYPTO_SUPPORT_USERNAME}?text=${encodeURIComponent(message)}`;
+  const tg = window.Telegram?.WebApp;
+  try {
+    if (tg && typeof tg.openTelegramLink === 'function') tg.openTelegramLink(url);
+    else if (tg && typeof tg.openLink === 'function') tg.openLink(url);
+    else window.open(url, '_blank', 'noopener');
+    return { ok: true, copied, url, message };
+  } catch (e) {
+    try {
+      window.open(url, '_blank', 'noopener');
+      return { ok: true, copied, url, message };
+    } catch (_) {
+      return { ok: false, copied, url, message, error: e.message, displayMessage: 'Could not open Telegram chat' };
+    }
+  }
+}
+
 // Pollable Cryptocloud verifier. This lets the miniapp recover even if the
 // provider postback URL is misconfigured or delayed: backend queries
 // CryptoCloud merchant/info, credits once, then returns the invite link.
@@ -1341,7 +1394,7 @@ Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
   useVideos, useVideo, usePaginatedVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, useFollowedFeed, userFromTelegram,
-  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionApplyPromo, actionStartCryptoCheckout, actionCheckCryptoCheckout, actionStartFreeTrial, actionCheckInvite, actionCreateStarsInvoice, actionOpenTribute, actionSetNotifyExpiry, actionSuggestArtist, startInvitePolling, stopInvitePolling, startCryptoCheckoutPolling, stopCryptoCheckoutPolling,
+  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionApplyPromo, actionStartCryptoCheckout, actionCheckCryptoCheckout, actionOpenCryptoSupport, actionStartFreeTrial, actionCheckInvite, actionCreateStarsInvoice, actionOpenTribute, actionSetNotifyExpiry, actionSuggestArtist, startInvitePolling, stopInvitePolling, startCryptoCheckoutPolling, stopCryptoCheckoutPolling,
   actionCreatePlaylist, actionAddToPlaylist, actionRemoveFromPlaylist, actionDeletePlaylist,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded

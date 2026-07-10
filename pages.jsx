@@ -287,7 +287,7 @@ function ExpiryReminderRow({ user, accent }) {
 // ── Subscription page — 1:1 port of the live miniapp flow ──────
 // Tiers PLUS / PRO / ELITE; one monthly plan
 // (31 days). Payment methods: Card via Tribute / TG Stars / SBP via
-// Tribute / Crypto via Cryptocloud. Trial card up top calls
+// Tribute / Crypto via admin chat. Trial card up top calls
 // actionStartFreeTrial. After paid checkout the AppShell-level
 // startInvitePolling picks up the bot-issued group invite link.
 const TIER_PRICES = {
@@ -424,37 +424,11 @@ function SubscriptionPage({ accent = C.pink }) {
         }
         return;
       }
-      // ── Cryptocloud ─────────────────────────────────────────
+      // ── Crypto via admin chat ───────────────────────────────
       if (method === 3) {
-        let promoForPay = appliedPromo;
-        if (!promoForPay && promo.trim()) promoForPay = await applyPromo();
-        if (promo.trim() && !promoForPay) return;
-        const r = await window.actionStartCryptoCheckout(tier, promoForPay?.code || '');
-        if (!r.ok) { alert(r.message || 'Could not create crypto invoice'); return; }
-        // Open hosted Cryptocloud page in external browser/WebApp.
-        const tg = window.Telegram?.WebApp;
-        if (tg?.openLink) tg.openLink(r.pay_url);
-        else window.open(r.pay_url, '_blank', 'noopener');
-        // Start polling for the bot-issued invite link.
-        window.startInvitePolling?.(
-          (link) => {
-            window.stopCryptoCheckoutPolling?.();
-            window.invalidate?.('user');
-            window.invalidate?.('my_invite');
-            nav.openInvite?.(link);
-          },
-          () => {},
-        );
-        window.startCryptoCheckoutPolling?.(
-          r.order_id,
-          (res) => {
-            window.stopInvitePolling?.();
-            window.invalidate?.('user');
-            window.invalidate?.('my_invite');
-            if (res?.invite_link) nav.openInvite?.(res.invite_link);
-          },
-          () => {},
-        );
+        const promoForChat = appliedPromo?.code || promo.trim().toUpperCase();
+        const r = await window.actionOpenCryptoSupport?.({ tier, promoCode: promoForChat });
+        if (!r?.ok) { alert(r?.displayMessage || 'Could not open Telegram chat'); return; }
         nav.reset('home');
         return;
       }
@@ -630,7 +604,7 @@ function SubscriptionPage({ accent = C.pink }) {
               { i: 0, icon: '💳', name: 'Card',     desc: 'via Tribute' },
               { i: 1, icon: '⭐', name: 'TG Stars', desc: 'Telegram Stars' },
               { i: 2, icon: '🏦', name: 'СБП',      desc: 'Russian banks · Tribute' },
-              { i: 3, icon: '₿',  name: 'Crypto',   desc: 'USDT · TON · BTC · ETH' },
+              { i: 3, icon: '₿',  name: 'Crypto',   desc: 'Manual via admin' },
             ].map((m) => {
               const active = method === m.i;
               return (
@@ -712,7 +686,7 @@ function SubscriptionPage({ accent = C.pink }) {
             {busy ? 'PROCESSING…' : `SUBSCRIBE — ${cur.name} €${price}/MO →`}
           </button>
           <div style={{ textAlign: 'center', fontSize: 10, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>
-            Cancel anytime · Powered by Tribute / Cryptocloud
+            Cancel anytime · Card via Tribute · Crypto via admin
           </div>
         </div>
 
