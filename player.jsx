@@ -87,15 +87,30 @@ async function prefetchPlayable(ids, concurrency = 3) {
 
 function VideoPlayer({ video, accent, fillParent = false, vertical = false, autoStart = false, loop = false, onEnded }) {
   const v = video;
-  const [phase, setPhase] = React.useState('idle'); // 'idle' | 'loading' | 'playing' | 'error'
+  // Keep "attaching" separate from "playing". The old player switched to
+  // "playing" as soon as /content/play returned, while HLS still had no
+  // manifest or first frame. On Android WebView that leaves a black video
+  // surface with no loader; navigating away and back happens to repaint it
+  // after the manifest/segment cache is warm.
+  const [phase, setPhase] = React.useState('idle'); // idle | loading | attaching | playing | error
+  const [buffering, setBuffering] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState('');
+  const [streamRequest, setStreamRequest] = React.useState(null); // { url, attempt }
   const videoRef = React.useRef(null);
   const hlsRef = React.useRef(null);
+  const mountedRef = React.useRef(true);
+  const watchdogRef = React.useRef(null);
+  const attemptRef = React.useRef(0);
   const posterUrl = v.thumb?.src || '';
 
   // Cleanup on unmount
-  React.useEffect(() => () => {
-    if (hlsRef.current) { try { hlsRef.current.destroy(); } catch (_) {} hlsRef.current = null; }
+  React.useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      clearTimeout(watchdogRef.current);
+      if (hlsRef.current) { try { hlsRef.current.destroy(); } catch (_) {} hlsRef.current = null; }
+    };
   }, []);
 
   // For shorts: auto-start playback as soon as the surface is mounted.
@@ -107,9 +122,27 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [v.id]);
 
+  // Attach only after React has committed the <video> and populated its ref.
+  // requestAnimationFrame is not a commit guarantee under React 18 concurrent
+  // rendering; the old code intermittently reached attachStream with a null
+  // ref and never retried until the user navigated away and back.
+  React.useEffect(() => {
+    if (!streamRequest) return;
+    attachStream(streamRequest.url);
+    // A new request/unmount destroys the current HLS instance elsewhere.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streamRequest]);
+
   const onPlayTap = async () => {
-    if (phase === 'loading') return;
+    if (phase === 'loading' || phase === 'attaching') return;
+    clearTimeout(watchdogRef.current);
+    if (hlsRef.current) {
+      try { hlsRef.current.destroy(); } catch (_) {}
+      hlsRef.current = null;
+    }
+    setStreamRequest(null);
     setPhase('loading');
+    setBuffering(false);
     setErrorMsg('');
 
     // Resolve a numeric backend content_id. Prefer raw.id / raw.content_id
@@ -126,11 +159,13 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
       const data = await fetchPlayableContent(contentId);
       url = data.url || '';
     } catch (e) {
+      if (!mountedRef.current) return;
       console.warn('[player] fetch failed:', e.status, e.message);
       setPhase('error');
       setErrorMsg(e.status === 403 ? 'Open from Telegram' : (e.message || 'Video unavailable'));
       return;
     }
+    if (!mountedRef.current) return;
     if (!url) {
       setPhase('error');
       setErrorMsg('Video unavailable');
@@ -138,10 +173,8 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
     }
 
     // Mount the <video> first so the ref is wired up, then start HLS.
-    setPhase('playing');
-
-    // Wait one frame so React commits the <video> before we touch it.
-    requestAnimationFrame(() => attachStream(url));
+    setPhase('attaching');
+    setStreamRequest({ url, attempt: ++attemptRef.current });
   };
 
   function attachStream(url) {
@@ -159,20 +192,78 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
 
     console.log('[player]', { isM3U8, nativeHls, isAndroid, hlsAvailable, url: url.substring(0, 80) });
 
+    let firstFrameSeen = false;
+    function markReady() {
+      if (firstFrameSeen || !mountedRef.current) return;
+      firstFrameSeen = true;
+      clearTimeout(watchdogRef.current);
+      setBuffering(false);
+      // The opacity transition below creates a fresh compositor paint for
+      // Android WebView instead of reusing the occasionally-black surface.
+      setPhase('playing');
+    }
+    const onWaiting = () => {
+      if (mountedRef.current && firstFrameSeen) setBuffering(true);
+    };
+    const onCanPlay = () => {
+      if (mountedRef.current) setBuffering(false);
+      markReady();
+    };
+    const onMediaError = () => {
+      const mediaError = vEl.error;
+      console.warn('[player] media element error:', mediaError?.code, mediaError?.message);
+      showError('Video failed to load');
+    };
+    vEl.addEventListener('loadeddata', markReady, { once: true });
+    // Keep these two listeners alive: they also clear the buffering HUD
+    // after any later mid-stream stall.
+    vEl.addEventListener('canplay', onCanPlay);
+    vEl.addEventListener('playing', markReady);
+    vEl.addEventListener('waiting', onWaiting);
+    vEl.addEventListener('stalled', onWaiting);
+    vEl.addEventListener('error', onMediaError, { once: true });
+
     function tryPlay() {
       vEl.muted = true; // Start muted to bypass Android autoplay block.
       const p = vEl.play();
       if (p && p.then) {
-        p.then(() => { vEl.muted = false; }).catch(e => {
+        p.then(() => {
+          if (!mountedRef.current) return;
+          vEl.muted = false;
+          if (vEl.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) markReady();
+        }).catch(e => {
           console.log('[player] autoplay blocked:', e?.message);
+          // Metadata/data may still be available even when autoplay itself
+          // is blocked. Reveal the first frame + manual play control then.
+          if (vEl.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) markReady();
         });
       }
     }
 
     function showError(msg) {
+      if (!mountedRef.current) return;
+      clearTimeout(watchdogRef.current);
+      setBuffering(false);
+      if (hlsRef.current) {
+        try { hlsRef.current.destroy(); } catch (_) {}
+        hlsRef.current = null;
+      }
+      setStreamRequest(null);
       setPhase('error');
       setErrorMsg(msg);
     }
+
+    // A lost WebView wake-up should not require the user to navigate away
+    // and back. Nudge HLS/play once if no first frame arrives promptly.
+    watchdogRef.current = setTimeout(() => {
+      if (!mountedRef.current || firstFrameSeen || vEl.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        markReady();
+        return;
+      }
+      console.warn('[player] first-frame watchdog: restarting load');
+      try { hlsRef.current?.startLoad(-1); } catch (_) {}
+      tryPlay();
+    }, 8000);
 
     // Strategy mirrors openVideoPlayer() in index.html.html:
     //   Safari/iOS → native HLS (better battery, AirPlay etc)
@@ -182,6 +273,7 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
     if (isM3U8 && nativeHls && !isAndroid) {
       console.log('[player] native HLS (Safari)');
       vEl.src = url;
+      vEl.load();
       tryPlay();
     } else if (isM3U8 && hlsAvailable) {
       console.log('[player] hls.js');
@@ -224,25 +316,30 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
           try { hls.destroy(); } catch (_) {}
           hlsRef.current = null;
           vEl.src = url;
+          vEl.load();
           tryPlay();
         }
       });
 
-      hls.attachMedia(vEl);
       // KEY: wait for MEDIA_ATTACHED before loadSource (Android race fix).
+      // Register before attachMedia so a very fast WebView cannot emit the
+      // event between attachMedia() and listener registration.
       hls.on(Hls.Events.MEDIA_ATTACHED, () => {
         console.log('[player] media attached, loading source...');
         hls.loadSource(url);
       });
+      hls.attachMedia(vEl);
     } else if (isM3U8 && nativeHls) {
       console.log('[player] native HLS (Android)');
       vEl.src = url;
+      vEl.load();
       tryPlay();
     } else if (isM3U8) {
       showError('HLS not supported in this browser');
     } else {
       // mp4 / webm / etc.
       vEl.src = url;
+      vEl.load();
       tryPlay();
     }
   }
@@ -262,16 +359,19 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
   // Custom controls overlay (for non-vertical, non-fillParent calls — i.e.
   // VideoPage). Shorts player keeps no chrome.
   const useCustomChrome = !vertical;
+  const streamMounted = phase === 'attaching' || phase === 'playing';
 
   return (
     <div style={containerStyle}>
-      {phase === 'playing' && (
+      {streamMounted && (
         <React.Fragment>
           <video
             ref={videoRef}
             controls={false}
             playsInline
             webkit-playsinline="true"
+            preload="auto"
+            poster={posterUrl || undefined}
             autoPlay={vertical || autoStart}
             loop={vertical || loop}
             onEnded={onEnded}
@@ -280,14 +380,50 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
               width: '100%', height: '100%',
               background: '#000',
               objectFit: videoFit,
+              opacity: phase === 'playing' ? 1 : 0,
+              transform: 'translateZ(0)',
+              transition: 'opacity 160ms ease-out',
             }}
           />
-          {useCustomChrome && (
+          {useCustomChrome && phase === 'playing' && (
             <CustomVideoChrome videoRef={videoRef} accent={accent} loop={loop} />
           )}
         </React.Fragment>
       )}
-      {phase !== 'playing' && (
+      {phase === 'attaching' && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 2,
+          background: v.thumb?.bg || '#000',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none',
+        }}>
+          <div style={{
+            width: 30, height: 30,
+            border: '3px solid rgba(255,255,255,0.18)',
+            borderTopColor: '#fff',
+            borderRadius: '50%',
+            animation: 'spin 0.7s linear infinite',
+            filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.55))',
+          }} />
+        </div>
+      )}
+      {phase === 'playing' && buffering && (
+        <div style={{
+          position: 'absolute', left: '50%', top: '50%', zIndex: 3,
+          transform: 'translate(-50%, -50%)',
+          pointerEvents: 'none',
+        }}>
+          <div style={{
+            width: 30, height: 30,
+            border: '3px solid rgba(255,255,255,0.18)',
+            borderTopColor: '#fff',
+            borderRadius: '50%',
+            animation: 'spin 0.7s linear infinite',
+            filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.55))',
+          }} />
+        </div>
+      )}
+      {!streamMounted && (
         <React.Fragment>
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.6) 100%)' }} />
           <button
@@ -328,9 +464,9 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
               {errorMsg}
             </div>
           )}
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </React.Fragment>
       )}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
@@ -615,7 +751,7 @@ function CustomVideoChrome({ videoRef, accent, loop }) {
       setScrubbing(false);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
-      scheduleHide();
+      wakeControls();
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
