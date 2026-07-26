@@ -100,6 +100,7 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
   const hlsRef = React.useRef(null);
   const mountedRef = React.useRef(true);
   const watchdogRef = React.useRef(null);
+  const bufferingTimerRef = React.useRef(null);
   const attemptRef = React.useRef(0);
   const posterUrl = v.thumb?.src || '';
 
@@ -109,6 +110,7 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
     return () => {
       mountedRef.current = false;
       clearTimeout(watchdogRef.current);
+      clearTimeout(bufferingTimerRef.current);
       if (hlsRef.current) { try { hlsRef.current.destroy(); } catch (_) {} hlsRef.current = null; }
     };
   }, []);
@@ -193,21 +195,50 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
     console.log('[player]', { isM3U8, nativeHls, isAndroid, hlsAvailable, url: url.substring(0, 80) });
 
     let firstFrameSeen = false;
+    let lastObservedTime = vEl.currentTime;
+    function clearBuffering() {
+      clearTimeout(bufferingTimerRef.current);
+      bufferingTimerRef.current = null;
+      if (mountedRef.current) setBuffering(false);
+    }
     function markReady() {
       if (firstFrameSeen || !mountedRef.current) return;
       firstFrameSeen = true;
       clearTimeout(watchdogRef.current);
-      setBuffering(false);
+      clearBuffering();
       // The opacity transition below creates a fresh compositor paint for
       // Android WebView instead of reusing the occasionally-black surface.
       setPhase('playing');
     }
     const onWaiting = () => {
-      if (mountedRef.current && firstFrameSeen) setBuffering(true);
+      if (!mountedRef.current || !firstFrameSeen || vEl.paused || vEl.ended) return;
+      clearTimeout(bufferingTimerRef.current);
+      const stalledAt = vEl.currentTime;
+      // iOS native HLS emits transient waiting/stalled events while it swaps
+      // segments even though the playhead keeps moving. Only show the HUD if
+      // playback is still genuinely stuck after a short grace period.
+      bufferingTimerRef.current = setTimeout(() => {
+        bufferingTimerRef.current = null;
+        if (!mountedRef.current || vEl.paused || vEl.ended) return;
+        const playheadAdvanced = Math.abs(vEl.currentTime - stalledAt) > 0.05;
+        const hasFutureData = vEl.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
+        if (!playheadAdvanced && !hasFutureData) setBuffering(true);
+      }, 450);
     };
     const onCanPlay = () => {
-      if (mountedRef.current) setBuffering(false);
+      clearBuffering();
       markReady();
+    };
+    const onPlaying = () => {
+      clearBuffering();
+      markReady();
+    };
+    const onTimeUpdate = () => {
+      // A moving playhead is definitive proof that the video is not
+      // buffering, even when WebKit forgot to emit canplay/playing.
+      const playheadAdvanced = Math.abs(vEl.currentTime - lastObservedTime) > 0.01;
+      lastObservedTime = vEl.currentTime;
+      if (playheadAdvanced) clearBuffering();
     };
     const onMediaError = () => {
       const mediaError = vEl.error;
@@ -218,7 +249,10 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
     // Keep these two listeners alive: they also clear the buffering HUD
     // after any later mid-stream stall.
     vEl.addEventListener('canplay', onCanPlay);
-    vEl.addEventListener('playing', markReady);
+    vEl.addEventListener('playing', onPlaying);
+    vEl.addEventListener('timeupdate', onTimeUpdate);
+    vEl.addEventListener('pause', clearBuffering);
+    vEl.addEventListener('ended', clearBuffering);
     vEl.addEventListener('waiting', onWaiting);
     vEl.addEventListener('stalled', onWaiting);
     vEl.addEventListener('error', onMediaError, { once: true });
@@ -243,7 +277,7 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
     function showError(msg) {
       if (!mountedRef.current) return;
       clearTimeout(watchdogRef.current);
-      setBuffering(false);
+      clearBuffering();
       if (hlsRef.current) {
         try { hlsRef.current.destroy(); } catch (_) {}
         hlsRef.current = null;
