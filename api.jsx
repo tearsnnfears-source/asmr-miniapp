@@ -908,7 +908,7 @@ function useFavorites() {
 function getMockTier() {
   try {
     const m = (new URLSearchParams(location.search).get('mock') || '').toLowerCase();
-    if (['plus', 'pro', 'elite', 'vip', 'founder'].includes(m)) return m;
+    if (['plus', 'pro', 'elite', 'king', 'vip', 'founder'].includes(m)) return m;
     return '';
   } catch (_) { return ''; }
 }
@@ -971,6 +971,8 @@ function useUser() {
         badges: Array.isArray(p.badges) ? p.badges : (p.badge ? p.badge.split(',').map(s => s.trim()).filter(Boolean) : []),
         tributeProUrl: p.tribute_pro_url || '',
         tributePlusUrl: p.tribute_plus_url || '',
+        tributeEliteUrl: p.tribute_elite_url || '',
+        tributeKingUrl: p.tribute_king_url || '',
         raw: p,
       };
     },
@@ -1131,13 +1133,15 @@ async function copyTextToClipboard(text) {
   }
 }
 
-async function actionOpenCryptoSupport({ tier = 'plus', promoCode = '' } = {}) {
+async function actionOpenCryptoSupport({ tier = 'plus', promoCode = '', bundleTarget = '' } = {}) {
   const safeTier = String(tier || 'plus').toUpperCase();
   const safePromo = String(promoCode || '').trim().toUpperCase();
   const lines = [
     CRYPTO_SUPPORT_TEXT,
     `Tier: ${safeTier}`,
   ];
+  if (safeTier === 'ELITE' && bundleTarget) lines.push(`Second page: ${bundleTarget}`);
+  if (safeTier === 'KING') lines.push('Pages: all four');
   if (safePromo) lines.push(`Promo code: ${safePromo}`);
   const message = lines.join('\n');
   const copied = await copyTextToClipboard(message);
@@ -1159,17 +1163,38 @@ async function actionOpenCryptoSupport({ tier = 'plus', promoCode = '' } = {}) {
 }
 
 // Telegram Stars invoice - POST /miniapp/create_stars_invoice
-async function actionCreateStarsInvoice(days = 31, tier = 'plus', promoCode = '') {
+async function actionCreateStarsInvoice(days = 31, tier = 'plus', promoCode = '', bundleTarget = '') {
   const initData = getInitData();
   if (!initData) {
     return { ok: false, reason: 'no-tg', message: 'Open from Telegram to subscribe' };
   }
   try {
-    const data = await apiPost('/miniapp/create_stars_invoice', { initData, days, tier, promo_code: promoCode || undefined });
+    const data = await apiPost('/miniapp/create_stars_invoice', {
+      initData, days, tier,
+      promo_code: promoCode || undefined,
+      bundle_target: bundleTarget || undefined,
+    });
     if (data.invoice_link) return { ok: true, invoice_link: data.invoice_link, promo_code: data.promo_code, promo_days: data.promo_days, days: data.days };
     return { ok: false, error: data.error || 'no invoice', message: data.error || 'Could not create Stars invoice' };
   } catch (e) {
     return { ok: false, error: e.message, message: 'Could not create Stars invoice. Try again.' };
+  }
+}
+
+async function actionPrepareBundleCheckout(tier, bundleTarget) {
+  const initData = getInitData();
+  if (!initData) {
+    return { ok: false, reason: 'no-tg', message: 'Open from Telegram to subscribe' };
+  }
+  try {
+    const data = await apiPost('/miniapp/prepare_bundle_checkout', {
+      initData,
+      tier,
+      bundle_target: bundleTarget,
+    });
+    return { ok: true, ...data };
+  } catch (e) {
+    return { ok: false, error: e.message, message: 'Could not prepare bundle checkout. Try again.' };
   }
 }
 
@@ -1199,7 +1224,10 @@ function startInvitePolling(onLink, onTimeout) {
       return;
     }
     const res = await actionCheckInvite();
-    if (res?.invite_link) {
+    if (Array.isArray(res?.access_links) && res.access_links.length) {
+      stopInvitePolling();
+      onLink && onLink(res);
+    } else if (res?.invite_link) {
       stopInvitePolling();
       onLink && onLink(res.invite_link);
     }
@@ -1252,8 +1280,75 @@ async function actionCheckInvite() {
   if (!initData) return { ok: false, reason: 'no-tg' };
   try {
     const res = await apiPost('/miniapp/check_invite', { initData });
-    return { ok: true, invite_link: res.invite_link || null };
+    return {
+      ok: true,
+      invite_link: res.invite_link || null,
+      access_links: Array.isArray(res.access_links) ? res.access_links : [],
+      tier: res.tier || '',
+      target_project: res.target_project || '',
+      created_at: res.created_at || '',
+    };
   } catch (e) { return { ok: false, error: e.message }; }
+}
+
+const ACCESS_LINKS_PREVIEW = {
+  tier: 'king',
+  access_links: [
+    { project: 'asmrleaks', label: 'ASMR.LEAKS', url: '', days_left: 31, active: true, status_available: true, refreshable: true },
+    { project: 'privateleaks', label: 'PrivateLeaks', url: '', days_left: 31, active: true, status_available: true, refreshable: true },
+    { project: 'asianleaks', label: 'AsianLeaks', url: '', days_left: 31, active: true, status_available: true, refreshable: true },
+    { project: 'extraleaks', label: 'ExtraLeaks', url: '', days_left: 31, active: true, status_available: true, refreshable: true },
+  ],
+};
+
+function useAccessLinks() {
+  return useFetch(
+    'access_links',
+    async () => {
+      const initData = getInitData();
+      if (!initData) return ACCESS_LINKS_PREVIEW;
+      const data = await apiPost('/miniapp/access_links', { initData });
+      return {
+        tier: data.tier || '',
+        access_links: Array.isArray(data.access_links) ? data.access_links : [],
+      };
+    },
+    { tier: '', access_links: [] },
+    [],
+  );
+}
+
+async function actionRefreshAccessLink(project) {
+  const safeProject = String(project || '').toLowerCase();
+  const initData = getInitData();
+  if (!initData) {
+    return {
+      ok: true,
+      project: safeProject,
+      invite_link: `https://t.me/+preview-${safeProject}`,
+      days_left: 31,
+      preview: true,
+    };
+  }
+  try {
+    const data = await apiPost('/miniapp/access_links/refresh', {
+      initData,
+      project: safeProject,
+    });
+    invalidate('access_links');
+    invalidate('my_invite');
+    return { ok: true, ...data };
+  } catch (e) {
+    let body = {};
+    try { body = JSON.parse(e.body || '{}'); } catch (_) {}
+    return {
+      ok: false,
+      active: body.active,
+      days_left: body.days_left,
+      message: body.error || (e.status === 403 ? 'No active access for this page.' : 'Could not create a new link. Try again.'),
+      error: e.message,
+    };
+  }
 }
 
 // Recent videos from the artists the current user follows. Empty
@@ -1307,15 +1402,21 @@ function useMyInvite() {
     'my_invite',
     async () => {
       const initData = getInitData();
-      if (!initData) return { invite_link: null };
+      if (!initData) return { invite_link: null, access_links: [] };
       try {
         const data = await apiPost('/miniapp/my_invite', { initData });
-        return { invite_link: data.invite_link || null };
+        return {
+          invite_link: data.invite_link || null,
+          access_links: Array.isArray(data.access_links) ? data.access_links : [],
+          tier: data.tier || '',
+          target_project: data.target_project || '',
+          created_at: data.created_at || '',
+        };
       } catch (_) {
-        return { invite_link: null };
+        return { invite_link: null, access_links: [] };
       }
     },
-    { invite_link: null },
+    { invite_link: null, access_links: [] },
     [],
   );
 }
@@ -1328,8 +1429,8 @@ initTelegram();
 Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
-  useVideos, useVideo, usePaginatedVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, useFollowedFeed, userFromTelegram,
-  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionApplyPromo, actionOpenCryptoSupport, actionStartFreeTrial, actionCheckInvite, actionCreateStarsInvoice, actionOpenTribute, actionSetNotifyExpiry, actionSuggestArtist, startInvitePolling, stopInvitePolling,
+  useVideos, useVideo, usePaginatedVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, useAccessLinks, useFollowedFeed, userFromTelegram,
+  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionApplyPromo, actionOpenCryptoSupport, actionStartFreeTrial, actionCheckInvite, actionRefreshAccessLink, actionCreateStarsInvoice, actionPrepareBundleCheckout, actionOpenTribute, actionSetNotifyExpiry, actionSuggestArtist, startInvitePolling, stopInvitePolling,
   actionCreatePlaylist, actionAddToPlaylist, actionRemoveFromPlaylist, actionDeletePlaylist,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded

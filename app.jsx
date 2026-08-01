@@ -46,6 +46,25 @@ const SCREEN_TO_TAB = {
   'paywall-artist': 'artists',
 };
 
+function normalizeInviteAccess(value) {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    return {
+      tier: '',
+      access_links: [{ project: 'asmrleaks', label: 'ASMR.LEAKS', url: value }],
+    };
+  }
+  const links = Array.isArray(value.access_links) ? value.access_links.filter(item => item?.url) : [];
+  if (links.length) return { ...value, access_links: links };
+  if (value.invite_link) {
+    return {
+      ...value,
+      access_links: [{ project: 'asmrleaks', label: 'ASMR.LEAKS', url: value.invite_link }],
+    };
+  }
+  return null;
+}
+
 // Clicks on a BottomNav tab route here.
 const TAB_TO_SCREEN = {
   home: 'home',
@@ -116,11 +135,11 @@ function AppShell() {
   // nav.openShorts(items, idx) to pop the immersive player.
   const [shortsPlayer, setShortsPlayer] = React.useState(null); // { items, order, pos } | null
 
-  // Global invite modal state. Set via nav.openInvite(link) — used by
+  // Global access modal state. Set via nav.openInvite(linkOrBundle) — used by
   //   · the boot-time auto-show below (after returning from checkout)
   //   · the SubscriptionPage trial CTA (link comes from /miniapp/free_trial)
   //   · the AppHeader bell (taps into the read-only useMyInvite hook)
-  const [inviteLink, setInviteLink] = React.useState(null);
+  const [inviteAccess, setInviteAccess] = React.useState(null);
 
   // Global paywall sheet state. Set via nav.openPaywall() — surfaces the
   // "Subscribe to unlock" modal whenever a non-Pro user tries to play /
@@ -139,7 +158,8 @@ function AppShell() {
     if (!window.isInsideTelegram || !window.isInsideTelegram()) return;
     inviteCheckedRef.current = true;
     window.actionCheckInvite?.().then(res => {
-      if (res?.invite_link) setInviteLink(res.invite_link);
+      const access = normalizeInviteAccess(res);
+      if (access) setInviteAccess(access);
     });
   }, []);
 
@@ -192,9 +212,12 @@ function AppShell() {
     setShortsPlayer,
     // Invite modal — surfaced after free trial / paid checkout, and any
     // time the user taps the AppHeader bell.
-    openInvite: (link) => { if (link) setInviteLink(link); },
-    closeInvite: () => setInviteLink(null),
-    inviteLink,
+    openInvite: (value) => {
+      const access = normalizeInviteAccess(value);
+      if (access) setInviteAccess(access);
+    },
+    closeInvite: () => setInviteAccess(null),
+    inviteAccess,
     // Paywall — opens the bottom-sheet upsell. `gate(action)` runs the
     // action straight through for Pro users, or pops the paywall for
     // free users. Every gated touch surface uses gate() so we can't
@@ -207,7 +230,7 @@ function AppShell() {
       return false;
     },
     paywallOpen,
-  }), [current.screen, current.params, stack.length, isPro, user, userState.loading, shortsPlayer, inviteLink, paywallOpen]);
+  }), [current.screen, current.params, stack.length, isPro, user, userState.loading, shortsPlayer, inviteAccess, paywallOpen]);
 
   const renderScreen = SCREENS[current.screen] || SCREENS.home;
   const view = renderScreen({ accent, density, params: current.params });
@@ -340,11 +363,11 @@ function AppShell() {
         </div>
       )}
       {/* Invite-link modal — your private group page. */}
-      {inviteLink && (
+      {inviteAccess && (
         <window.InviteModal
-          link={inviteLink}
+          access={inviteAccess}
           accent={accent}
-          onClose={() => setInviteLink(null)}
+          onClose={() => setInviteAccess(null)}
         />
       )}
       {/* Paywall upsell — opened by nav.openPaywall / nav.gate. */}

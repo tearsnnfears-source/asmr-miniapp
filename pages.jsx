@@ -285,16 +285,23 @@ function ExpiryReminderRow({ user, accent }) {
 
 // ── SUBSCRIPTION PAGE ─────────────────────────────────────────
 // ── Subscription page — 1:1 port of the live miniapp flow ──────
-// Tiers PLUS / PRO / ELITE; one monthly plan
+// Tiers PLUS / PRO / ELITE / KING; one monthly plan
 // (31 days). Payment methods: Card via Tribute / TG Stars / SBP via
 // Tribute / Crypto via admin chat. Trial card up top calls
 // actionStartFreeTrial. After paid checkout the AppShell-level
 // startInvitePolling picks up the bot-issued group invite link.
 const TIER_PRICES = {
-  plus:  { eur: 6, stars: 500 },
-  pro:   { eur: 8, stars: 650 },
-  elite: { eur: 10, stars: 800 },
+  plus:  { eur: 6,  stars: 500,  available: true },
+  pro:   { eur: 8,  stars: 650,  available: true },
+  elite: { eur: 10, stars: 800,  available: true },
+  king:  { eur: 13, stars: 1050, available: true },
 };
+const SUBSCRIPTION_TIER_ORDER = ['plus', 'pro', 'elite', 'king'];
+const ELITE_TARGETS = [
+  { id: 'privateleaks', label: 'PrivateLeaks' },
+  { id: 'asianleaks', label: 'AsianLeaks' },
+  { id: 'extraleaks', label: 'ExtraLeaks' },
+];
 function SubscriptionPage({ accent = C.pink }) {
   const nav = window.useNav();
   const userState = window.useUser();
@@ -303,8 +310,9 @@ function SubscriptionPage({ accent = C.pink }) {
   const hasAnySub = user.isPro;
   const isInfiniteSub = user.isInfinite;
 
-  // Tier carousel state.
+  // Tier grid state.
   const [tier, setTier] = React.useState('plus');
+  const [eliteTarget, setEliteTarget] = React.useState('privateleaks');
   // Payment method: 0=Card 1=Stars 2=SBP 3=Crypto
   const [method, setMethod] = React.useState(0);
   const [busy, setBusy] = React.useState(false);
@@ -350,23 +358,46 @@ function SubscriptionPage({ accent = C.pink }) {
   };
 
   // Match live miniapp's per-tier Tribute URLs (provided via /miniapp/profile).
-  const tributeUrl = tier === 'elite'
-    ? (user.tributeEliteUrl || 'https://t.me/tribute/app?startapp=sT5E')
+  const tributeUrl = tier === 'king'
+    ? (user.tributeKingUrl || 'https://t.me/tribute/app?startapp=s10Vq')
+    : tier === 'elite'
+      ? (user.tributeEliteUrl || 'https://t.me/tribute/app?startapp=sT5E')
     : tier === 'pro'
       ? (user.tributeProUrl || 'https://t.me/tribute/app?startapp=sT5D')
       : (user.tributePlusUrl || 'https://t.me/tribute/app?startapp=sQSn');
 
   const planDays = 31;
   const tierMeta = {
-    plus:  { name: 'PLUS',  color: C.pink,   accent: C.pink,  gradient: 'linear-gradient(145deg,#1a0d1f,#260d1a)' },
-    pro:   { name: 'PRO',   color: '#00E5FF', accent: '#00E5FF', gradient: 'linear-gradient(145deg,#091820,#0d1f26)' },
-    elite: { name: 'ELITE', color: '#FFD700', accent: '#FFD700', gradient: 'linear-gradient(145deg,#1a1508,#261d08)' },
+    plus: {
+      name: 'PLUS', color: C.pink, surface: 'rgba(255,126,200,0.055)', access: 'ASMR ACCESS',
+      cardLines: ['Full video catalog', 'Photos & playlists'], detail: 'Everything you need inside ASMR.LEAKS.',
+    },
+    pro: {
+      name: 'PRO', color: '#00E5FF', surface: 'rgba(0,229,255,0.05)', access: 'ASMR PRO',
+      cardLines: ['Everything in PLUS', 'VODs & backups'], detail: 'The complete ASMR.LEAKS experience.',
+    },
+    elite: {
+      name: 'ELITE', color: '#FFD45A', surface: 'rgba(255,212,90,0.055)', access: '2 CHANNELS',
+      cardLines: ['ASMR + your choice', 'One subscription'], detail: 'ASMR.LEAKS plus one private page of your choice.',
+    },
+    king: {
+      name: 'KING', color: '#C792FF', surface: 'rgba(199,146,255,0.06)', access: 'ALL 4 CHANNELS',
+      cardLines: ['4 private pages', '250+ artists'], detail: 'ASMR, PRIVATELEAKS, ASIAN and EXTRALEAKS pages. Over 250 artists, 100,000 photos and 20,000 videos.',
+    },
   };
   const cur = tierMeta[tier];
-  const price = TIER_PRICES[tier].eur;
+  const selectedPlan = TIER_PRICES[tier];
+  const price = selectedPlan.eur;
+  const isTierAvailable = selectedPlan.available;
+  const selectedEliteTarget = ELITE_TARGETS.find((item) => item.id === eliteTarget) || ELITE_TARGETS[0];
+  const bundleTarget = tier === 'elite' ? selectedEliteTarget.id : tier === 'king' ? 'all' : '';
+  const selectedDetail = tier === 'elite'
+    ? `ASMR.LEAKS + ${selectedEliteTarget.label}. One subscription, two private pages.`
+    : cur.detail;
 
   const onPay = async () => {
     if (busy) return;
+    if (!isTierAvailable) return;
     // Preview-mode (outside Telegram): just flip Pro locally.
     if (!isInsideTg) {
       nav.setPro(true); nav.reset('home'); return;
@@ -378,10 +409,17 @@ function SubscriptionPage({ accent = C.pink }) {
         let promoForPay = appliedPromo;
         if (!promoForPay && promo.trim()) promoForPay = await applyPromo();
         if (promo.trim() && !promoForPay) return;
+        if (tier === 'elite' || tier === 'king') {
+          const prepared = await window.actionPrepareBundleCheckout?.(tier, bundleTarget);
+          if (!prepared?.ok) {
+            alert(prepared?.message || 'Could not prepare bundle checkout');
+            return;
+          }
+        }
         const r = window.actionOpenTribute(tributeUrl,
-          (link) => {
+          (access) => {
             // Bot issued the invite — pop the modal and reset caches.
-            nav.openInvite?.(link);
+            nav.openInvite?.(access);
             window.invalidate?.('user');
             window.invalidate?.('my_invite');
           },
@@ -399,7 +437,7 @@ function SubscriptionPage({ accent = C.pink }) {
         let promoForPay = appliedPromo;
         if (!promoForPay && promo.trim()) promoForPay = await applyPromo();
         if (promo.trim() && !promoForPay) return;
-        const r = await window.actionCreateStarsInvoice(planDays, tier, promoForPay?.code || '');
+        const r = await window.actionCreateStarsInvoice(planDays, tier, promoForPay?.code || '', bundleTarget);
         if (!r.ok) { alert(r.message || 'Could not create Stars invoice'); return; }
         const tg = window.Telegram?.WebApp;
         if (tg && typeof tg.openInvoice === 'function') {
@@ -409,7 +447,7 @@ function SubscriptionPage({ accent = C.pink }) {
               window.invalidate?.('my_invite');
               // Bot issues invite via postback — poll for it.
               window.startInvitePolling?.(
-                (link) => nav.openInvite?.(link),
+                (access) => nav.openInvite?.(access),
                 () => {},
               );
               nav.reset('home');
@@ -427,7 +465,7 @@ function SubscriptionPage({ accent = C.pink }) {
       // ── Crypto via admin chat ───────────────────────────────
       if (method === 3) {
         const promoForChat = appliedPromo?.code || promo.trim().toUpperCase();
-        const r = await window.actionOpenCryptoSupport?.({ tier, promoCode: promoForChat });
+        const r = await window.actionOpenCryptoSupport?.({ tier, promoCode: promoForChat, bundleTarget });
         if (!r?.ok) { alert(r?.displayMessage || 'Could not open Telegram chat'); return; }
         nav.reset('home');
         return;
@@ -481,76 +519,117 @@ function SubscriptionPage({ accent = C.pink }) {
           </div>
         </div>
 
-        {/* Tier carousel — 3 cards horizontally scrollable, snap-to */}
-        <div style={{
-          display: 'flex', gap: 12, padding: '14px 14px 6px',
-          overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch',
-        }}>
-          {['plus','pro','elite'].map((id) => {
-            const t = tierMeta[id];
-            const isActive = id === tier;
-            const isSoon = id === 'elite';
-            const onTap = isSoon ? undefined : () => setTier(id);
-            return (
-              <div key={id} onClick={onTap} style={{
-                flexShrink: 0, width: 220, scrollSnapAlign: 'center',
-                background: t.gradient,
-                border: `2px solid ${isActive ? t.color : C.border}`,
-                borderRadius: 18,
-                padding: '14px 14px 12px',
-                cursor: isSoon ? 'default' : 'pointer',
-                opacity: isSoon ? 0.58 : 1,
-                position: 'relative',
-                boxShadow: isActive ? `0 10px 28px ${t.color}33` : 'none',
-                transition: 'all 200ms',
-              }}>
-                {isSoon && (
-                  <div style={{
-                    position: 'absolute', top: 10, right: 10,
-                    background: t.color, color: '#000',
-                    fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 999, letterSpacing: 0.4,
-                  }}>SOON</div>
-                )}
-                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: t.color, letterSpacing: 1, lineHeight: 1 }}>{t.name}</div>
-                {!isSoon ? (
-                  <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, marginTop: 6, lineHeight: 1 }}>
-                    €{TIER_PRICES[id].eur} <span style={{ fontSize: 11, color: C.muted, fontWeight: 400 }}>/ mo</span>
+        {/* All plans stay visible: core ASMR plans above, bundles below. */}
+        <div style={{ padding: '14px 14px 10px' }}>
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gap: 8,
+          }}>
+            {SUBSCRIPTION_TIER_ORDER.map((id) => {
+              const t = tierMeta[id];
+              const plan = TIER_PRICES[id];
+              const isActive = id === tier;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={isActive}
+                  onClick={() => setTier(id)}
+                  style={{
+                    minWidth: 0, height: 142,
+                    background: isActive ? `${t.color}12` : t.surface,
+                    color: C.text,
+                    border: `1.5px solid ${isActive ? t.color : C.border2}`,
+                    borderRadius: 8,
+                    padding: '12px 11px 10px',
+                    cursor: 'pointer', textAlign: 'left',
+                    position: 'relative', overflow: 'hidden',
+                    outline: 'none',
+                    boxShadow: isActive ? `inset 0 0 0 1px ${t.color}26` : 'none',
+                    transition: 'background 160ms ease, border-color 160ms ease',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
+                    <div style={{
+                      fontFamily: "'Bebas Neue', sans-serif", fontSize: 22,
+                      color: t.color, letterSpacing: 1, lineHeight: 1,
+                    }}>{t.name}</div>
+                    <span style={{
+                      width: 16, height: 16, flex: '0 0 16px', borderRadius: '50%',
+                      border: `1.5px solid ${isActive ? t.color : C.border2}`,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {isActive && <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.color }} />}
+                    </span>
                   </div>
-                ) : (
-                  <div style={{ fontSize: 11, marginTop: 6, color: 'rgba(255,215,0,0.6)' }}>privateleaks.tv</div>
-                )}
-                <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 5, fontSize: 11, color: 'rgba(255,255,255,0.78)' }}>
-                  {id === 'plus' && (<>
-                    <div>✅ All ASMR videos</div>
-                    <div>✅ Photo galleries</div>
-                    <div>✅ Favorites & playlists</div>
-                  </>)}
-                  {id === 'pro' && (<>
-                    <div>✅ Everything in PLUS</div>
-                    <div>📺 Stream VODs</div>
-                    <div>▶️ YouTube backups</div>
-                    <div>💎 PRO badge</div>
-                  </>)}
-                  {id === 'elite' && (<>
-                    <div>✅ Everything in PRO</div>
-                    <div>🌐 asmrleaks.tv + privateleaks.tv</div>
-                    <div>👑 ELITE badge</div>
-                  </>)}
-                </div>
-              </div>
-            );
-          })}
+                  <div style={{
+                    display: 'inline-flex', marginTop: 6,
+                    color: t.color, border: `1px solid ${t.color}45`,
+                    borderRadius: 999, padding: '2px 6px',
+                    fontSize: 8, lineHeight: 1.2, fontWeight: 800, letterSpacing: 0.55,
+                  }}>{t.access}</div>
+                  <div style={{
+                    display: 'flex', alignItems: 'baseline', gap: 4,
+                    fontFamily: "'Bebas Neue', sans-serif", fontSize: 25,
+                    lineHeight: 1, marginTop: 7,
+                  }}>
+                    €{plan.eur}
+                    <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 9, color: C.muted, fontWeight: 600 }}>/MO</span>
+                    {!plan.available && (
+                      <span style={{ marginLeft: 'auto', color: t.color, fontFamily: "'DM Sans', sans-serif", fontSize: 8, fontWeight: 800, letterSpacing: 0.55 }}>SOON</span>
+                    )}
+                  </div>
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {t.cardLines.map((line) => (
+                      <div key={line} style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        minWidth: 0, color: 'rgba(255,255,255,0.72)', fontSize: 9.5, lineHeight: 1.15,
+                      }}>
+                        <span style={{ width: 4, height: 4, flex: '0 0 4px', borderRadius: '50%', background: t.color }} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{line}</span>
+                      </div>
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
-        {/* Tier dots */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, padding: '4px 0 10px' }}>
-          {['plus','pro','elite'].map((id) => (
-            <span key={id} style={{
-              width: id === tier ? 18 : 6, height: 6, borderRadius: 999,
-              background: id === tier ? tierMeta[id].color : 'rgba(255,255,255,0.18)',
-              transition: 'all 200ms',
-            }} />
-          ))}
-        </div>
+
+        {tier === 'elite' && (
+          <div style={{ padding: '0 14px 10px' }}>
+            <div style={{
+              fontSize: 9.5, color: C.muted, fontWeight: 800,
+              letterSpacing: 0.9, textTransform: 'uppercase', marginBottom: 7,
+            }}>Choose your second page</div>
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gap: 6, padding: 5, background: C.dark2,
+              border: `1px solid ${C.border}`, borderRadius: 8,
+            }}>
+              {ELITE_TARGETS.map((item) => {
+                const active = item.id === eliteTarget;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setEliteTarget(item.id)}
+                    style={{
+                      minWidth: 0, height: 38, padding: '0 5px',
+                      borderRadius: 6,
+                      border: `1px solid ${active ? cur.color : 'transparent'}`,
+                      background: active ? `${cur.color}16` : 'transparent',
+                      color: active ? cur.color : C.muted2,
+                      fontSize: 10, fontWeight: 800, lineHeight: 1,
+                      cursor: 'pointer', outline: 'none', fontFamily: 'inherit',
+                    }}
+                  >{item.label}</button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Free trial card */}
         {!user.trialUsed && (
@@ -582,111 +661,119 @@ function SubscriptionPage({ accent = C.pink }) {
         <div style={{ padding: '4px 14px 6px' }}>
           <div style={{
             background: C.dark2, border: `1.5px solid ${cur.color}`,
-            borderRadius: 16, padding: '14px 14px',
+            borderRadius: 8, padding: '14px 14px',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: 12,
           }}>
-            <div>
-              <div style={{ fontSize: 9.5, color: cur.color, fontWeight: 800, letterSpacing: 0.7, textTransform: 'uppercase' }}>Most popular</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 9.5, color: cur.color, fontWeight: 800, letterSpacing: 0.7, textTransform: 'uppercase' }}>
+                {isTierAvailable ? 'Selected plan' : 'Coming soon'}
+              </div>
               <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, marginTop: 2, lineHeight: 1 }}>1 Month</div>
-              <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>€{(price/planDays).toFixed(2)}/day · ⭐ {TIER_PRICES[tier].stars} Stars</div>
+              <div style={{ fontSize: 10.5, color: C.muted2, marginTop: 4, lineHeight: 1.35 }}>{selectedDetail}</div>
+              <div style={{ fontSize: 10.5, color: C.muted, marginTop: 5 }}>€{(price/planDays).toFixed(2)}/day · ⭐ {selectedPlan.stars} Stars</div>
             </div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 30, color: cur.color, lineHeight: 1 }}>
+            <div style={{ flex: '0 0 auto', fontFamily: "'Bebas Neue', sans-serif", fontSize: 30, color: cur.color, lineHeight: 1 }}>
               €{price}
             </div>
           </div>
         </div>
 
-        {/* Payment method section */}
-        <div style={{ padding: '14px 14px 6px' }}>
-          <div style={{ fontSize: 9.5, color: C.muted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Payment method</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {[
-              { i: 0, icon: '💳', name: 'Card',     desc: 'via Tribute' },
-              { i: 1, icon: '⭐', name: 'TG Stars', desc: 'Telegram Stars' },
-              { i: 2, icon: '🏦', name: 'СБП',      desc: 'Russian banks · Tribute' },
-              { i: 3, icon: '₿',  name: 'Crypto',   desc: 'Manual via admin' },
-            ].map((m) => {
-              const active = method === m.i;
-              return (
-                <div key={m.i} onClick={() => setMethod(m.i)} style={{
-                  background: active ? `${cur.color}14` : C.dark2,
-                  border: `1.5px solid ${active ? cur.color : C.border}`,
-                  borderRadius: 12, padding: '10px 12px',
-                  display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
-                }}>
-                  <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>{m.icon}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700 }}>{m.name}</div>
-                    <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{m.desc}</div>
-                  </div>
-                  <span style={{
-                    width: 18, height: 18, borderRadius: '50%',
-                    border: `2px solid ${active ? cur.color : C.border2}`,
-                    background: active ? cur.color : 'transparent',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        {isTierAvailable && (<>
+          {/* Payment method section */}
+          <div style={{ padding: '14px 14px 6px' }}>
+            <div style={{ fontSize: 9.5, color: C.muted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Payment method</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {[
+                { i: 0, icon: '💳', name: 'Card',     desc: 'via Tribute' },
+                { i: 1, icon: '⭐', name: 'TG Stars', desc: 'Telegram Stars' },
+                { i: 2, icon: '🏦', name: 'СБП',      desc: 'Russian banks · Tribute' },
+                { i: 3, icon: '₿',  name: 'Crypto',   desc: 'Manual via admin' },
+              ].map((m) => {
+                const active = method === m.i;
+                return (
+                  <div key={m.i} onClick={() => setMethod(m.i)} style={{
+                    background: active ? `${cur.color}14` : C.dark2,
+                    border: `1.5px solid ${active ? cur.color : C.border}`,
+                    borderRadius: 12, padding: '10px 12px',
+                    display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
                   }}>
-                    {active && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#000' }} />}
-                  </span>
-                </div>
-              );
-            })}
+                    <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>{m.icon}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{m.name}</div>
+                      <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{m.desc}</div>
+                    </div>
+                    <span style={{
+                      width: 18, height: 18, borderRadius: '50%',
+                      border: `2px solid ${active ? cur.color : C.border2}`,
+                      background: active ? cur.color : 'transparent',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {active && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#000' }} />}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
 
-        {/* Promo code */}
-        <div style={{ padding: '12px 14px 4px' }}>
-          <div style={{ fontSize: 9.5, color: C.muted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Promo code</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <input
-              value={promo}
-              onChange={(e) => {
-                setPromo(e.target.value.toUpperCase());
-                setPromoState('');
-                setPromoMsg('');
-                setAppliedPromo(null);
-              }}
-              placeholder="Enter promo code"
-              style={{
-                flex: 1, minWidth: 0,
-                background: C.dark2,
-                border: `1px solid ${promoState === 'ok' ? C.lime : promoState === 'bad' ? '#FF6B6B' : C.border}`,
-                color: C.text, padding: '11px 12px', borderRadius: 12,
-                fontSize: 13, outline: 'none', fontFamily: 'inherit',
-              }}
-            />
-            <button onClick={applyPromo} disabled={promoBusy} style={{
-              background: 'transparent', color: accent,
-              border: `1px solid ${accent}55`, borderRadius: 12,
-              padding: '0 16px', fontSize: 12, fontWeight: 700, cursor: promoBusy ? 'default' : 'pointer',
-              fontFamily: 'inherit',
-              opacity: promoBusy ? 0.65 : 1,
-            }}>{promoBusy ? '…' : 'Apply'}</button>
+          {/* Promo code */}
+          <div style={{ padding: '12px 14px 4px' }}>
+            <div style={{ fontSize: 9.5, color: C.muted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Promo code</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                value={promo}
+                onChange={(e) => {
+                  setPromo(e.target.value.toUpperCase());
+                  setPromoState('');
+                  setPromoMsg('');
+                  setAppliedPromo(null);
+                }}
+                placeholder="Enter promo code"
+                style={{
+                  flex: 1, minWidth: 0,
+                  background: C.dark2,
+                  border: `1px solid ${promoState === 'ok' ? C.lime : promoState === 'bad' ? '#FF6B6B' : C.border}`,
+                  color: C.text, padding: '11px 12px', borderRadius: 12,
+                  fontSize: 13, outline: 'none', fontFamily: 'inherit',
+                }}
+              />
+              <button onClick={applyPromo} disabled={promoBusy} style={{
+                background: 'transparent', color: accent,
+                border: `1px solid ${accent}55`, borderRadius: 12,
+                padding: '0 16px', fontSize: 12, fontWeight: 700, cursor: promoBusy ? 'default' : 'pointer',
+                fontFamily: 'inherit',
+                opacity: promoBusy ? 0.65 : 1,
+              }}>{promoBusy ? '…' : 'Apply'}</button>
+            </div>
+            {promoState === 'ok' && (
+              <div style={{ fontSize: 11, color: C.lime, marginTop: 6 }}>🎉 {promoMsg || 'Promo applied'}</div>
+            )}
+            {promoState === 'bad' && (
+              <div style={{ fontSize: 11, color: '#FF6B6B', marginTop: 6 }}>❌ {promoMsg || 'Invalid promo code'}</div>
+            )}
           </div>
-          {promoState === 'ok' && (
-            <div style={{ fontSize: 11, color: C.lime, marginTop: 6 }}>🎉 {promoMsg || 'Promo applied'}</div>
-          )}
-          {promoState === 'bad' && (
-            <div style={{ fontSize: 11, color: '#FF6B6B', marginTop: 6 }}>❌ {promoMsg || 'Invalid promo code'}</div>
-          )}
-        </div>
+        </>)}
 
         {/* Pay CTA */}
         <div style={{ padding: '16px 14px 8px' }}>
-          <button onClick={onPay} disabled={busy} style={{
+          <button onClick={onPay} disabled={busy || !isTierAvailable} style={{
             width: '100%',
             background: busy ? 'rgba(255,255,255,0.08)'
-                            : `linear-gradient(135deg, ${cur.color}, ${C.purple})`,
-            color: busy ? C.muted2 : '#000',
-            border: 'none', padding: '16px', borderRadius: 16,
+                            : isTierAvailable ? cur.color : `${cur.color}14`,
+            color: busy ? C.muted2 : isTierAvailable ? '#000' : cur.color,
+            border: isTierAvailable ? 'none' : `1px solid ${cur.color}55`, padding: '16px', borderRadius: 12,
             fontFamily: "'Bebas Neue', sans-serif",
             fontSize: 17, letterSpacing: 1.2,
-            cursor: busy ? 'default' : 'pointer',
-            boxShadow: busy ? 'none' : `0 8px 24px ${cur.color}44`,
+            cursor: busy || !isTierAvailable ? 'default' : 'pointer',
+            boxShadow: 'none',
           }}>
-            {busy ? 'PROCESSING…' : `SUBSCRIBE — ${cur.name} €${price}/MO →`}
+            {busy ? 'PROCESSING…' : isTierAvailable ? `SUBSCRIBE — ${cur.name} €${price}/MO →` : `${cur.name} €${price}/MO — COMING SOON`}
           </button>
           <div style={{ textAlign: 'center', fontSize: 10, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>
-            Cancel anytime · Card via Tribute · Crypto via admin
+            {isTierAvailable
+              ? 'Cancel anytime · Card via Tribute · Crypto via admin'
+              : `31 days · ${selectedPlan.stars} Stars · ${cur.access.toLowerCase()}`}
           </div>
         </div>
 

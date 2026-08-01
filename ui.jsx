@@ -74,6 +74,10 @@ const Ico = {
   user: (props={}) => <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}><circle cx="12" cy="8" r="4"/><path d="M5 21c1-4 4-6 7-6s6 2 7 6"/></svg>,
   search: (props={}) => <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/></svg>,
   bell: (props={}) => <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2H4.5z"/><path d="M10 21h4"/></svg>,
+  link: (props={}) => <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.2-1.2"/></svg>,
+  refresh: (props={}) => <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M18.5 9A7 7 0 0 0 6.2 6.2L4 8"/><path d="M5.5 15A7 7 0 0 0 17.8 17.8L20 16"/></svg>,
+  external: (props={}) => <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M14 4h6v6"/><path d="m20 4-9 9"/><path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"/></svg>,
+  close: (props={}) => <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...props}><path d="m6 6 12 12M18 6 6 18"/></svg>,
   play: (props={}) => <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" {...props}><path d="M8 5v14l11-7z"/></svg>,
   heart: (props={}) => <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg>,
   heartFilled: (props={}) => <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" {...props}><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg>,
@@ -163,87 +167,34 @@ const TIER_COLORS = {
   plus: '#FF7EC8',   // pink
   pro: '#00E5FF',    // cyan
   elite: '#FFD700',  // gold
+  king: '#C792FF',   // violet
   vip: '#C86BFF',    // purple
   founder: '#FF9F44', // orange
 };
 
-// App Header — avatar + name + tier, clickable area on left → profile.
-// Pulls user data from nav context (live API or Telegram fallback).
-function AppHeader({ user: userProp, accent = C.pink }) {
+// Compact app header. Subscription identity lives in the center profile tab;
+// the header keeps the high-frequency actions visible at every width.
+function AppHeader({ accent = C.pink }) {
   const nav = useNav();
-  const user = userProp || nav.user || { name: 'You', daysLeft: 0, isPro: false };
-  // While /miniapp/profile is in flight we don't yet know the user's tier.
-  // Skip the badge entirely so we don't flash FREE → ELITE.
-  const userLoading = nav.userLoading;
-  const tier = (user.tier || 'free').toLowerCase();
-  const tierColor = TIER_COLORS[tier] || accent;
-  const daysLabel = user.isInfinite ? '∞' : (user.daysLeft || 0);
-  // Tier badge only when the user actually has access (days>0 or
-  // lifetime). The previous fallback on `tier !== 'free'` left expired
-  // subscribers wearing their last tier badge — which conflicts with
-  // the gated /content/play behaviour on the backend.
-  // Grace users get their own orange badge so they don't look like
-  // strangers — same UX as the live miniapp.
-  const showGrace = !userLoading && user.isGrace;
-  const showTier  = !userLoading && user.isPro;
-  const showFree  = !userLoading && !user.isPro && !user.isGrace;
-  const GRACE_COLOR = '#FF9800';
   return (
     <div style={{
-      padding: '8px 14px 10px',
+      minHeight: 56,
+      padding: '8px 10px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       flexShrink: 0,
       background: C.dark2,
       borderBottom: `1px solid ${C.border}`,
     }}>
-      {/* clickable cluster → profile */}
-      <div onClick={() => nav.go('profile')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-        <Avatar
-          artist={{ id: 'u-' + (user.telegramId || 0), name: user.name, photo: user.photo }}
-          size={40}
-          ring={showTier ? tierColor : (showGrace ? GRACE_COLOR : accent)}
-        />
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-            {user.name}
-            {showTier ? (
-              <span style={{
-                fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: 12, letterSpacing: 1, padding: '2px 6px', borderRadius: 4,
-                background: tierColor, color: '#000', lineHeight: 1, fontWeight: 700,
-              }}>{tier.toUpperCase()}{user.isInfinite ? ' ∞' : ''}</span>
-            ) : showGrace ? (
-              <span style={{
-                fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: 12, letterSpacing: 1, padding: '2px 6px', borderRadius: 4,
-                background: GRACE_COLOR, color: '#000', lineHeight: 1, fontWeight: 700,
-              }}>GRACE {user.graceDaysLeft}d</span>
-            ) : showFree ? (
-              <span style={{
-                fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: 12, letterSpacing: 1, padding: '2px 6px', borderRadius: 4,
-                background: 'rgba(255,255,255,0.15)', color: C.muted2, lineHeight: 1, fontWeight: 700,
-              }}>FREE</span>
-            ) : (
-              // userLoading: show a neutral placeholder so we don't flash FREE.
-              <span style={{
-                width: 40, height: 14, borderRadius: 4,
-                background: 'rgba(255,255,255,0.08)',
-                display: 'inline-block',
-              }} />
-            )}
-          </div>
-          <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>
-            {user.isPro
-              ? (user.isInfinite ? 'lifetime · view profile ›' : `${daysLabel} days left · view profile ›`)
-              : (showGrace
-                  ? `Renew to keep access · view profile ›`
-                  : 'view profile ›')}
-          </div>
-        </div>
-      </div>
+      <button onClick={() => nav.go('home')} title="Home" style={{
+        minWidth: 0, padding: '4px 2px', border: 'none', background: 'transparent',
+        color: C.text, cursor: 'pointer', fontFamily: "'Bebas Neue', sans-serif",
+        fontSize: 20, lineHeight: 1, letterSpacing: 0, whiteSpace: 'nowrap',
+      }}>
+        ASMR<span style={{ color: accent }}>.LEAKS</span>
+      </button>
       <div style={{ display: 'flex', gap: 6 }}>
-        <button onClick={() => nav.go('search')} style={iconBtn}><Ico.search /></button>
+        <AppHeaderLinks accent={accent} />
+        <button onClick={() => nav.go('search')} style={iconBtn} title="Search" aria-label="Search"><Ico.search /></button>
         <AppHeaderBell accent={accent} />
       </div>
     </div>
@@ -252,12 +203,30 @@ function AppHeader({ user: userProp, accent = C.pink }) {
 
 const iconBtn = {
   position: 'relative',
-  width: 38, height: 38, borderRadius: 12,
+  width: 38, height: 38, borderRadius: 8,
   background: 'transparent',
   border: `1px solid ${C.border}`,
   color: C.text, cursor: 'pointer',
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
 };
+
+function AppHeaderLinks({ accent = C.pink }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <React.Fragment>
+      <button onClick={() => setOpen(true)} title="Your group links" style={{
+        height: 38, padding: '0 10px', borderRadius: 8,
+        background: `${accent}12`, border: `1px solid ${accent}66`,
+        color: accent, cursor: 'pointer', fontFamily: 'inherit',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+      }}>
+        <Ico.link />
+        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0 }}>LINKS</span>
+      </button>
+      {open && <LinksPanel accent={accent} onClose={() => setOpen(false)} />}
+    </React.Fragment>
+  );
+}
 
 // Bell → notifications panel. Reads invite link from /miniapp/my_invite
 // and surfaces it as a notification entry (so the user can always come
@@ -301,15 +270,29 @@ function _firstSeenAt(key) {
 }
 
 function AppHeaderBell({ accent = C.pink }) {
-  const myInvite = window.useMyInvite ? window.useMyInvite() : { data: { invite_link: null } };
+  const myInvite = window.useMyInvite ? window.useMyInvite() : { data: { invite_link: null, access_links: [] } };
   const link = myInvite.data?.invite_link;
+  const accessLinks = Array.isArray(myInvite.data?.access_links) ? myInvite.data.access_links : [];
 
   // Build the notifications array. Newest first. Each item:
   //   { id, kind, createdAt, render({ accent, onClose }) => ReactNode }
   // For now only the invite-link entry exists; new kinds slot in here.
   const notifications = React.useMemo(() => {
     const out = [];
-    if (link) {
+    if (accessLinks.length) {
+      const bundleKey = `${myInvite.data?.tier || 'bundle'}:${accessLinks.map(item => item.url).join('|')}`;
+      const createdRaw = myInvite.data?.created_at;
+      const createdAt = createdRaw
+        ? (new Date(createdRaw).getTime() || _firstSeenAt('bundle:' + bundleKey))
+        : _firstSeenAt('bundle:' + bundleKey);
+      out.push({
+        id: 'bundle:' + bundleKey,
+        kind: 'bundle',
+        createdAt,
+        tier: myInvite.data?.tier || '',
+        links: accessLinks,
+      });
+    } else if (link) {
       const createdAt = _firstSeenAt('invite:' + link);
       out.push({
         id: 'invite:' + link,
@@ -321,7 +304,7 @@ function AppHeaderBell({ accent = C.pink }) {
     // Sort newest first.
     out.sort((a, b) => b.createdAt - a.createdAt);
     return out;
-  }, [link]);
+  }, [link, accessLinks, myInvite.data?.tier, myInvite.data?.created_at]);
 
   // Bump on every open so we re-read seenAt from storage after stamping.
   const [openTick, setOpenTick] = React.useState(0);
@@ -416,26 +399,39 @@ function BottomNav({ active, centerMode, accent = C.pink, subAccent = C.lime }) 
           // Profile avatar in the center slot — uses the live user from
           // context so it shows the real Telegram photo, not a letter.
           const u = nav.user || {};
+          const reportedTier = String(u.tier || '').toLowerCase();
+          const tier = reportedTier && reportedTier !== 'free' ? reportedTier : 'pro';
+          const profileAccent = u.isGrace ? '#FF9800' : (TIER_COLORS[tier] || subAccent);
+          const tierLabel = u.isGrace
+            ? 'GRACE'
+            : u.isInfinite ? 'LIFETIME' : tier.toUpperCase();
           return (
-            <div key={t.id} style={{ display: 'flex', justifyContent: 'center' }}>
+            <div key={t.id} style={{ height: 44, display: 'flex', justifyContent: 'center' }}>
               <button onClick={() => nav.onTab('center')} style={{
-                marginTop: -22, position: 'relative',
-                width: 56, height: 56, borderRadius: '50%',
-                background: C.dark3,
-                border: `2px solid ${subAccent}`,
+                marginTop: -24, position: 'relative',
+                width: 68, height: 70,
+                background: 'transparent', border: 'none',
                 cursor: 'pointer', padding: 0,
-                boxShadow: `0 0 0 4px ${C.dark2}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
               }}>
-                <Avatar artist={{ id: 'u-' + (u.telegramId || 0), name: u.name || 'You', photo: u.photo }} size={44} />
                 <span style={{
-                  position: 'absolute', bottom: -2, right: -2,
-                  background: subAccent, color: '#000',
-                  width: 18, height: 18, borderRadius: '50%',
+                  width: 56, height: 56, borderRadius: '50%',
+                  background: C.dark3, border: `2px solid ${profileAccent}`,
+                  boxShadow: `0 0 0 4px ${C.dark2}`,
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 10, fontWeight: 800,
+                }}>
+                  <Avatar artist={{ id: 'u-' + (u.telegramId || 0), name: u.name || 'You', photo: u.photo }} size={44} />
+                </span>
+                <span style={{
+                  position: 'absolute', top: 49, left: '50%', transform: 'translateX(-50%)',
+                  minWidth: 38, maxWidth: 66, height: 17, padding: '0 6px', borderRadius: 5,
+                  background: profileAccent, color: '#000',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: tierLabel.length > 6 ? 8.5 : 10, fontWeight: 800, letterSpacing: 0,
+                  whiteSpace: 'nowrap', overflow: 'hidden',
                   border: `2px solid ${C.dark2}`,
-                }}>✓</span>
+                }}>{tierLabel}</span>
               </button>
             </div>
           );
@@ -815,31 +811,36 @@ const TickerSlides = {
 // "Your private page" — pops after free trial / paid checkout and
 // whenever the user taps the AppHeader bell. The Join button uses
 // tg.openTelegramLink so it stays inside the Telegram client.
-function InviteModal({ link, onClose, accent = C.pink }) {
-  const openLink = (e) => {
-    e?.preventDefault?.();
-    if (!link) return;
-    const tg = window.Telegram?.WebApp;
-    const isTg = /^https?:\/\/(t\.me|telegram\.me)\//i.test(link) || /^tg:\/\//i.test(link);
-    if (isTg && tg && typeof tg.openTelegramLink === 'function') {
-      tg.openTelegramLink(link);
-    } else if (tg && typeof tg.openLink === 'function') {
-      tg.openLink(link);
-    } else {
-      window.open(link, '_blank', 'noopener');
-    }
-    onClose && onClose();
-  };
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(link);
-    } catch (_) {
-      // Fallback for older WebViews — select and execCommand('copy').
-      const ta = document.createElement('textarea');
-      ta.value = link; document.body.appendChild(ta);
-      ta.select(); try { document.execCommand('copy'); } catch (_) {}
-      ta.remove();
-    }
+function _openAccessLink(link) {
+  if (!link) return;
+  const tg = window.Telegram?.WebApp;
+  const isTg = /^https?:\/\/(t\.me|telegram\.me)\//i.test(link) || /^tg:\/\//i.test(link);
+  if (isTg && tg && typeof tg.openTelegramLink === 'function') tg.openTelegramLink(link);
+  else if (tg && typeof tg.openLink === 'function') tg.openLink(link);
+  else window.open(link, '_blank', 'noopener');
+}
+
+async function _copyAccessLink(link) {
+  try {
+    await navigator.clipboard.writeText(link);
+  } catch (_) {
+    const ta = document.createElement('textarea');
+    ta.value = link; document.body.appendChild(ta);
+    ta.select(); try { document.execCommand('copy'); } catch (_) {}
+    ta.remove();
+  }
+}
+
+function InviteModal({ access, link, onClose, accent = C.pink }) {
+  const links = Array.isArray(access?.access_links) && access.access_links.length
+    ? access.access_links
+    : link ? [{ project: 'asmrleaks', label: 'ASMR.LEAKS', url: link }] : [];
+  const tier = String(access?.tier || '').toUpperCase();
+  const [copied, setCopied] = React.useState('');
+  const copy = async (item) => {
+    await _copyAccessLink(item.url);
+    setCopied(item.project || item.url);
+    setTimeout(() => setCopied(''), 1400);
   };
   return (
     <div onClick={onClose} style={{
@@ -865,46 +866,48 @@ function InviteModal({ link, onClose, accent = C.pink }) {
         <div style={{
           fontFamily: "'Bebas Neue', sans-serif",
           fontSize: 26, letterSpacing: 1.2, lineHeight: 1,
-        }}>Your <span style={{ color: accent }}>page</span> is ready</div>
+        }}>{tier || 'Your'} <span style={{ color: accent }}>access</span> is ready</div>
         <div style={{ fontSize: 13, color: C.muted2, marginTop: 8, lineHeight: 1.45 }}>
-          Tap below to open your private group. Save the link — it's yours.
+          {links.length > 1
+            ? `Your subscription includes ${links.length} private pages. Join each one below.`
+            : 'Tap below to open your private group.'}
         </div>
-        {/* Link preview row */}
-        <div style={{
-          marginTop: 16, display: 'flex', alignItems: 'center', gap: 8,
-          background: 'rgba(0,0,0,0.4)', border: `1px solid ${C.border}`,
-          borderRadius: 12, padding: '10px 12px',
-          textAlign: 'left',
-        }}>
-          <div style={{
-            flex: 1, minWidth: 0,
-            fontSize: 11, color: C.muted2, fontFamily: 'monospace',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>{link || '—'}</div>
-          <button onClick={copy} style={{
-            background: 'transparent', border: `1px solid ${C.border2}`,
-            color: C.muted2, padding: '5px 10px', borderRadius: 999,
-            fontSize: 10, fontWeight: 700, cursor: 'pointer',
-            fontFamily: 'inherit', flexShrink: 0,
-          }}>Copy</button>
+        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {links.map((item) => {
+            const key = item.project || item.url;
+            return (
+              <div key={key} style={{
+                display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto',
+                alignItems: 'center', gap: 7,
+                background: 'rgba(0,0,0,0.35)', border: `1px solid ${C.border2}`,
+                borderRadius: 8, padding: '8px 8px 8px 11px', textAlign: 'left',
+              }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: C.text }}>{item.label || item.project || 'Private page'}</div>
+                  {item.days_left != null && <div style={{ fontSize: 9.5, color: C.muted, marginTop: 2 }}>{item.days_left} days</div>}
+                </div>
+                <button onClick={() => copy(item)} style={{
+                  height: 32, padding: '0 9px', borderRadius: 6,
+                  background: 'transparent', border: `1px solid ${C.border2}`,
+                  color: copied === key ? accent : C.muted2,
+                  fontSize: 9.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                }}>{copied === key ? 'Copied' : 'Copy'}</button>
+                <button onClick={() => _openAccessLink(item.url)} disabled={!item.url} style={{
+                  height: 32, padding: '0 12px', borderRadius: 6,
+                  background: item.url ? accent : 'rgba(255,255,255,0.08)',
+                  border: 'none', color: item.url ? '#000' : C.muted,
+                  fontFamily: "'Bebas Neue', sans-serif", fontSize: 14, letterSpacing: 0.7,
+                  cursor: item.url ? 'pointer' : 'default',
+                }}>JOIN</button>
+              </div>
+            );
+          })}
         </div>
-        {/* CTA */}
-        <button onClick={openLink} disabled={!link} style={{
-          width: '100%', marginTop: 14,
-          background: link ? `linear-gradient(135deg, ${accent}, ${C.purple})` : 'rgba(255,255,255,0.08)',
-          color: link ? '#000' : C.muted2,
-          border: 'none', borderRadius: 14,
-          padding: '14px 16px',
-          fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: 18, letterSpacing: 1.2,
-          cursor: link ? 'pointer' : 'default',
-          boxShadow: link ? `0 8px 22px ${accent}55` : 'none',
-        }}>JOIN GROUP →</button>
         <button onClick={onClose} style={{
-          marginTop: 8, background: 'transparent', border: 'none',
+          marginTop: 10, background: 'transparent', border: 'none',
           color: C.muted, fontSize: 12, fontWeight: 600,
           cursor: 'pointer', padding: 8, fontFamily: 'inherit',
-        }}>Maybe later</button>
+        }}>Done</button>
       </div>
     </div>
   );
@@ -915,6 +918,172 @@ function InviteModal({ link, onClose, accent = C.pink }) {
 // events — currently just the "subscription active" entry that holds
 // the private-group invite link. Designed to grow: new kinds register
 // in AppHeaderBell's `notifications` builder and render here.
+// Persistent access hub. A refresh never grants days: the corresponding bot
+// checks its own database first and only then creates a fresh one-time invite.
+function LinksPanel({ accent = C.pink, onClose }) {
+  const linksState = window.useAccessLinks();
+  const fetchedLinks = Array.isArray(linksState.data?.access_links)
+    ? linksState.data.access_links
+    : [];
+  const [rows, setRows] = React.useState([]);
+  const [overrides, setOverrides] = React.useState({});
+  const [busy, setBusy] = React.useState('');
+  const [feedback, setFeedback] = React.useState({});
+
+  React.useEffect(() => {
+    if (fetchedLinks.length || !linksState.loading) setRows(fetchedLinks);
+  }, [fetchedLinks, linksState.loading]);
+
+  React.useEffect(() => {
+    const onKey = (event) => { if (event.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const refresh = async (item) => {
+    const project = item.project;
+    if (!project || busy) return;
+    setBusy(project);
+    setFeedback(current => ({
+      ...current,
+      [project]: { kind: 'loading', text: 'Checking access...' },
+    }));
+    const result = await window.actionRefreshAccessLink(project);
+    if (result.ok) {
+      setOverrides(current => ({
+        ...current,
+        [project]: {
+          url: result.invite_link,
+          days_left: result.days_left,
+          active: true,
+        },
+      }));
+      setFeedback(current => ({
+        ...current,
+        [project]: { kind: 'success', text: 'New link ready' },
+      }));
+    } else {
+      if (result.active === false) {
+        setOverrides(current => ({
+          ...current,
+          [project]: { url: '', days_left: 0, active: false },
+        }));
+      }
+      setFeedback(current => ({
+        ...current,
+        [project]: { kind: 'error', text: result.message || 'Could not create a new link.' },
+      }));
+    }
+    setBusy('');
+  };
+
+  const links = rows.map(item => ({ ...item, ...(overrides[item.project] || {}) }));
+  const tier = String(linksState.data?.tier || '').toUpperCase();
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 9750,
+      background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)',
+      display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+      padding: '0 10px',
+      paddingTop: 'calc(60px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))',
+      paddingBottom: 'calc(18px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))',
+    }}>
+      <div onClick={(event) => event.stopPropagation()} style={{
+        width: '100%', maxWidth: 380,
+        maxHeight: 'calc(100vh - 92px)', overflow: 'hidden',
+        background: C.dark2, border: `1px solid ${C.border2}`, borderRadius: 8,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.58)',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        <div style={{
+          minHeight: 58, padding: '11px 12px 11px 14px',
+          borderBottom: `1px solid ${C.border}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{
+              fontFamily: "'Bebas Neue', sans-serif", fontSize: 21,
+              lineHeight: 1, letterSpacing: 0,
+            }}>YOUR <span style={{ color: accent }}>LINKS</span></div>
+            <div style={{ fontSize: 10.5, color: C.muted, marginTop: 4 }}>
+              {tier ? `${tier} access` : 'Private pages'}{links.length ? ` · ${links.length} ${links.length === 1 ? 'page' : 'pages'}` : ''}
+            </div>
+          </div>
+          <button onClick={onClose} style={iconBtn} title="Close" aria-label="Close links"><Ico.close /></button>
+        </div>
+
+        <div style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {linksState.loading && links.length === 0 && (
+            <div style={{ padding: '30px 14px', color: C.muted, textAlign: 'center', fontSize: 12 }}>Loading links...</div>
+          )}
+          {!linksState.loading && links.length === 0 && (
+            <div style={{ padding: '34px 18px', textAlign: 'center' }}>
+              <div style={{ color: C.muted2, fontSize: 13, fontWeight: 700 }}>No active pages</div>
+              <div style={{ color: C.muted, fontSize: 11, marginTop: 5 }}>Your subscription links will appear here.</div>
+            </div>
+          )}
+          {links.map((item, index) => {
+            const state = feedback[item.project];
+            const isBusy = busy === item.project;
+            const statusText = item.status_available === false
+              ? 'Status unavailable'
+              : item.active === false
+              ? 'No active access'
+              : Number(item.days_left) > 0
+                ? `${item.days_left} days left`
+                : tier ? `Included in ${tier}` : 'Active access';
+            return (
+              <div key={item.project || item.url || index} style={{
+                minHeight: 72, padding: '12px 12px 12px 14px',
+                borderBottom: index < links.length - 1 ? `1px solid ${C.border}` : 'none',
+                display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 38px 72px',
+                alignItems: 'center', columnGap: 8,
+              }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.15 }}>{item.label || item.project}</div>
+                  <div style={{
+                    fontSize: 10.5, marginTop: 4,
+                    color: item.status_available === false ? C.orange : item.active === false ? '#FF6B75' : C.muted,
+                  }}>{statusText}</div>
+                  {state && (
+                    <div style={{
+                      fontSize: 9.5, marginTop: 3, lineHeight: 1.25,
+                      color: state.kind === 'success' ? accent : state.kind === 'error' ? '#FF6B75' : C.muted2,
+                    }}>{state.text}</div>
+                  )}
+                </div>
+                <button
+                  onClick={() => refresh(item)} disabled={isBusy}
+                  title={`Create a new ${item.label || 'group'} link`}
+                  aria-label={`Refresh ${item.label || 'group'} link`}
+                  style={{
+                    ...iconBtn, width: 38, height: 38,
+                    color: isBusy ? accent : C.muted2,
+                    cursor: isBusy ? 'wait' : 'pointer', opacity: busy && !isBusy ? 0.55 : 1,
+                  }}
+                ><Ico.refresh /></button>
+                <button
+                  onClick={() => _openAccessLink(item.url)} disabled={!item.url}
+                  style={{
+                    height: 38, padding: '0 9px', borderRadius: 7,
+                    border: item.url ? `1px solid ${accent}` : `1px solid ${C.border}`,
+                    background: item.url ? accent : 'transparent',
+                    color: item.url ? '#000' : C.muted,
+                    cursor: item.url ? 'pointer' : 'default', fontFamily: 'inherit',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                    fontSize: 10.5, fontWeight: 800, letterSpacing: 0,
+                  }}
+                >JOIN <Ico.external /></button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NotificationsPanel({ notifications, accent = C.pink, onClose }) {
   const items = Array.isArray(notifications) ? notifications : [];
   return (
@@ -960,6 +1129,14 @@ function NotificationsPanel({ notifications, accent = C.pink, onClose }) {
         }}>
           {items.length === 0 && <NotificationsEmpty />}
           {items.map(n => {
+            if (n.kind === 'bundle') {
+              return (
+                <NotifBundleCard key={n.id}
+                  tier={n.tier} links={n.links} createdAt={n.createdAt}
+                  accent={accent}
+                />
+              );
+            }
             if (n.kind === 'invite') {
               return (
                 <NotifInviteCard key={n.id}
@@ -987,6 +1164,45 @@ function NotificationsEmpty() {
       <div style={{ fontSize: 13 }}>No notifications yet</div>
       <div style={{ fontSize: 11, marginTop: 4, color: C.muted }}>
         Subscription updates and new drops from artists you follow will show up here.
+      </div>
+    </div>
+  );
+}
+
+function NotifBundleCard({ tier, links, createdAt, accent = C.pink }) {
+  const accessLinks = Array.isArray(links) ? links : [];
+  return (
+    <div style={{
+      background: `${accent}0d`, border: `1px solid ${accent}55`,
+      borderRadius: 10, padding: 12,
+      display: 'flex', flexDirection: 'column', gap: 9,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 8,
+          background: accent, color: '#000',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: "'Bebas Neue', sans-serif", fontSize: 14, letterSpacing: 0.6,
+        }}>{String(tier || 'VIP').toUpperCase()}</div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 800 }}>Bundle access active</div>
+          <div style={{ fontSize: 10.5, color: C.muted2, marginTop: 2 }}>
+            {_formatNotifDate(createdAt)} · {accessLinks.length} private pages
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {accessLinks.map((item) => (
+          <button key={item.project || item.url} onClick={() => _openAccessLink(item.url)} style={{
+            width: '100%', minHeight: 38, padding: '0 10px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+            background: C.dark3, border: `1px solid ${C.border2}`, borderRadius: 7,
+            color: C.text, cursor: 'pointer', fontFamily: 'inherit',
+          }}>
+            <span style={{ fontSize: 11.5, fontWeight: 700 }}>{item.label || item.project || 'Private page'}</span>
+            <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 13, color: accent, letterSpacing: 0.6 }}>JOIN →</span>
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -1186,4 +1402,4 @@ function PaywallSheet({ accent = C.pink, onClose }) {
   );
 }
 
-Object.assign(window, { C, tagColor, Phone, Ico, Thumb, Avatar, AppHeader, BottomNav, StatsStrip, PromoBanner, Chip, SectionHeader, TickerBanner, TickerSlides, TIER_COLORS, InviteModal, NotificationsPanel, BlurLock, PaywallSheet });
+Object.assign(window, { C, tagColor, Phone, Ico, Thumb, Avatar, AppHeader, BottomNav, StatsStrip, PromoBanner, Chip, SectionHeader, TickerBanner, TickerSlides, TIER_COLORS, InviteModal, LinksPanel, NotificationsPanel, BlurLock, PaywallSheet });
