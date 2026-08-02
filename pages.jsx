@@ -369,19 +369,19 @@ function SubscriptionPage({ accent = C.pink }) {
   const planDays = 31;
   const tierMeta = {
     plus: {
-      name: 'PLUS', color: C.pink, surface: 'rgba(255,126,200,0.055)', access: 'ASMR ACCESS',
+      name: 'ASMR PLUS', color: C.pink, surface: 'rgba(255,126,200,0.055)', access: 'ASMR ACCESS',
       cardLines: ['Full video catalog', 'Photos & playlists'], detail: 'Everything you need inside ASMR.LEAKS.',
     },
     pro: {
-      name: 'PRO', color: '#00E5FF', surface: 'rgba(0,229,255,0.05)', access: 'ASMR PRO',
+      name: 'ASMR PRO', color: '#00E5FF', surface: 'rgba(0,229,255,0.05)', access: 'ASMR PRO',
       cardLines: ['Everything in PLUS', 'VODs & backups'], detail: 'The complete ASMR.LEAKS experience.',
     },
     elite: {
-      name: 'ELITE', color: '#FFD45A', surface: 'rgba(255,212,90,0.055)', access: '2 CHANNELS',
+      name: 'LEAKS ELITE', color: '#FFD45A', surface: 'rgba(255,212,90,0.055)', access: '2 CHANNELS',
       cardLines: ['ASMR + your choice', 'One subscription'], detail: 'ASMR.LEAKS plus one private page of your choice.',
     },
     king: {
-      name: 'KING', color: '#C792FF', surface: 'rgba(199,146,255,0.06)', access: 'ALL 4 CHANNELS',
+      name: 'LEAKS KING', color: '#C792FF', surface: 'rgba(199,146,255,0.06)', access: 'ALL 4 CHANNELS',
       cardLines: ['4 private pages', '250+ artists'], detail: 'ASMR, PRIVATELEAKS, ASIAN and EXTRALEAKS pages. Over 250 artists, 100,000 photos and 20,000 videos.',
     },
   };
