@@ -121,7 +121,9 @@ function AppShell() {
     // we don't hit Railway with parallel /content/play POSTs (it was
     // visibly throttling the very requests we wanted to speed up at
     // concurrency 4+). The rest load lazily via IntersectionObserver.
-    const ids = list.slice(0, 4).map(s => s.raw?.id ?? s.id).filter(x => x != null);
+    const ids = list.slice(0, 4)
+      .map(s => s.raw?.id ?? s.id)
+      .filter(id => /^\d+$/.test(String(id)));
     if (ids.length && window.prefetchPlayable) {
       window.prefetchPlayable(ids, 2);
     }
