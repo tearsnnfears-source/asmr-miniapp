@@ -52,8 +52,7 @@
   input { -webkit-appearance: none; appearance: none; }
 
   /* Static splash. Renders before any React JS — so users never see the
-     mock-data fallback flash. App calls window.__hideSplash() once real
-     data is loaded; the 10s safety timeout below hides it regardless. */
+     mock-data fallback flash. App hides it only after real data is ready. */
   #static-splash {
     position: fixed; inset: 0; z-index: 100000;
     background: #0E0E0F;
@@ -80,6 +79,25 @@
     border-top-color: #FF7EC8;
     border-radius: 50%;
     animation: spl-spin 0.7s linear infinite;
+  }
+  #static-splash .slow-load {
+    display: none;
+    text-align: center;
+    color: rgba(255,255,255,0.72);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  #static-splash.is-slow .slow-load { display: block; }
+  #static-splash .retry-load {
+    margin-top: 12px;
+    min-width: 112px;
+    min-height: 38px;
+    border: 1px solid rgba(255,126,200,0.55);
+    border-radius: 8px;
+    background: rgba(255,126,200,0.1);
+    color: #FF7EC8;
+    font-size: 12px;
+    font-weight: 700;
   }
   @keyframes spl-spin { to { transform: rotate(360deg); } }
 
@@ -117,6 +135,10 @@
 <div id="static-splash">
   <div class="logo">ASMR<span class="accent">.LEAKS</span></div>
   <div class="spin"></div>
+  <div class="slow-load">
+    Connection is taking longer than usual.<br>
+    <button class="retry-load" type="button" onclick="location.reload()">Retry</button>
+  </div>
 </div>
 <script>
   // Hide hook that AppShell calls once real data lands.
@@ -127,8 +149,12 @@
     setTimeout(function () { el && el.remove && el.remove(); }, 300);
     window.__hideSplash = function () {}; // idempotent
   };
-  // Safety net: never let the splash trap the user even if React crashes.
-  setTimeout(function () { window.__hideSplash(); }, 10000);
+  // Never reveal an empty shell. If startup really stalls, keep the splash
+  // and offer a retry; successful late data can still call __hideSplash().
+  setTimeout(function () {
+    var el = document.getElementById('static-splash');
+    if (el) el.classList.add('is-slow');
+  }, 15000);
 </script>
 <div id="root"></div>
 
