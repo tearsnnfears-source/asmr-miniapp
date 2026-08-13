@@ -1254,10 +1254,20 @@ function actionOpenTribute(url, onLink, onTimeout) {
   if (!url) return { ok: false, message: 'No Tribute URL configured' };
   const tg = window.Telegram?.WebApp;
   try {
-    if (tg && typeof tg.openLink === 'function') tg.openLink(url);
+    // Tribute is itself a Telegram Mini App. openLink() treats the URL as an
+    // external website on iOS and sends the user through Safari; using
+    // openTelegramLink() lets Telegram resolve the direct Mini App link and
+    // open it over this app without closing our current WebView.
+    if (tg && typeof tg.openTelegramLink === 'function') tg.openTelegramLink(url);
+    else if (tg && typeof tg.openLink === 'function') tg.openLink(url);
     else window.open(url, '_blank', 'noopener');
   } catch (_) {
-    window.open(url, '_blank', 'noopener');
+    try {
+      if (tg && typeof tg.openLink === 'function') tg.openLink(url);
+      else window.open(url, '_blank', 'noopener');
+    } catch (_) {
+      return { ok: false, message: 'Could not open Tribute' };
+    }
   }
   startInvitePolling(onLink, onTimeout);
   return { ok: true };
