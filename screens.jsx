@@ -1,10 +1,8 @@
 // Shorts page — Hybrid: grid catalog on top, tap opens swipe-player
 // Video page — Title → action-row → artist card → next videos (no comments)
 
-// Single cache key for every consumer of the shorts list — anything that
-// uses useShorts must pass this constant so ShortsTab grid and ShortsPlayer
-// see the exact same array (preventing index/id mismatch on tap-through).
-const SHORTS_LIMIT = 1000; // effective no-cap; catalog is well under this
+// Load the catalog incrementally so mobile WebViews never parse it all at once.
+const SHORTS_PAGE_SIZE = 24;
 
 // ── SHORTS TAB ────────────────────────────────────────────────
 // The grid and the immersive player live in one component now so the grid
@@ -13,19 +11,19 @@ const SHORTS_LIMIT = 1000; // effective no-cap; catalog is well under this
 // the whole ShortsTab mounted across tab switches (via visibility:hidden)
 // so the loaded video elements aren't blown away by Home/Saved tab clicks.
 function ShortsTab({ accent = C.pink }) {
-  const shortsState = window.useShorts(SHORTS_LIMIT);
+  const shortsPage = window.usePaginatedShorts(SHORTS_PAGE_SIZE);
   const artistsState = window.useArtists();
   // Enrich each short's artist with the photo from /miniapp/artists so the
   // tile avatars in the grid show real faces, not a single letter.
   const allShorts = React.useMemo(() => {
-    const raw = shortsState.data || [];
+    const raw = shortsPage.items || [];
     const byName = new Map((artistsState.data || []).map(a => [a.name, a]));
     return raw.map(s => {
       const live = byName.get(s.artist?.name);
       if (!live) return s;
       return { ...s, artist: { ...s.artist, photo: live.photo, profilePhoto: live.profilePhoto } };
     });
-  }, [shortsState.data, artistsState.data]);
+  }, [shortsPage.items, artistsState.data]);
   const favState = window.useFavorites();
   const likedIds = new Set((favState.data?.items || []).map(it => Number(it.raw?.content_id ?? it.id)));
 
@@ -147,7 +145,7 @@ function ShortsTab({ accent = C.pink }) {
           <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, letterSpacing: 1.4, lineHeight: 1 }}>
             <span style={{ color: accent }}>Shorts</span>
           </div>
-          <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{allShorts.length} clips · all artists</div>
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{allShorts.length} clips loaded · all artists</div>
         </div>
 
         {/* Filter chips: Newest / Best / Liked / <artists…>.
@@ -200,18 +198,32 @@ function ShortsTab({ accent = C.pink }) {
               }} />
           ))}
         </div>
-        {visible < filteredShorts.length && (
+        {(visible < filteredShorts.length || shortsPage.hasMore) && (
           <div style={{ padding: '4px 14px 18px' }}>
-            <button onClick={() => setVisible(v => v + 20)} style={{
+            <button
+              disabled={shortsPage.loading}
+              onClick={() => {
+                if (visible < filteredShorts.length) setVisible(v => v + 20);
+                else shortsPage.loadMore();
+              }}
+              style={{
               width: '100%',
               background: 'transparent',
               color: accent,
               border: `1px solid ${accent}55`,
               borderRadius: 12,
               padding: '12px',
-              fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              fontSize: 13, fontWeight: 700,
+              cursor: shortsPage.loading ? 'default' : 'pointer',
+              opacity: shortsPage.loading ? 0.5 : 1,
               fontFamily: 'inherit',
-            }}>Load more ({filteredShorts.length - visible} left)</button>
+            }}>
+              {shortsPage.loading
+                ? 'Loading...'
+                : visible < filteredShorts.length
+                  ? `Load more (${filteredShorts.length - visible} ready)`
+                  : 'Load more clips'}
+            </button>
           </div>
         )}
         {filter === 'liked' && filteredShorts.length === 0 && (

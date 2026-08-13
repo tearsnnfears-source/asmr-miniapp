@@ -1181,6 +1181,57 @@ async function actionCreateStarsInvoice(days = 31, tier = 'plus', promoCode = ''
   }
 }
 
+// Incremental shorts catalog. Keeping the first page small is important on
+// iOS Telegram WebViews: the old 1000-row response was about 25 MB and could
+// exhaust the WebView before React painted the home screen.
+const _paginatedShortsCache = new Map();
+function usePaginatedShorts(pageSize = 24) {
+  const cached = _paginatedShortsCache.get(pageSize);
+  const [items, setItems]     = React.useState(cached?.items || []);
+  const [hasMore, setHasMore] = React.useState(cached?.hasMore ?? true);
+  const [loading, setLoading] = React.useState(!cached);
+  const [error, setError]     = React.useState(null);
+  const inflight = React.useRef(false);
+
+  React.useEffect(() => {
+    _paginatedShortsCache.set(pageSize, { items, hasMore });
+  }, [pageSize, items, hasMore]);
+
+  const fetchPage = React.useCallback(async (offset) => {
+    if (inflight.current) return;
+    inflight.current = true;
+    setLoading(true);
+    try {
+      const data = await apiGet('/miniapp/shorts', { limit: pageSize, offset });
+      const fresh = (data.shorts || []).map(normalizeShort).filter(s => s.id != null);
+      setItems(prev => {
+        if (offset === 0) return fresh;
+        const seen = new Set(prev.map(s => String(s.id)));
+        return [...prev, ...fresh.filter(s => !seen.has(String(s.id)))];
+      });
+      setHasMore(typeof data.has_more === 'boolean' ? data.has_more : fresh.length === pageSize);
+      setError(null);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setLoading(false);
+      inflight.current = false;
+    }
+  }, [pageSize]);
+
+  React.useEffect(() => {
+    if (!cached) fetchPage(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const loadMore = React.useCallback(() => {
+    if (!hasMore || loading) return;
+    fetchPage(items.length);
+  }, [items.length, hasMore, loading, fetchPage]);
+
+  return { items, loading, hasMore, loadMore, error };
+}
+
 async function actionPrepareBundleCheckout(tier, bundleTarget) {
   const initData = getInitData();
   if (!initData) {
@@ -1429,7 +1480,7 @@ initTelegram();
 Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
-  useVideos, useVideo, usePaginatedVideos, useShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, useAccessLinks, useFollowedFeed, userFromTelegram,
+  useVideos, useVideo, usePaginatedVideos, useShorts, usePaginatedShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, useAccessLinks, useFollowedFeed, userFromTelegram,
   actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionApplyPromo, actionOpenCryptoSupport, actionStartFreeTrial, actionCheckInvite, actionRefreshAccessLink, actionCreateStarsInvoice, actionPrepareBundleCheckout, actionOpenTribute, actionSetNotifyExpiry, actionSuggestArtist, startInvitePolling, stopInvitePolling,
   actionCreatePlaylist, actionAddToPlaylist, actionRemoveFromPlaylist, actionDeletePlaylist,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,

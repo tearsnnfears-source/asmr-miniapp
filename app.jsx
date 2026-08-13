@@ -87,47 +87,18 @@ function AppShell() {
   // History stack — each entry { screen, params }. Top of stack = current.
   const [stack, setStack] = React.useState([{ screen: 'home', params: {} }]);
   const current = stack[stack.length - 1];
+  const [shortsMounted, setShortsMounted] = React.useState(false);
+  React.useEffect(() => {
+    if (current.screen === 'shorts') setShortsMounted(true);
+  }, [current.screen]);
 
   // User profile from real API — drives isPro, displayed name, days left.
   // Falls back to mock when not in Telegram (preview-URL browser testing).
   const userState = window.useUser();
   const user = userState.data;
-  // Warm the cache for videos + shorts + artists at app start so tab-switching
-  // is instant. Hooks return state but we don't use it here — the goal is to
-  // populate the module-level cache before screens mount their own consumers.
-  // Only the 30-item "latest" list is warmed at start — it powers Home
-  // and the "Up next" tail in VideoPage. Specific videos are fetched on
-  // demand via useVideo(id) (GET /miniapp/video/{id}), so the catalog can
-  // be unlimited without slowing down launch.
-  window.useVideos(30);
-  // Home now uses usePaginatedVideos (offset/limit chunks of 30) so we
-  // don't try to warm the whole DB at boot any more — that was making
-  // first paint wait on a 10s+ response while the splash sat.
-  // Must match SHORTS_LIMIT in screens.jsx — otherwise ShortsTab and the warm
-  // cache would have different keys and the player would index into the wrong
-  // array.
-  const shortsState = window.useShorts(1000);
+  // Load only the data required by the first visible Home screen.
+  const homeVideosState = window.usePaginatedVideos(30);
   const artistsState = window.useArtists();
-  window.useFavorites();
-  window.useFollows();
-
-  // Prefetch playable URLs for the first batch of shorts so tile previews
-  // come up almost instantly when the user opens the Shorts tab.
-  React.useEffect(() => {
-    const list = shortsState.data || [];
-    if (!list.length) return;
-    // Warm the first 4 IDs — exactly the 2×2 grid the user sees above
-    // the fold the moment they tap Shorts. Concurrency stays at 2 so
-    // we don't hit Railway with parallel /content/play POSTs (it was
-    // visibly throttling the very requests we wanted to speed up at
-    // concurrency 4+). The rest load lazily via IntersectionObserver.
-    const ids = list.slice(0, 4)
-      .map(s => s.raw?.id ?? s.id)
-      .filter(id => /^\d+$/.test(String(id)));
-    if (ids.length && window.prefetchPlayable) {
-      window.prefetchPlayable(ids, 2);
-    }
-  }, [shortsState.data]);
   // Tweak toggle still wins for local testing.
   const [proOverride, setProOverride] = React.useState(null);
   const isPro = proOverride != null ? proOverride : (t.startPro ? true : user.isPro);
@@ -191,6 +162,7 @@ function AppShell() {
     setPro,
     user,
     userLoading: userState.loading,
+    homeVideos: homeVideosState,
     // Tab-click handler used by BottomNav.
     onTab: (tabId) => {
       if (tabId === 'center') {
@@ -232,7 +204,7 @@ function AppShell() {
       return false;
     },
     paywallOpen,
-  }), [current.screen, current.params, stack.length, isPro, user, userState.loading, shortsPlayer, inviteAccess, paywallOpen]);
+  }), [current.screen, current.params, stack.length, isPro, user, userState.loading, homeVideosState.items, homeVideosState.loading, homeVideosState.hasMore, shortsPlayer, inviteAccess, paywallOpen]);
 
   const renderScreen = SCREENS[current.screen] || SCREENS.home;
   const view = renderScreen({ accent, density, params: current.params });
@@ -255,7 +227,7 @@ function AppShell() {
   // tier badge appears). Outside Telegram there's no /profile to wait on.
   const isTg = !!(window.isInsideTelegram && window.isInsideTelegram());
   const userReady = !isTg || hasReal('user');
-  const dataReady = hasReal('artists') && hasReal('videos:30') && userReady;
+  const dataReady = hasReal('artists') && homeVideosState.items.length > 0 && userReady;
   React.useEffect(() => {
     if (!dataReady) return;
     // Give the screens one paint to render real data, then hide.
@@ -323,20 +295,17 @@ function AppShell() {
   return (
     <NavContext.Provider value={nav}>
       <PhoneStage>
-        {/* Layered stage: ShortsTab is always mounted so the 200+ short-tile
-            preview videos stay loaded across tab switches. The other screens
-            are mounted on demand. visibility:hidden + position:absolute keep
-            ShortsTab out of layout while still keeping its <video> elements
-            alive in the DOM (no reload on return). */}
+        {/* Shorts mounts only after its first visit, then stays alive across
+            tab switches so previews do not reload on every return. */}
         <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <div style={{
+          {(shortsMounted || current.screen === 'shorts') && <div style={{
             position: 'absolute', inset: 0,
             display: 'flex', flexDirection: 'column',
             visibility: current.screen === 'shorts' ? 'visible' : 'hidden',
             pointerEvents: current.screen === 'shorts' ? 'auto' : 'none',
           }}>
             <window.ShortsTab accent={accent} />
-          </div>
+          </div>}
           {current.screen !== 'shorts' && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
               {view}

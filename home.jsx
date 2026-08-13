@@ -99,7 +99,7 @@ function HomeV2({ accent = C.pink, density = 'comfortable' }) {
   // Incremental pagination — first page (30 rows) lands fast, the rest
   // streams in only when the user actually taps Load more. Bye-bye the
   // 10s+ wait that the previous useVideos(10000) caused.
-  const videosPage = window.usePaginatedVideos(30);
+  const videosPage = nav.homeVideos;
   const videos = videosPage.items;
   const hero = videos[0];
 
