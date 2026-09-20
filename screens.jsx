@@ -1,31 +1,34 @@
 // Shorts page — Hybrid: grid catalog on top, tap opens swipe-player
 // Video page — Title → action-row → artist card → next videos (no comments)
 
-// Load the catalog incrementally so mobile WebViews never parse it all at once.
-const SHORTS_PAGE_SIZE = 24;
-
 // ── SHORTS TAB ────────────────────────────────────────────────
 // The grid and the immersive player live in one component now so the grid
 // stays mounted while the player is open — preview videos don't have to
 // reload when the user dismisses the player. AppShell additionally keeps
 // the whole ShortsTab mounted across tab switches (via visibility:hidden)
 // so the loaded video elements aren't blown away by Home/Saved tab clicks.
-function ShortsTab({ accent = C.pink }) {
-  const shortsPage = window.usePaginatedShorts(SHORTS_PAGE_SIZE);
+function ShortsTab({ accent = C.pink, active = true }) {
+  const nav = window.useNav();
+  const [filter, setFilter] = React.useState(null);
+  const [visible, setVisible] = React.useState(20);
+  const shortsPage = window.usePaginatedShorts(window.SHORTS_PAGE_SIZE, {
+    enabled: filter !== 'liked',
+    order: filter === 'newest' || filter === 'best' ? filter : 'random',
+    artist: filter?.startsWith('artist:') ? filter.slice(7) : '',
+  });
+  const favState = window.useFavorites();
   const artistsState = window.useArtists();
   // Enrich each short's artist with the photo from /miniapp/artists so the
   // tile avatars in the grid show real faces, not a single letter.
   const allShorts = React.useMemo(() => {
-    const raw = shortsPage.items || [];
+    const raw = filter === 'liked' ? (favState.data?.shorts || []) : shortsPage.items;
     const byName = new Map((artistsState.data || []).map(a => [a.name, a]));
     return raw.map(s => {
       const live = byName.get(s.artist?.name);
       if (!live) return s;
       return { ...s, artist: { ...s.artist, photo: live.photo, profilePhoto: live.profilePhoto } };
     });
-  }, [shortsPage.items, artistsState.data]);
-  const favState = window.useFavorites();
-  const likedIds = new Set((favState.data?.items || []).map(it => Number(it.raw?.content_id ?? it.id)));
+  }, [shortsPage.items, artistsState.data, filter, favState.data?.shorts]);
 
   // Player overlay state.
   // playingPos = position in the currently active list (allShorts or shuffled).
@@ -53,56 +56,15 @@ function ShortsTab({ accent = C.pink }) {
     };
   }, [playingPos != null]);
 
-  // Filter state — null = default (random shuffle), or one of the named
-  // filters: 'newest' | 'best' | 'liked' | 'artist:<name>'.
-  const [filter, setFilter] = React.useState(null);
-  const [visible, setVisible] = React.useState(20);
-
   // Reset visible count when the filter changes (otherwise "Load more" leaks
   // state across filter changes and shows confusing tile counts).
   React.useEffect(() => { setVisible(20); }, [filter]);
 
-  // Stable random ordering for the default view. Reshuffled only when the
-  // underlying shorts list itself changes (new fetch).
-  const randomShorts = React.useMemo(() => {
-    const arr = [...allShorts];
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
-  }, [allShorts]);
-
-  // Apply the active filter to produce the rendered list.
-  const filteredShorts = React.useMemo(() => {
-    if (filter == null) return randomShorts;
-    if (filter === 'newest') {
-      // Latest first by created_at (raw.created_at), falling back to id.
-      return [...allShorts].sort((a, b) => {
-        const ta = new Date(a.raw?.created_at || 0).getTime();
-        const tb = new Date(b.raw?.created_at || 0).getTime();
-        if (ta !== tb) return tb - ta;
-        return (b.raw?.id || 0) - (a.raw?.id || 0);
-      });
-    }
-    if (filter === 'best') {
-      // Best-effort sort by reaction/like count if backend ever ships it,
-      // otherwise by views (proxy for popularity).
-      return [...allShorts].sort((a, b) => {
-        const la = a.raw?.reaction_count ?? a.raw?.likes ?? a.raw?.views ?? 0;
-        const lb = b.raw?.reaction_count ?? b.raw?.likes ?? b.raw?.views ?? 0;
-        return lb - la;
-      });
-    }
-    if (filter === 'liked') {
-      return allShorts.filter(s => likedIds.has(Number(s.raw?.id ?? s.id)));
-    }
-    if (filter.startsWith('artist:')) {
-      const name = filter.slice('artist:'.length);
-      return allShorts.filter(s => s.artist?.name === name);
-    }
-    return allShorts;
-  }, [allShorts, randomShorts, filter, likedIds]);
+  // The server orders the whole catalog before paging. Never reshuffle
+  // loaded rows when artist metadata arrives or another page is appended.
+  const filteredShorts = allShorts;
+  const hasMore = filter !== 'liked' && shortsPage.hasMore;
+  const loading = filter === 'liked' ? favState.loading : shortsPage.loading;
 
   // Unique artist names appearing in the loaded shorts list — for dynamic
   // artist pills. Capped to keep the chip row short.
@@ -172,7 +134,7 @@ function ShortsTab({ accent = C.pink }) {
               <div style={{ fontSize: 13, fontWeight: 700 }}>Play all · shuffled</div>
               <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Continuous feed · random order</div>
             </div>
-            <button onClick={(e) => { e.stopPropagation(); onPlayAll(); }} style={{
+            <button aria-label="Play all shorts" onClick={(e) => { e.stopPropagation(); onPlayAll(); }} style={{
               width: 44, height: 44, borderRadius: '50%',
               background: accent, border: 'none', color: '#000',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -190,6 +152,8 @@ function ShortsTab({ accent = C.pink }) {
         <div style={{ padding: '12px 14px 12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {filteredShorts.slice(0, visible).map((s, i) => (
             <ShortsTile key={s.id} s={s} idx={i} accent={accent} fresh={false}
+              previewEnabled={active || (filter == null && i < 4)}
+              eager={filter == null && i < 4} active={active && playingPos == null}
               onOpen={(pos) => {
                 // Use the filtered list as the playback order.
                 const order = filteredShorts.map(x => allShorts.indexOf(x));
@@ -198,13 +162,14 @@ function ShortsTab({ accent = C.pink }) {
               }} />
           ))}
         </div>
-        {(visible < filteredShorts.length || shortsPage.hasMore) && (
+        {(visible < filteredShorts.length || hasMore) && (
           <div style={{ padding: '4px 14px 18px' }}>
             <button
-              disabled={shortsPage.loading}
-              onClick={() => {
-                if (visible < filteredShorts.length) setVisible(v => v + 20);
-                else shortsPage.loadMore();
+              disabled={loading}
+              onClick={async () => {
+                const nextVisible = visible + 20;
+                if (nextVisible > filteredShorts.length && hasMore) await shortsPage.loadMore();
+                setVisible(nextVisible);
               }}
               style={{
               width: '100%',
@@ -214,12 +179,13 @@ function ShortsTab({ accent = C.pink }) {
               borderRadius: 12,
               padding: '12px',
               fontSize: 13, fontWeight: 700,
-              cursor: shortsPage.loading ? 'default' : 'pointer',
-              opacity: shortsPage.loading ? 0.5 : 1,
+              cursor: loading ? 'default' : 'pointer',
+              opacity: loading ? 0.5 : 1,
               fontFamily: 'inherit',
             }}>
-              {shortsPage.loading
+              {loading
                 ? 'Loading...'
+                : shortsPage.error && filter !== 'liked' ? 'Retry'
                 : visible < filteredShorts.length
                   ? `Load more (${filteredShorts.length - visible} ready)`
                   : 'Load more clips'}
@@ -250,8 +216,9 @@ function ShortsTab({ accent = C.pink }) {
   );
 }
 
-function ShortsTile({ s, idx, accent, fresh, onOpen }) {
+function ShortsTile({ s, idx, accent, fresh, onOpen, previewEnabled = true, eager = false, active = true }) {
   const nav = window.useNav();
+  const artistsState = window.useArtists();
   // Non-Pro users see a blurred preview (artist photo or thumb) + lock
   // badge — no video preview is loaded at all, so the gated tile is
   // cheap to render. Tap pops the paywall sheet instead of opening the
@@ -259,12 +226,11 @@ function ShortsTile({ s, idx, accent, fresh, onOpen }) {
   if (!nav.isPro) {
     // Most shorts don't ship a thumbnail_url — fall back to the artist
     // photo so the locked tile isn't just a flat gradient.
-    const artistsState = window.useArtists();
     const liveArtist = (artistsState.data || []).find(a => a.name === s.artist?.name);
     const fallbackPhoto = liveArtist?.profilePhoto || liveArtist?.photo;
     const bgUrl = s.thumb?.src || fallbackPhoto;
     return (
-      <div onClick={() => nav.openPaywall && nav.openPaywall()} style={{
+      <div data-short-id={s.id} onClick={() => nav.openPaywall && nav.openPaywall()} style={{
         position: 'relative', aspectRatio: '9/16', borderRadius: 14,
         overflow: 'hidden', background: '#161617', cursor: 'pointer',
       }}>
@@ -295,13 +261,13 @@ function ShortsTile({ s, idx, accent, fresh, onOpen }) {
     );
   }
   return (
-    <div onClick={() => onOpen && onOpen(idx)} style={{
+    <div data-short-id={s.id} onClick={() => onOpen && onOpen(idx)} style={{
       position: 'relative', aspectRatio: '9/16', borderRadius: 14,
       overflow: 'hidden', background: '#161617', cursor: 'pointer',
     }}>
       {/* Real video preview (lazy-loaded, muted, looping). Falls back to
           static thumb if /content/play fails. */}
-      <window.ShortsThumbVideo short={s} />
+      <window.ShortsThumbVideo short={s} enabled={previewEnabled} eager={eager} active={active} />
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.75) 100%)', pointerEvents: 'none' }} />
       {/* duration top-right (hide if backend didn't ship one) */}
       {s.duration && (
@@ -458,6 +424,7 @@ function ShortsPlayer({ accent = C.pink, allShorts, order, items, pos, setPos, o
   return (
     <div
       ref={swipeContainerRef}
+      data-shorts-player={s.id}
       style={{
         position: 'absolute', inset: 0, zIndex: 50,
         background: '#000',
@@ -480,7 +447,7 @@ function ShortsPlayer({ accent = C.pink, allShorts, order, items, pos, setPos, o
             double-padding (visible as a 'phantom header' gap above the
             controls). Just hug the top with 4px. */}
         <div style={{ position: 'absolute', top: 4, left: 12, right: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <button onClick={() => onClose && onClose()} style={{
+          <button aria-label="Close shorts player" onClick={() => onClose && onClose()} style={{
             width: 36, height: 36, borderRadius: '50%',
             background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',

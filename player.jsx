@@ -53,7 +53,11 @@ async function fetchPlayableContent(contentId) {
     }
     _playableCache.set(contentId, { url: data.url, ts: Date.now() });
     return data;
-  })();
+  })().catch(error => {
+    // A failed warm-up must not poison this ID for the rest of the session.
+    _playableCache.delete(contentId);
+    throw error;
+  });
   _playableCache.set(contentId, { promise: p });
   return p;
 }
@@ -509,87 +513,99 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
 // Ports hydrateShortVideoThumbs() from the live miniapp: lazy-loads via
 // IntersectionObserver so we don't hit /content/play for 20 tiles upfront,
 // uses HLS.js for .m3u8 streams. Falls back to s.thumb.bg poster on error.
-function ShortsThumbVideo({ short }) {
+function ShortsThumbVideo({ short, enabled = true, eager = false, active = true }) {
   const s = short;
   const containerRef = React.useRef(null);
   const videoRef = React.useRef(null);
   const hlsRef = React.useRef(null);
   const [state, setState] = React.useState('idle'); // idle | loading | ready | error
+  const [near, setNear] = React.useState(false);
+  const [requested, setRequested] = React.useState(false);
+  const contentId = s.raw?.id ?? s.raw?.content_id ?? s.id;
 
-  React.useEffect(() => () => {
-    if (hlsRef.current) { try { hlsRef.current.destroy(); } catch (_) {} hlsRef.current = null; }
-  }, []);
-
-  // Start loading once the tile scrolls near the viewport.
   React.useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el || !enabled) return;
     if (!('IntersectionObserver' in window)) {
-      // SSR / very old browser — just load on mount.
-      load();
+      setNear(true);
       return;
     }
     const io = new IntersectionObserver((entries) => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          io.disconnect();
-          load();
-        }
-      });
+      setNear(entries.some(e => e.isIntersecting));
     }, { rootMargin: '160px' });
     io.observe(el);
     return () => io.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s.id]);
+  }, [contentId, enabled]);
 
-  async function load() {
-    if (state !== 'idle') return;
-    setState('loading');
-    const contentId = s.raw?.id ?? s.raw?.content_id ?? s.id;
-    if (contentId == null) { setState('error'); return; }
-    let url = '';
-    try {
-      const data = await fetchPlayableContent(contentId);
-      url = data.url || '';
-      if (!url) throw new Error('no url');
-    } catch (e) {
-      console.warn('[short-thumb]', e.message);
-      setState('error');
-      return;
-    }
+  React.useEffect(() => {
+    if (enabled && (eager || near)) setRequested(true);
+  }, [enabled, eager, near]);
+
+  React.useEffect(() => {
+    if (!requested) return;
+    let cancelled = false;
     const vEl = videoRef.current;
     if (!vEl) return;
-    vEl.muted = true; vEl.loop = true; vEl.playsInline = true; vEl.preload = 'metadata';
+    let hls = null;
+    const markReady = () => { if (!cancelled) setState('ready'); };
+    const markError = () => { if (!cancelled) setState('error'); };
+    setState('loading');
+    vEl.muted = true; vEl.loop = true; vEl.playsInline = true; vEl.preload = 'auto';
     vEl.setAttribute('playsinline', '');
     vEl.setAttribute('webkit-playsinline', '');
-    const markReady = () => { setState('ready'); vEl.play().catch(() => {}); };
     vEl.addEventListener('loadeddata', markReady, { once: true });
     vEl.addEventListener('canplay', markReady, { once: true });
-    vEl.addEventListener('error', () => setState('error'), { once: true });
-
-    const isM3U8 = url.includes('.m3u8') || url.includes('/hls/');
-    if (isM3U8 && window.Hls && window.Hls.isSupported()) {
-      const Hls = window.Hls;
-      const hls = new Hls({ enableWorker: false, maxBufferLength: 4, startLevel: -1 });
-      hlsRef.current = hls;
-      hls.attachMedia(vEl);
-      hls.on(Hls.Events.MEDIA_ATTACHED, () => hls.loadSource(url));
-      hls.on(Hls.Events.MANIFEST_PARSED, () => vEl.play().catch(() => {}));
-      hls.on(Hls.Events.ERROR, (_ev, data) => {
-        if (data.fatal) {
-          try { hls.destroy(); } catch (_) {}
-          hlsRef.current = null;
-          setState('error');
+    vEl.addEventListener('error', markError, { once: true });
+    (async () => {
+      try {
+        const { url } = await fetchPlayableContent(contentId);
+        if (cancelled) return;
+        if (!url) throw new Error('no url');
+        const isM3U8 = url.includes('.m3u8') || url.includes('/hls/');
+        if (isM3U8 && window.Hls?.isSupported()) {
+          const Hls = window.Hls;
+          hls = new Hls({ enableWorker: false, maxBufferLength: 2, maxMaxBufferLength: 4, backBufferLength: 0, startLevel: 0 });
+          hlsRef.current = hls;
+          hls.on(Hls.Events.MEDIA_ATTACHED, () => hls.loadSource(url));
+          hls.on(Hls.Events.ERROR, (_ev, data) => {
+            if (data.fatal) { hls.destroy(); hlsRef.current = null; markError(); }
+          });
+          hls.attachMedia(vEl);
+        } else {
+          vEl.src = url;
+          vEl.load();
         }
-      });
-    } else {
-      vEl.src = url;
+      } catch (error) {
+        if (!cancelled) { console.warn('[short-thumb]', error.message); markError(); }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      vEl.removeEventListener('loadeddata', markReady);
+      vEl.removeEventListener('canplay', markReady);
+      vEl.removeEventListener('error', markError);
+      if (hls) hls.destroy();
+      hlsRef.current = null;
+      vEl.pause();
+      vEl.removeAttribute('src');
       vEl.load();
+    };
+  }, [contentId, requested]);
+
+  React.useEffect(() => {
+    const video = videoRef.current;
+    if (!video || state !== 'ready') return;
+    if (enabled && active && near) {
+      hlsRef.current?.startLoad(-1);
+      video.play().catch(() => {});
+    } else {
+      video.pause();
+      hlsRef.current?.stopLoad();
     }
-  }
+  }, [enabled, active, near, state]);
 
   return (
-    <div ref={containerRef} style={{ position: 'absolute', inset: 0 }}>
+    <div ref={containerRef} data-short-preview={contentId} data-preview-state={state} style={{ position: 'absolute', inset: 0 }}>
       {/* Always render <video> so the ref is wired up even before load() fires */}
       <video ref={videoRef} style={{
         position: 'absolute', inset: 0,

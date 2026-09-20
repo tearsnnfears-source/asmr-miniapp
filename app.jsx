@@ -228,6 +228,26 @@ function AppShell() {
   const isTg = !!(window.isInsideTelegram && window.isInsideTelegram());
   const userReady = !isTg || hasReal('user');
   const dataReady = hasReal('artists') && homeVideosState.items.length > 0 && userReady;
+  const [warmShorts, setWarmShorts] = React.useState(false);
+  const [shortsPreviewsReady, setShortsPreviewsReady] = React.useState(false);
+  React.useEffect(() => {
+    if (!dataReady) return;
+    const timer = setTimeout(() => setWarmShorts(true), 250);
+    return () => clearTimeout(timer);
+  }, [dataReady]);
+  const shortsState = window.usePaginatedShorts(window.SHORTS_PAGE_SIZE, {
+    enabled: warmShorts || current.screen === 'shorts',
+  });
+  const firstShortIds = shortsState.items.slice(0, 4).map(s => s.id).join(',');
+  React.useEffect(() => {
+    if (!isPro || !firstShortIds || !window.getInitData()) return;
+    let alive = true;
+    const ids = firstShortIds.split(',').filter(id => /^\d+$/.test(id)).map(Number);
+    window.prefetchPlayable(ids, 2).then(() => {
+      if (alive) setShortsPreviewsReady(true);
+    });
+    return () => { alive = false; };
+  }, [isPro, firstShortIds]);
   React.useEffect(() => {
     if (!dataReady) return;
     // Give the screens one paint to render real data, then hide.
@@ -295,16 +315,16 @@ function AppShell() {
   return (
     <NavContext.Provider value={nav}>
       <PhoneStage>
-        {/* Shorts mounts only after its first visit, then stays alive across
-            tab switches so previews do not reload on every return. */}
+        {/* Warm only the first four previews after Home is ready. Keep the
+            visited grid mounted so returning never resets its order. */}
         <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          {(shortsMounted || current.screen === 'shorts') && <div style={{
+          {(shortsPreviewsReady || shortsMounted || current.screen === 'shorts') && <div style={{
             position: 'absolute', inset: 0,
             display: 'flex', flexDirection: 'column',
             visibility: current.screen === 'shorts' ? 'visible' : 'hidden',
             pointerEvents: current.screen === 'shorts' ? 'auto' : 'none',
           }}>
-            <window.ShortsTab accent={accent} />
+            <window.ShortsTab accent={accent} active={current.screen === 'shorts'} />
           </div>}
           {current.screen !== 'shorts' && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>

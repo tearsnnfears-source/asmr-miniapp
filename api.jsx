@@ -1181,55 +1181,75 @@ async function actionCreateStarsInvoice(days = 31, tier = 'plus', promoCode = ''
   }
 }
 
-// Incremental shorts catalog. Keeping the first page small is important on
-// iOS Telegram WebViews: the old 1000-row response was about 25 MB and could
-// exhaust the WebView before React painted the home screen.
+// One random order per app session, shared by Home warming and the Shorts tab.
+// Keep pages small: loading the old full catalog could exhaust iOS WebViews.
+const SHORTS_PAGE_SIZE = 24;
+const _shortsSeed = Math.floor(Math.random() * 2_000_000_000) + 1;
 const _paginatedShortsCache = new Map();
-function usePaginatedShorts(pageSize = 24) {
-  const cached = _paginatedShortsCache.get(pageSize);
-  const [items, setItems]     = React.useState(cached?.items || []);
-  const [hasMore, setHasMore] = React.useState(cached?.hasMore ?? true);
-  const [loading, setLoading] = React.useState(!cached);
-  const [error, setError]     = React.useState(null);
-  const inflight = React.useRef(false);
 
-  React.useEffect(() => {
-    _paginatedShortsCache.set(pageSize, { items, hasMore });
-  }, [pageSize, items, hasMore]);
+function _shortsEntry(pageSize, order, artist) {
+  const key = JSON.stringify([pageSize, order, artist, _shortsSeed]);
+  if (!_paginatedShortsCache.has(key)) {
+    _paginatedShortsCache.set(key, {
+      key, params: { limit: pageSize, order, artist, seed: _shortsSeed },
+      offset: 0, maxId: null, started: false, promise: null, subscribers: new Set(),
+      state: { key, items: [], hasMore: true, loading: false, error: null },
+    });
+  }
+  return _paginatedShortsCache.get(key);
+}
 
-  const fetchPage = React.useCallback(async (offset) => {
-    if (inflight.current) return;
-    inflight.current = true;
-    setLoading(true);
+function _publishShorts(entry, patch) {
+  entry.state = { ...entry.state, ...patch };
+  entry.subscribers.forEach(notify => notify(entry.state));
+}
+
+function _loadShortsPage(entry) {
+  if (entry.promise) return entry.promise;
+  if (!entry.state.hasMore) return Promise.resolve(entry.state);
+  entry.started = true;
+  _publishShorts(entry, { loading: true, error: null });
+  entry.promise = (async () => {
     try {
-      const data = await apiGet('/miniapp/shorts', { limit: pageSize, offset });
+      const params = { ...entry.params, offset: entry.offset };
+      if (entry.maxId != null) params.max_id = entry.maxId;
+      const data = await apiGet('/miniapp/shorts', params);
       const fresh = (data.shorts || []).map(normalizeShort).filter(s => s.id != null);
-      setItems(prev => {
-        if (offset === 0) return fresh;
-        const seen = new Set(prev.map(s => String(s.id)));
-        return [...prev, ...fresh.filter(s => !seen.has(String(s.id)))];
+      const seen = new Set(entry.state.items.map(s => String(s.id)));
+      const items = [...entry.state.items];
+      for (const short of fresh) {
+        if (seen.has(String(short.id))) continue;
+        seen.add(String(short.id));
+        items.push(short);
+      }
+      entry.offset = Number.isInteger(data.next_offset) ? data.next_offset : entry.offset + fresh.length;
+      if (Number.isInteger(data.max_id)) entry.maxId = data.max_id;
+      _publishShorts(entry, {
+        items, hasMore: typeof data.has_more === 'boolean' ? data.has_more : fresh.length === entry.params.limit,
       });
-      setHasMore(typeof data.has_more === 'boolean' ? data.has_more : fresh.length === pageSize);
-      setError(null);
     } catch (e) {
-      setError(e);
+      _publishShorts(entry, { error: e });
     } finally {
-      setLoading(false);
-      inflight.current = false;
+      entry.promise = null;
+      _publishShorts(entry, { loading: false });
     }
-  }, [pageSize]);
+    return entry.state;
+  })();
+  return entry.promise;
+}
 
+function usePaginatedShorts(pageSize = SHORTS_PAGE_SIZE, { enabled = true, order = 'random', artist = '' } = {}) {
+  const entry = _shortsEntry(pageSize, order, artist);
+  const [snapshot, setSnapshot] = React.useState(entry.state);
   React.useEffect(() => {
-    if (!cached) fetchPage(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const loadMore = React.useCallback(() => {
-    if (!hasMore || loading) return;
-    fetchPage(items.length);
-  }, [items.length, hasMore, loading, fetchPage]);
-
-  return { items, loading, hasMore, loadMore, error };
+    entry.subscribers.add(setSnapshot);
+    setSnapshot(entry.state);
+    if (enabled && !entry.started) _loadShortsPage(entry);
+    return () => entry.subscribers.delete(setSnapshot);
+  }, [entry, enabled]);
+  const loadMore = React.useCallback(() => _loadShortsPage(entry), [entry]);
+  const state = snapshot.key === entry.key ? snapshot : entry.state;
+  return { ...state, loading: state.loading || (enabled && !entry.started), loadMore };
 }
 
 async function actionPrepareBundleCheckout(tier, bundleTarget) {
@@ -1488,6 +1508,7 @@ initTelegram();
 // Expose everything on window so screens can pull what they need without
 // per-file imports (this codebase uses globals).
 Object.assign(window, {
+  SHORTS_PAGE_SIZE,
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
   useVideos, useVideo, usePaginatedVideos, useShorts, usePaginatedShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, useAccessLinks, useFollowedFeed, userFromTelegram,
