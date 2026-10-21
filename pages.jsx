@@ -302,9 +302,23 @@ const ELITE_TARGETS = [
   { id: 'asianleaks', label: 'AsianLeaks' },
   { id: 'extraleaks', label: 'ExtraLeaks' },
 ];
+function isCheckoutNoticeHidden(key) {
+  try { return !!key && localStorage.getItem(key) === '1'; }
+  catch (_) { return false; }
+}
+
+function setCheckoutNoticeHidden(key, hidden) {
+  if (!key) return;
+  try {
+    if (hidden) localStorage.setItem(key, '1');
+    else localStorage.removeItem(key);
+  } catch (_) {}
+}
+Object.assign(window, { isCheckoutNoticeHidden, setCheckoutNoticeHidden });
+
 const CHECKOUT_NOTICE_COPY = {
   en: {
-    title: 'Your access after payment', close: 'Close', pay: 'PAY', busy: 'PROCESSING...',
+    title: 'Your access after payment', close: 'Close', pay: 'PAY', busy: 'PROCESSING...', dismiss: "Don't show me again",
     returnTitle: 'Return to this app',
     returnText: 'After payment, return here. As soon as your payment is confirmed, your group invite link will appear.',
     linksTitle: 'Missed the link? Open LINKS',
@@ -313,7 +327,7 @@ const CHECKOUT_NOTICE_COPY = {
     month: 'month',
   },
   ru: {
-    title: 'Ваш доступ после оплаты', close: 'Закрыть', pay: 'PAY', busy: 'ОБРАБОТКА...',
+    title: 'Ваш доступ после оплаты', close: 'Закрыть', pay: 'PAY', busy: 'ОБРАБОТКА...', dismiss: 'Больше не показывать',
     returnTitle: 'Вернитесь в приложение',
     returnText: 'После оплаты вернитесь сюда. Как только платёж будет подтверждён, появится ссылка для входа в оплаченную группу.',
     linksTitle: 'Пропустили ссылку? Откройте LINKS',
@@ -322,7 +336,7 @@ const CHECKOUT_NOTICE_COPY = {
     month: 'месяц',
   },
   es: {
-    title: 'Tu acceso después del pago', close: 'Cerrar', pay: 'PAY', busy: 'PROCESANDO...',
+    title: 'Tu acceso después del pago', close: 'Cerrar', pay: 'PAY', busy: 'PROCESANDO...', dismiss: 'No volver a mostrar',
     returnTitle: 'Vuelve a esta aplicación',
     returnText: 'Después de pagar, vuelve aquí. En cuanto se confirme el pago, aparecerá el enlace para entrar al grupo que has pagado.',
     linksTitle: '¿No viste el enlace? Abre LINKS',
@@ -332,7 +346,8 @@ const CHECKOUT_NOTICE_COPY = {
   },
 };
 
-function CheckoutNoticeModal({ initialLanguage = 'en', plan, method, accent, busy, onClose, onPay }) {
+function CheckoutNoticeModal({ initialLanguage = 'en', preferenceKey, plan, method, accent, busy, onClose, onPay }) {
+  const [hidden, setHidden] = React.useState(() => isCheckoutNoticeHidden(preferenceKey));
   const [language, setLanguage] = React.useState(
     CHECKOUT_NOTICE_COPY[initialLanguage] ? initialLanguage : 'en',
   );
@@ -362,7 +377,7 @@ function CheckoutNoticeModal({ initialLanguage = 'en', plan, method, accent, bus
   }, [onClose]);
 
   return ReactDOM.createPortal(
-    <div onClick={() => { if (!busy) onClose(); }} style={{
+    <div className="checkout-notice-overlay" onClick={() => { if (!busy) onClose(); }} style={{
       position: 'fixed', inset: 0, zIndex: 9800, background: 'rgba(0,0,0,0.78)',
       backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: 'max(16px, var(--tg-safe-top)) 16px max(16px, var(--tg-safe-bottom))',
@@ -399,7 +414,16 @@ function CheckoutNoticeModal({ initialLanguage = 'en', plan, method, accent, bus
             </div>
           ))}
         </div>
-        <div style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${C.border}`,
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 18,
+          color: C.muted2, fontSize: 11, lineHeight: 1.4, cursor: 'pointer' }}>
+          <input type="checkbox" checked={hidden} onChange={event => {
+            setHidden(event.target.checked);
+            setCheckoutNoticeHidden(preferenceKey, event.target.checked);
+          }} style={{ width: 15, height: 15, margin: 0, flexShrink: 0, accentColor: accent,
+            appearance: 'auto', WebkitAppearance: 'checkbox', cursor: 'pointer' }} />
+          <span>{text.dismiss}</span>
+        </label>
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${C.border}`,
           display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
           <div style={{ minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 800 }}>{plan.name}</div>
             <div style={{ fontSize: 11, lineHeight: 1.45, marginTop: 4, color: C.muted }}>{text.method[method]}</div></div>
@@ -436,6 +460,7 @@ function SubscriptionPage({ accent = C.pink }) {
   const [checkoutNotice, setCheckoutNotice] = React.useState(false);
   const closeCheckoutNotice = React.useCallback(() => setCheckoutNotice(false), []);
   const payingRef = React.useRef(false);
+  const noticePreferenceKey = `asmrleaks.checkout-notice.v1:${user.telegramId || 'guest'}`;
 
   // Promo is activated on the backend and consumed by the next paid checkout.
   const [promo, setPromo] = React.useState('');
@@ -880,7 +905,10 @@ function SubscriptionPage({ accent = C.pink }) {
 
         {/* Pay CTA */}
         <div style={{ padding: '16px 14px 8px' }}>
-          <button onClick={() => setCheckoutNotice(true)} disabled={busy || !isTierAvailable} style={{
+          <button onClick={() => {
+            if (isCheckoutNoticeHidden(noticePreferenceKey)) onPay();
+            else setCheckoutNotice(true);
+          }} disabled={busy || !isTierAvailable} style={{
             width: '100%',
             background: busy ? 'rgba(255,255,255,0.08)'
                             : isTierAvailable ? cur.color : `${cur.color}14`,
@@ -903,6 +931,7 @@ function SubscriptionPage({ accent = C.pink }) {
       </div>
       {checkoutNotice && <CheckoutNoticeModal
         initialLanguage={user.lang || 'en'}
+        preferenceKey={noticePreferenceKey}
         plan={{ name: cur.name, eur: price, stars: selectedPlan.stars }} method={method}
         accent={cur.color} busy={busy} onClose={closeCheckoutNotice} onPay={onPay}
       />}
