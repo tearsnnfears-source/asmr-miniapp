@@ -902,7 +902,7 @@ function SubscriptionPage({ accent = C.pink }) {
 
       </div>
       {checkoutNotice && <CheckoutNoticeModal
-        initialLanguage={user.lang || window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code?.split('-')[0] || 'en'}
+        initialLanguage={user.lang || 'en'}
         plan={{ name: cur.name, eur: price, stars: selectedPlan.stars }} method={method}
         accent={cur.color} busy={busy} onClose={closeCheckoutNotice} onPay={onPay}
       />}

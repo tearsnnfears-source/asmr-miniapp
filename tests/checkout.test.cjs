@@ -27,6 +27,18 @@ test('pending invite requests are deduplicated across checkout and return checks
   assert.equal(calls, 1);
 });
 
+test('checkout language uses the saved bot choice or English, never the Telegram locale', async () => {
+  for (const saved of ['en', 'ru', 'es', '', undefined, 'de']) {
+    const { context } = apiRuntime(async () => ({ ok: true,
+      json: async () => ({ lang: saved, days_left: 0 }) }));
+    context.window.Telegram.WebApp.initDataUnsafe = { user: { id: 123, language_code: 'ru' } };
+    vm.runInContext('useFetch = (_key, fetcher) => fetcher()', context);
+    const user = await context.useUser();
+    assert.equal(user.lang, ['en', 'ru', 'es'].includes(saved) ? saved : 'en');
+    assert.equal(context.userFromTelegram().lang, 'en');
+  }
+});
+
 test('returning from checkout rechecks pending links and invalidates all access caches', async () => {
   let calls = 0, shown = 0;
   const { context, events, tgEvents, document } = apiRuntime(async () => ({ ok: true,

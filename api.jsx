@@ -573,7 +573,7 @@ function userFromTelegram() {
     return {
       name: 'You', username: '', telegramId: 0, photo: '',
       daysLeft: 0, isPro: false, isInfinite: false, trialUsed: false, tier: 'free',
-      badges: [], tributeProUrl: '', tributePlusUrl: '',
+      badges: [], tributeProUrl: '', tributePlusUrl: '', lang: 'en',
       raw: null,
     };
   }
@@ -589,6 +589,7 @@ function userFromTelegram() {
     isInfinite: false,
     trialUsed: false,
     tier: 'free',
+    lang: 'en',
     badges: [],
     tributeProUrl: '',
     tributePlusUrl: '',
@@ -968,6 +969,7 @@ function useUser() {
         isInfinite: days > INFINITE_THRESHOLD,
         trialUsed: !!p.trial_used,
         tier,
+        lang: ['en', 'ru', 'es'].includes(p.lang) ? p.lang : 'en',
         badges: Array.isArray(p.badges) ? p.badges : (p.badge ? p.badge.split(',').map(s => s.trim()).filter(Boolean) : []),
         tributeProUrl: p.tribute_pro_url || '',
         tributePlusUrl: p.tribute_plus_url || '',
