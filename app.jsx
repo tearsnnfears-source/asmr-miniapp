@@ -120,17 +120,10 @@ function AppShell() {
   // tap, saved tile tap, etc).
   const [paywallOpen, setPaywallOpen] = React.useState(false);
 
-  // One-shot check at boot: if there's a pending invite (user returned
-  // from a paid checkout, or simply re-opened after a free-trial activation),
-  // pop the modal right after the splash hides. Consumes the row server-
-  // side so we don't re-pop on every nav action — the bell affordance
-  // (useMyInvite) takes over for persistent access afterwards.
-  const inviteCheckedRef = React.useRef(false);
+  // Recover pending links at boot and when returning from external checkout.
   React.useEffect(() => {
-    if (inviteCheckedRef.current) return;
     if (!window.isInsideTelegram || !window.isInsideTelegram()) return;
-    inviteCheckedRef.current = true;
-    window.actionCheckInvite?.().then(res => {
+    return window.watchInviteReturns?.(res => {
       const access = normalizeInviteAccess(res);
       if (access) setInviteAccess(access);
     });
@@ -188,7 +181,10 @@ function AppShell() {
     // time the user taps the AppHeader bell.
     openInvite: (value) => {
       const access = normalizeInviteAccess(value);
-      if (access) setInviteAccess(access);
+      if (access) {
+        window.refreshSubscriptionAccess?.();
+        setInviteAccess(access);
+      }
     },
     closeInvite: () => setInviteAccess(null),
     inviteAccess,

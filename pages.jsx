@@ -302,6 +302,123 @@ const ELITE_TARGETS = [
   { id: 'asianleaks', label: 'AsianLeaks' },
   { id: 'extraleaks', label: 'ExtraLeaks' },
 ];
+const CHECKOUT_NOTICE_COPY = {
+  en: {
+    title: 'Your access after payment', close: 'Close', pay: 'PAY', busy: 'PROCESSING...',
+    returnTitle: 'Return to this app',
+    returnText: 'After payment, return here. As soon as your payment is confirmed, your group invite link will appear.',
+    linksTitle: 'Missed the link? Open LINKS',
+    linksText: 'Tap LINKS at the top of the app to see all your group links. If a link has expired, refresh it there.',
+    method: ['Card via Tribute', 'Telegram Stars', 'SBP via Tribute', 'Crypto via support'],
+    month: 'month',
+  },
+  ru: {
+    title: 'Ваш доступ после оплаты', close: 'Закрыть', pay: 'PAY', busy: 'ОБРАБОТКА...',
+    returnTitle: 'Вернитесь в приложение',
+    returnText: 'После оплаты вернитесь сюда. Как только платёж будет подтверждён, появится ссылка для входа в оплаченную группу.',
+    linksTitle: 'Пропустили ссылку? Откройте LINKS',
+    linksText: 'Нажмите LINKS вверху приложения: там доступны ссылки на все ваши группы. Истёкшую ссылку можно обновить там же.',
+    method: ['Карта через Tribute', 'Telegram Stars', 'СБП через Tribute', 'Криптовалюта через поддержку'],
+    month: 'месяц',
+  },
+  es: {
+    title: 'Tu acceso después del pago', close: 'Cerrar', pay: 'PAY', busy: 'PROCESANDO...',
+    returnTitle: 'Vuelve a esta aplicación',
+    returnText: 'Después de pagar, vuelve aquí. En cuanto se confirme el pago, aparecerá el enlace para entrar al grupo que has pagado.',
+    linksTitle: '¿No viste el enlace? Abre LINKS',
+    linksText: 'Pulsa LINKS en la parte superior de la app para ver los enlaces a todos tus grupos. Si un enlace ha caducado, puedes renovarlo allí.',
+    method: ['Tarjeta con Tribute', 'Telegram Stars', 'SBP con Tribute', 'Cripto con soporte'],
+    month: 'mes',
+  },
+};
+
+function CheckoutNoticeModal({ initialLanguage = 'en', plan, method, accent, busy, onClose, onPay }) {
+  const [language, setLanguage] = React.useState(
+    CHECKOUT_NOTICE_COPY[initialLanguage] ? initialLanguage : 'en',
+  );
+  const text = CHECKOUT_NOTICE_COPY[language];
+  const panelRef = React.useRef(null);
+  const busyRef = React.useRef(busy);
+  busyRef.current = busy;
+  const titleId = React.useId();
+  const bodyId = React.useId();
+  React.useEffect(() => {
+    const previousFocus = document.activeElement;
+    const panel = panelRef.current;
+    panel?.focus();
+    const onKey = (event) => {
+      if (event.key === 'Escape' && !busyRef.current) { event.preventDefault(); onClose(); }
+      if (event.key !== 'Tab') return;
+      const buttons = Array.from(panel.querySelectorAll('button:not(:disabled)'));
+      const first = buttons[0], last = buttons[buttons.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === panel)) {
+        event.preventDefault(); last?.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === panel)) {
+        event.preventDefault(); first?.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('keydown', onKey); previousFocus?.focus?.(); };
+  }, [onClose]);
+
+  return ReactDOM.createPortal(
+    <div onClick={() => { if (!busy) onClose(); }} style={{
+      position: 'fixed', inset: 0, zIndex: 9800, background: 'rgba(0,0,0,0.78)',
+      backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 'max(16px, var(--tg-safe-top)) 16px max(16px, var(--tg-safe-bottom))',
+    }}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId}
+        aria-describedby={bodyId} aria-busy={busy} tabIndex={-1} lang={language}
+        onClick={event => event.stopPropagation()} style={{
+          width: '100%', maxWidth: 400, maxHeight: '100%', overflowY: 'auto',
+          background: C.dark2, color: C.text, border: `1px solid ${C.border2}`, borderTop: `3px solid ${accent}`,
+          borderRadius: 8, padding: 20, outline: 'none', boxShadow: '0 24px 80px rgba(0,0,0,0.55)',
+        }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div role="group" aria-label="Language" style={{ display: 'flex', gap: 4, padding: 3,
+            background: C.dark, border: `1px solid ${C.border}`, borderRadius: 6 }}>
+            {['en', 'ru', 'es'].map(code => (
+              <button key={code} type="button" aria-pressed={language === code}
+                onClick={() => setLanguage(code)} style={{
+                  width: 46, height: 32, border: 'none', borderRadius: 4, fontSize: 11, fontWeight: 800,
+                  background: language === code ? accent : 'transparent',
+                  color: language === code ? '#000' : C.muted2, cursor: 'pointer',
+                }}>{code.toUpperCase()}</button>
+            ))}
+          </div>
+          <button type="button" onClick={onClose} disabled={busy} aria-label={text.close}
+            title={text.close} style={{ ...iconBtn, flexShrink: 0 }}><Ico.close /></button>
+        </div>
+        <h2 id={titleId} style={{ fontSize: 21, lineHeight: 1.25, margin: '22px 0 18px', letterSpacing: 0 }}>{text.title}</h2>
+        <div id={bodyId} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {[[text.returnTitle, text.returnText], [text.linksTitle, text.linksText]].map(([title, body], index) => (
+            <div key={index} style={{ display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr)', gap: 10 }}>
+              <span style={{ color: accent, fontSize: 12, fontWeight: 800, paddingTop: 2 }}>0{index + 1}</span>
+              <div><div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.4 }}>{title}</div>
+                <p style={{ fontSize: 12, lineHeight: 1.65, color: C.muted2, margin: '5px 0 0' }}>{body}</p></div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${C.border}`,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <div style={{ minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 800 }}>{plan.name}</div>
+            <div style={{ fontSize: 11, lineHeight: 1.45, marginTop: 4, color: C.muted }}>{text.method[method]}</div></div>
+          <div style={{ fontSize: 16, fontWeight: 800, flexShrink: 0 }}>
+            {method === 1 ? `${plan.stars} Stars` : `€${plan.eur}`}
+            <div style={{ fontSize: 10, marginTop: 3, color: C.muted, fontWeight: 500, textAlign: 'right' }}>/{text.month}</div>
+          </div>
+        </div>
+        <button type="button" onClick={onPay} disabled={busy} style={{
+          marginTop: 18, width: '100%', minHeight: 46, border: 'none', borderRadius: 6,
+          background: accent, color: '#000', fontSize: 13, fontWeight: 800,
+          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8,
+          opacity: busy ? 0.6 : 1, cursor: busy ? 'wait' : 'pointer',
+        }}>{busy ? text.busy : <>{text.pay}<Ico.external /></>}</button>
+      </div>
+    </div>, document.body,
+  );
+}
+
 function SubscriptionPage({ accent = C.pink }) {
   const nav = window.useNav();
   const userState = window.useUser();
@@ -316,6 +433,9 @@ function SubscriptionPage({ accent = C.pink }) {
   // Payment method: 0=Card 1=Stars 2=SBP 3=Crypto
   const [method, setMethod] = React.useState(0);
   const [busy, setBusy] = React.useState(false);
+  const [checkoutNotice, setCheckoutNotice] = React.useState(false);
+  const closeCheckoutNotice = React.useCallback(() => setCheckoutNotice(false), []);
+  const payingRef = React.useRef(false);
 
   // Promo is activated on the backend and consumed by the next paid checkout.
   const [promo, setPromo] = React.useState('');
@@ -396,12 +516,13 @@ function SubscriptionPage({ accent = C.pink }) {
     : cur.detail;
 
   const onPay = async () => {
-    if (busy) return;
+    if (busy || payingRef.current) return;
     if (!isTierAvailable) return;
     // Preview-mode (outside Telegram): just flip Pro locally.
     if (!isInsideTg) {
       nav.setPro(true); nav.reset('home'); return;
     }
+    payingRef.current = true;
     setBusy(true);
     try {
       // ── Card / SBP via Tribute ──────────────────────────────
@@ -420,12 +541,12 @@ function SubscriptionPage({ accent = C.pink }) {
           (access) => {
             // Bot issued the invite — pop the modal and reset caches.
             nav.openInvite?.(access);
-            window.invalidate?.('user');
-            window.invalidate?.('my_invite');
+            window.refreshSubscriptionAccess?.();
           },
           () => { /* timeout — silent; user can re-open via bell */ },
         );
         if (!r.ok) { alert(r.message || 'Could not open Tribute'); return; }
+        setCheckoutNotice(false);
         // Drop back to home so the polling overlay isn't sitting on a
         // dead subscription screen. The invite modal will surface when
         // the bot finishes.
@@ -439,12 +560,12 @@ function SubscriptionPage({ accent = C.pink }) {
         if (promo.trim() && !promoForPay) return;
         const r = await window.actionCreateStarsInvoice(planDays, tier, promoForPay?.code || '', bundleTarget);
         if (!r.ok) { alert(r.message || 'Could not create Stars invoice'); return; }
+        setCheckoutNotice(false);
         const tg = window.Telegram?.WebApp;
         if (tg && typeof tg.openInvoice === 'function') {
           tg.openInvoice(r.invoice_link, (status) => {
             if (status === 'paid') {
-              window.invalidate?.('user');
-              window.invalidate?.('my_invite');
+              window.refreshSubscriptionAccess?.();
               // Bot issues invite via postback — poll for it.
               window.startInvitePolling?.(
                 (access) => nav.openInvite?.(access),
@@ -467,10 +588,12 @@ function SubscriptionPage({ accent = C.pink }) {
         const promoForChat = appliedPromo?.code || promo.trim().toUpperCase();
         const r = await window.actionOpenCryptoSupport?.({ tier, promoCode: promoForChat, bundleTarget });
         if (!r?.ok) { alert(r?.displayMessage || 'Could not open Telegram chat'); return; }
+        setCheckoutNotice(false);
         nav.reset('home');
         return;
       }
     } finally {
+      payingRef.current = false;
       setBusy(false);
     }
   };
@@ -757,7 +880,7 @@ function SubscriptionPage({ accent = C.pink }) {
 
         {/* Pay CTA */}
         <div style={{ padding: '16px 14px 8px' }}>
-          <button onClick={onPay} disabled={busy || !isTierAvailable} style={{
+          <button onClick={() => setCheckoutNotice(true)} disabled={busy || !isTierAvailable} style={{
             width: '100%',
             background: busy ? 'rgba(255,255,255,0.08)'
                             : isTierAvailable ? cur.color : `${cur.color}14`,
@@ -778,6 +901,11 @@ function SubscriptionPage({ accent = C.pink }) {
         </div>
 
       </div>
+      {checkoutNotice && <CheckoutNoticeModal
+        initialLanguage={user.lang || window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code?.split('-')[0] || 'en'}
+        plan={{ name: cur.name, eur: price, stars: selectedPlan.stars }} method={method}
+        accent={cur.color} busy={busy} onClose={closeCheckoutNotice} onPay={onPay}
+      />}
     </Phone>
   );
 }

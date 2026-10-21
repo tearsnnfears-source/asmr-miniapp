@@ -212,9 +212,13 @@ const iconBtn = {
 
 function AppHeaderLinks({ accent = C.pink }) {
   const [open, setOpen] = React.useState(false);
+  const openLinks = () => {
+    window.invalidate?.('access_links');
+    setOpen(true);
+  };
   return (
     <React.Fragment>
-      <button onClick={() => setOpen(true)} title="Your group links" style={{
+      <button onClick={openLinks} title="Your group links" style={{
         height: 38, padding: '0 10px', borderRadius: 8,
         background: `${accent}12`, border: `1px solid ${accent}66`,
         color: accent, cursor: 'pointer', fontFamily: 'inherit',

@@ -1318,6 +1318,36 @@ function stopInvitePolling() {
   if (_invitePollerId) { clearInterval(_invitePollerId); _invitePollerId = null; }
 }
 
+function refreshSubscriptionAccess() {
+  ['user', 'my_invite', 'access_links'].forEach(invalidate);
+}
+
+// Telegram may suspend the WebView for longer than the checkout poll window.
+// Check again when the user returns, even after that timer has expired.
+function watchInviteReturns(onAccess) {
+  let alive = true;
+  let checking = false;
+  const check = async () => {
+    if (!alive || checking || document.visibilityState === 'hidden') return;
+    checking = true;
+    try {
+      const result = await actionCheckInvite();
+      if (!alive) return;
+      refreshSubscriptionAccess();
+      if (result?.invite_link || result?.access_links?.length) onAccess(result);
+    } finally { checking = false; }
+  };
+  const tg = window.Telegram?.WebApp;
+  document.addEventListener('visibilitychange', check);
+  tg?.onEvent?.('activated', check);
+  check();
+  return () => {
+    alive = false;
+    document.removeEventListener('visibilitychange', check);
+    tg?.offEvent?.('activated', check);
+  };
+}
+
 // View counter — fired after the user has watched at least 10s of content.
 // Backend dedupes per (user, content) so re-fires are harmless.
 async function actionRegisterView(contentId) {
@@ -1356,7 +1386,14 @@ async function actionStartFreeTrial() {
 // One-shot: returns the user's pending invite link and marks the row as
 // "used" on the backend. Called once at AppShell boot — if a checkout
 // happened between sessions, the auto-modal pops here.
-async function actionCheckInvite() {
+let _inviteCheckPromise = null;
+function actionCheckInvite() {
+  if (_inviteCheckPromise) return _inviteCheckPromise;
+  _inviteCheckPromise = _checkPendingInvite().finally(() => { _inviteCheckPromise = null; });
+  return _inviteCheckPromise;
+}
+
+async function _checkPendingInvite() {
   const initData = getInitData();
   if (!initData) return { ok: false, reason: 'no-tg' };
   try {
@@ -1512,7 +1549,7 @@ Object.assign(window, {
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
   apiGet, apiPost, useFetch, invalidate,
   useVideos, useVideo, usePaginatedVideos, useShorts, usePaginatedShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, useAccessLinks, useFollowedFeed, userFromTelegram,
-  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionApplyPromo, actionOpenCryptoSupport, actionStartFreeTrial, actionCheckInvite, actionRefreshAccessLink, actionCreateStarsInvoice, actionPrepareBundleCheckout, actionOpenTribute, actionSetNotifyExpiry, actionSuggestArtist, startInvitePolling, stopInvitePolling,
+  actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionApplyPromo, actionOpenCryptoSupport, actionStartFreeTrial, actionCheckInvite, actionRefreshAccessLink, actionCreateStarsInvoice, actionPrepareBundleCheckout, actionOpenTribute, actionSetNotifyExpiry, actionSuggestArtist, startInvitePolling, stopInvitePolling, refreshSubscriptionAccess, watchInviteReturns,
   actionCreatePlaylist, actionAddToPlaylist, actionRemoveFromPlaylist, actionDeletePlaylist,
   normalizeVideo, normalizeShort, normalizeArtist, thumbFor, paletteThumb,
   // For SplashScreen to peek at whether everything is loaded
