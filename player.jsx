@@ -17,9 +17,17 @@
 // huge UX win (shorts grid → player → back → grid no longer re-fetches).
 const _playableCache = new Map(); // contentId → { url, ts, promise? }
 const PLAYABLE_TTL_MS = 5 * 60 * 1000;
+let _playableIdentity = null;
 
 async function fetchPlayableContent(contentId) {
   if (contentId == null) {
+    const err = new Error('Open from Telegram to watch');
+    err.status = 403;
+    throw err;
+  }
+  const initData = window.getInitData();
+  if (initData !== _playableIdentity) { _playableCache.clear(); _playableIdentity = initData; }
+  if (!initData) {
     const err = new Error('Open from Telegram to watch');
     err.status = 403;
     throw err;
@@ -32,12 +40,6 @@ async function fetchPlayableContent(contentId) {
   // De-dup parallel calls for the same id.
   if (cached?.promise) return cached.promise;
 
-  const initData = window.getInitData();
-  if (!initData) {
-    const err = new Error('Open from Telegram to watch');
-    err.status = 403;
-    throw err;
-  }
   const p = (async () => {
     const res = await fetch(`${window.API_BASE}/miniapp/content/play`, {
       method: 'POST',
@@ -46,16 +48,16 @@ async function fetchPlayableContent(contentId) {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.url) {
-      _playableCache.delete(contentId);
+      if (_playableIdentity === initData) _playableCache.delete(contentId);
       const err = new Error(data.error || 'Video unavailable');
       err.status = res.status;
       throw err;
     }
-    _playableCache.set(contentId, { url: data.url, ts: Date.now() });
+    if (_playableIdentity === initData) _playableCache.set(contentId, { url: data.url, ts: Date.now() });
     return data;
   })().catch(error => {
     // A failed warm-up must not poison this ID for the rest of the session.
-    _playableCache.delete(contentId);
+    if (_playableIdentity === initData) _playableCache.delete(contentId);
     throw error;
   });
   _playableCache.set(contentId, { promise: p });
@@ -89,7 +91,32 @@ async function prefetchPlayable(ids, concurrency = 3) {
   await Promise.all(workers);
 }
 
-function VideoPlayer({ video, accent, fillParent = false, vertical = false, autoStart = false, loop = false, onEnded }) {
+function videoPipMode(video, doc = document) {
+  if (!video || video.disablePictureInPicture) return null;
+  if (typeof video.webkitSupportsPresentationMode === 'function'
+    && typeof video.webkitSetPresentationMode === 'function') {
+    try { return video.webkitSupportsPresentationMode('picture-in-picture') ? 'webkit' : null; }
+    catch (_) { return null; }
+  }
+  return doc.pictureInPictureEnabled && typeof video.requestPictureInPicture === 'function' ? 'standard' : null;
+}
+
+function toggleVideoPip(video, doc = document) {
+  const mode = videoPipMode(video, doc);
+  if (!mode) return Promise.reject(new Error('PiP unavailable'));
+  // Invoke the native API synchronously in the click handler, before any await.
+  try {
+    if (mode === 'webkit') {
+      return Promise.resolve(video.webkitSetPresentationMode(
+        video.webkitPresentationMode === 'picture-in-picture' ? 'inline' : 'picture-in-picture'));
+    }
+    return Promise.resolve(doc.pictureInPictureElement === video
+      ? doc.exitPictureInPicture() : video.requestPictureInPicture());
+  } catch (error) { return Promise.reject(error); }
+}
+
+function VideoPlayer({ video, accent, fillParent = false, vertical = false, autoStart = false, loop = false, onEnded,
+  compact = false, suspended = false, onRestore, onClose }) {
   const v = video;
   // Keep "attaching" separate from "playing". The old player switched to
   // "playing" as soon as /content/play returned, while HLS still had no
@@ -101,12 +128,19 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
   const [errorMsg, setErrorMsg] = React.useState('');
   const [streamRequest, setStreamRequest] = React.useState(null); // { url, attempt }
   const videoRef = React.useRef(null);
+  const attachedMediaRef = React.useRef(null);
   const hlsRef = React.useRef(null);
   const mountedRef = React.useRef(true);
   const watchdogRef = React.useRef(null);
   const bufferingTimerRef = React.useRef(null);
   const attemptRef = React.useRef(0);
   const posterUrl = v.thumb?.src || '';
+  const suspendedRef = React.useRef(suspended);
+  const resumeAfterSuspend = React.useRef(false);
+  const manuallyPaused = React.useRef(false);
+  suspendedRef.current = suspended;
+  const endedRef = React.useRef(onEnded);
+  endedRef.current = onEnded;
 
   // Cleanup on unmount
   React.useEffect(() => {
@@ -116,6 +150,17 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
       clearTimeout(watchdogRef.current);
       clearTimeout(bufferingTimerRef.current);
       if (hlsRef.current) { try { hlsRef.current.destroy(); } catch (_) {} hlsRef.current = null; }
+      const media = attachedMediaRef.current;
+      if (media) {
+        try {
+          if (document.pictureInPictureElement === media) document.exitPictureInPicture()?.catch(() => {});
+          else if (media.webkitPresentationMode === 'picture-in-picture') media.webkitSetPresentationMode?.('inline');
+        } catch (_) {}
+        media.pause();
+        media.removeAttribute('src');
+        media.load();
+      }
+      attachedMediaRef.current = null;
     };
   }, []);
 
@@ -138,6 +183,18 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
     // A new request/unmount destroys the current HLS instance elsewhere.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streamRequest]);
+
+  React.useEffect(() => {
+    const media = videoRef.current;
+    if (!media) return;
+    if (suspended) {
+      if (!media.paused) resumeAfterSuspend.current = true;
+      media.pause();
+    } else if (resumeAfterSuspend.current) {
+      resumeAfterSuspend.current = false;
+      media.play().catch(() => {});
+    }
+  }, [suspended, phase]);
 
   const onPlayTap = async () => {
     if (phase === 'loading' || phase === 'attaching') return;
@@ -189,6 +246,7 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
       console.warn('[player] no video ref');
       return;
     }
+    attachedMediaRef.current = vEl;
     if (posterUrl) vEl.setAttribute('poster', posterUrl);
 
     const isM3U8 = url.includes('.m3u8') || url.includes('/hls/');
@@ -196,7 +254,7 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
     const isAndroid = /android/i.test(navigator.userAgent);
     const hlsAvailable = typeof window.Hls !== 'undefined' && window.Hls.isSupported();
 
-    console.log('[player]', { isM3U8, nativeHls, isAndroid, hlsAvailable, url: url.substring(0, 80) });
+    console.log('[player]', { isM3U8, nativeHls, isAndroid, hlsAvailable });
 
     let firstFrameSeen = false;
     let lastObservedTime = vEl.currentTime;
@@ -234,6 +292,8 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
       markReady();
     };
     const onPlaying = () => {
+      if (suspendedRef.current) { resumeAfterSuspend.current = true; vEl.pause(); return; }
+      manuallyPaused.current = false;
       clearBuffering();
       markReady();
     };
@@ -255,26 +315,39 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
     vEl.addEventListener('canplay', onCanPlay);
     vEl.addEventListener('playing', onPlaying);
     vEl.addEventListener('timeupdate', onTimeUpdate);
-    vEl.addEventListener('pause', clearBuffering);
+    vEl.addEventListener('pause', () => {
+      if (!suspendedRef.current && !vEl.ended) manuallyPaused.current = true;
+      clearBuffering();
+    });
     vEl.addEventListener('ended', clearBuffering);
     vEl.addEventListener('waiting', onWaiting);
     vEl.addEventListener('stalled', onWaiting);
     vEl.addEventListener('error', onMediaError, { once: true });
 
+    let playPending = false;
     function tryPlay() {
+      if (playPending) return;
+      if (suspendedRef.current) { resumeAfterSuspend.current = true; return; }
+      if (manuallyPaused.current) return;
+      const previousMuted = vEl.muted;
       vEl.muted = true; // Start muted to bypass Android autoplay block.
       const p = vEl.play();
       if (p && p.then) {
+        playPending = true;
         p.then(() => {
           if (!mountedRef.current) return;
-          vEl.muted = false;
+          vEl.muted = previousMuted;
+          if (suspendedRef.current) { resumeAfterSuspend.current = true; vEl.pause(); return; }
           if (vEl.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) markReady();
         }).catch(e => {
+          if (mountedRef.current) vEl.muted = previousMuted;
           console.log('[player] autoplay blocked:', e?.message);
           // Metadata/data may still be available even when autoplay itself
           // is blocked. Reveal the first frame + manual play control then.
           if (vEl.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) markReady();
-        });
+        }).finally(() => { playPending = false; });
+      } else {
+        vEl.muted = previousMuted;
       }
     }
 
@@ -383,7 +456,10 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
   }
 
   // Layout: shorts/vertical fill the parent; regular videos keep 16:9.
-  const containerStyle = fillParent || vertical ? {
+  const containerStyle = compact ? {
+    position: 'relative', width: 80, height: 45, flexShrink: 0,
+    background: v.thumb?.bg || '#000', overflow: 'hidden', borderRadius: 4,
+  } : fillParent || vertical ? {
     position: 'absolute', inset: 0,
     background: v.thumb?.bg || '#000',
     overflow: 'hidden',
@@ -400,6 +476,11 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
   const streamMounted = phase === 'attaching' || phase === 'playing';
 
   return (
+    <div data-video-player data-compact={compact ? 'true' : 'false'} style={compact ? {
+      position: 'relative', height: 84, padding: '8px 8px 24px',
+      display: 'flex', gap: 8, alignItems: 'flex-start',
+      background: C.dark2, borderTop: `1px solid ${C.border2}`,
+    } : (fillParent || vertical ? { position: 'absolute', inset: 0 } : { position: 'relative' })}>
     <div style={containerStyle}>
       {streamMounted && (
         <React.Fragment>
@@ -412,7 +493,7 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
             poster={posterUrl || undefined}
             autoPlay={vertical || autoStart}
             loop={vertical || loop}
-            onEnded={onEnded}
+            onEnded={() => endedRef.current?.()}
             style={{
               position: 'absolute', inset: 0,
               width: '100%', height: '100%',
@@ -423,7 +504,7 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
               transition: 'opacity 160ms ease-out',
             }}
           />
-          {useCustomChrome && phase === 'playing' && (
+          {useCustomChrome && phase === 'playing' && !compact && (
             <CustomVideoChrome videoRef={videoRef} accent={accent} loop={loop} />
           )}
         </React.Fragment>
@@ -470,7 +551,7 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
             style={{
               position: 'absolute', left: '50%', top: '50%',
               transform: 'translate(-50%, -50%)',
-              width: 64, height: 64, borderRadius: '50%',
+              width: compact ? 36 : 64, height: compact ? 36 : 64, borderRadius: '50%',
               background: `linear-gradient(135deg, ${accent}, #C86BFF)`,
               border: 'none', color: '#000',
               boxShadow: `0 8px 28px ${accent}66`,
@@ -506,7 +587,46 @@ function VideoPlayer({ video, accent, fillParent = false, vertical = false, auto
       )}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
+    {compact && <MiniVideoControls videoRef={videoRef} video={v} phase={phase} accent={accent}
+      onRestore={onRestore} onClose={onClose} suspended={suspended} />}
+    </div>
   );
+}
+
+function MiniVideoControls({ videoRef, video, phase, accent, onRestore, onClose, suspended }) {
+  const [state, setState] = React.useState({ paused: true, time: 0, duration: 0 });
+  React.useEffect(() => {
+    const media = videoRef.current;
+    if (!media) return;
+    const update = () => setState({ paused: media.paused, time: media.currentTime || 0,
+      duration: Number.isFinite(media.duration) ? media.duration : 0 });
+    const events = ['play', 'pause', 'timeupdate', 'durationchange', 'ended'];
+    update();
+    events.forEach(name => media.addEventListener(name, update));
+    return () => events.forEach(name => media.removeEventListener(name, update));
+  }, [phase, videoRef]);
+  const buttonStyle = { width: 38, height: 44, flexShrink: 0, display: 'grid', placeItems: 'center',
+    border: 'none', borderRadius: 6, background: 'transparent', color: '#fff', cursor: 'pointer' };
+  return <React.Fragment>
+    <button onClick={onRestore} aria-label={`Expand player: ${video.title}`} title="Expand player" style={{
+      flex: 1, minWidth: 0, height: 45, padding: '2px 0', textAlign: 'left',
+      border: 'none', background: 'none', color: '#fff', cursor: 'pointer',
+    }}>
+      <span style={{ display: 'block', fontSize: 11, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{video.title}</span>
+      <span style={{ display: 'block', marginTop: 5, color: C.muted2, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{video.artist?.name}</span>
+    </button>
+    <button aria-label={state.paused ? 'Play video' : 'Pause video'} title={state.paused ? 'Play video' : 'Pause video'}
+      disabled={suspended || phase !== 'playing'} style={buttonStyle} onClick={() => {
+        const media = videoRef.current;
+        if (media?.paused) media.play().catch(() => {}); else media?.pause();
+      }}>
+      {state.paused ? <Ico.play width="20" height="20" /> : <Ico.pause />}
+    </button>
+    <button aria-label="Close player" title="Close player" onClick={onClose} style={buttonStyle}><Ico.close /></button>
+    <div aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 2, background: C.border2 }}>
+      <div style={{ width: `${state.duration ? Math.min(100, state.time / state.duration * 100) : 0}%`, height: '100%', background: accent }} />
+    </div>
+  </React.Fragment>;
 }
 
 // ShortsThumbVideo — muted, looping <video> that previews the actual short.
@@ -650,6 +770,10 @@ function CustomVideoChrome({ videoRef, accent, loop }) {
   const [controlsVisible, setControlsVisible] = React.useState(true);
   const [scrubbing, setScrubbing] = React.useState(false);
   const [muted, setMuted] = React.useState(false);
+  const [pipAvailable, setPipAvailable] = React.useState(false);
+  const [pipActive, setPipActive] = React.useState(false);
+  const [pipError, setPipError] = React.useState('');
+  const pipPending = React.useRef(false);
   const hideTimer = React.useRef(null);
   const trackRef = React.useRef(null);
 
@@ -721,6 +845,27 @@ function CustomVideoChrome({ videoRef, accent, loop }) {
     if (!el) return;
     el.muted = !el.muted;
     wakeControls();
+  };
+  React.useEffect(() => {
+    const media = videoRef.current;
+    if (!media) return;
+    const update = () => {
+      setPipAvailable(!!videoPipMode(media));
+      setPipActive(document.pictureInPictureElement === media || media.webkitPresentationMode === 'picture-in-picture');
+    };
+    const events = ['loadedmetadata', 'canplay', 'enterpictureinpicture', 'leavepictureinpicture', 'webkitpresentationmodechanged'];
+    update();
+    events.forEach(name => media.addEventListener(name, update));
+    return () => events.forEach(name => media.removeEventListener(name, update));
+  }, [videoRef]);
+  const togglePip = () => {
+    if (pipPending.current) return;
+    pipPending.current = true;
+    setPipError('');
+    toggleVideoPip(videoRef.current).catch(() => {
+      setPipError('Picture in picture is unavailable here.');
+      setControlsVisible(true);
+    }).finally(() => { pipPending.current = false; });
   };
   // Direct port of main miniapp's toggleVpFullscreen — combination of an
   // immersive CSS class on the wrapper + native Fullscreen API + screen
@@ -830,8 +975,11 @@ function CustomVideoChrome({ videoRef, accent, loop }) {
       style={{ position: 'absolute', inset: 0 }}
     >
       {/* Center play/pause big button — visible when paused or while idle. */}
+      {pipError && <div role="status" style={{ position: 'absolute', top: 54, left: 12, right: 12,
+        padding: 8, background: 'rgba(0,0,0,0.8)', borderRadius: 6, fontSize: 11, textAlign: 'center',
+      }}>{pipError}</div>}
       {(paused || controlsVisible) && (
-        <button onClick={togglePlay} style={{
+        <button aria-label={paused ? 'Play video' : 'Pause video'} title={paused ? 'Play video' : 'Pause video'} onClick={togglePlay} style={{
           position: 'absolute', left: '50%', top: '50%',
           transform: 'translate(-50%, -50%)',
           width: 64, height: 64, borderRadius: '50%',
@@ -859,6 +1007,23 @@ function CustomVideoChrome({ videoRef, accent, loop }) {
         {/* Scrub track */}
         <div
           ref={trackRef}
+          data-control="seek"
+          role="slider"
+          aria-label="Seek video"
+          aria-valuemin={0}
+          aria-valuemax={Number.isFinite(duration) ? duration : 0}
+          aria-valuenow={Math.floor(currentTime)}
+          tabIndex={0}
+          onKeyDown={event => {
+            const media = videoRef.current;
+            if (!media || !duration || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+            event.preventDefault();
+            const target = event.key === 'Home' ? 0 : event.key === 'End' ? duration - 0.1
+              : media.currentTime + (event.key === 'ArrowRight' ? 5 : -5);
+            media.currentTime = Math.max(0, Math.min(duration, target));
+            setCurrentTime(media.currentTime);
+            wakeControls();
+          }}
           onPointerDown={onScrubDown}
           style={{
             position: 'relative', height: 14,
@@ -882,12 +1047,16 @@ function CustomVideoChrome({ videoRef, accent, loop }) {
         }}>
           <span>{fmt(currentTime)} / {fmt(duration)}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <button onClick={toggleMute} style={chromeBtnStyle}>
+            {pipAvailable && <button onClick={togglePip} aria-label={pipActive ? 'Exit picture in picture' : 'Picture in picture'}
+              title={pipActive ? 'Exit picture in picture' : 'Picture in picture'} aria-pressed={pipActive} style={chromeBtnStyle}>
+              <Ico.external />
+            </button>}
+            <button onClick={toggleMute} aria-label={muted ? 'Unmute video' : 'Mute video'} title={muted ? 'Unmute video' : 'Mute video'} style={chromeBtnStyle}>
               {muted
                 ? <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 9v6h4l5 4V5L9 9H5z M16 9l4 6 M20 9l-4 6"/></svg>
                 : <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 9v6h4l5 4V5L9 9H5z M16 8a4 4 0 0 1 0 8 M18.5 5.5a8 8 0 0 1 0 13"/></svg>}
             </button>
-            <button onClick={toggleFullscreen} style={chromeBtnStyle}>
+            <button onClick={toggleFullscreen} aria-label="Fullscreen" title="Fullscreen" style={chromeBtnStyle}>
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8V4h4 M16 4h4v4 M20 16v4h-4 M8 20H4v-4"/></svg>
             </button>
           </div>

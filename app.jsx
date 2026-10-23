@@ -87,6 +87,12 @@ function AppShell() {
   // History stack — each entry { screen, params }. Top of stack = current.
   const [stack, setStack] = React.useState([{ screen: 'home', params: {} }]);
   const current = stack[stack.length - 1];
+  const [videoSession, setVideoSession] = React.useState(null);
+  const videoMinimized = !!videoSession && current.screen !== 'video';
+  const stageRef = React.useRef(null);
+  const [playerBottom, setPlayerBottom] = React.useState(0);
+  const [hasPlayerFooter, setHasPlayerFooter] = React.useState(false);
+  const [localShortsPlaying, setLocalShortsPlaying] = React.useState(false);
   const [shortsMounted, setShortsMounted] = React.useState(false);
   React.useEffect(() => {
     if (current.screen === 'shorts') setShortsMounted(true);
@@ -103,6 +109,10 @@ function AppShell() {
   const [proOverride, setProOverride] = React.useState(null);
   const isPro = proOverride != null ? proOverride : (t.startPro ? true : user.isPro);
   const setPro = (v) => setProOverride(v);
+  const confirmedPlaybackAccess = React.useRef(false);
+  if (!userState.loading && !userState.error) confirmedPlaybackAccess.current = isPro;
+  const playbackAuthorized = isPro || (confirmedPlaybackAccess.current && (userState.loading
+    || (userState.error && ![401, 403].includes(userState.error.status))));
 
   // Global shorts player overlay state. Any screen can call
   // nav.openShorts(items, idx) to pop the immersive player.
@@ -135,16 +145,36 @@ function AppShell() {
         console.warn(`[nav] unknown screen: ${screen}`);
         return;
       }
-      setStack(s => [...s, { screen, params }]);
+      if (screen === 'video') setVideoSession(params);
+      setStack(s => [...(screen === 'video' && s[s.length - 1].screen === 'video' ? s.slice(0, -1) : s), { screen, params }]);
     },
     back: () => {
       setStack(s => s.length > 1 ? s.slice(0, -1) : s);
     },
     replace: (screen, params = {}) => {
+      if (screen === 'video') {
+        setVideoSession(params);
+        // Autoplay advances the persistent session without replacing the
+        // catalog/profile the user is browsing underneath the mini-player.
+        if (current.screen !== 'video') return;
+      }
       setStack(s => [...s.slice(0, -1), { screen, params }]);
     },
     reset: (screen = 'home', params = {}) => {
+      if (screen === 'video') setVideoSession(params);
       setStack([{ screen, params }]);
+    },
+    videoMinimized,
+    minimizeVideo: () => setStack(s => s[s.length - 1].screen === 'video'
+      ? (s.length > 1 ? s.slice(0, -1) : [{ screen: 'home', params: {} }]) : s),
+    restoreVideo: () => {
+      if (videoSession) setStack(s => s[s.length - 1].screen === 'video'
+        ? s : [...s, { screen: 'video', params: videoSession }]);
+    },
+    closeVideo: () => {
+      setVideoSession(null);
+      setStack(s => s.filter(entry => entry.screen !== 'video').length
+        ? s.filter(entry => entry.screen !== 'video') : [{ screen: 'home', params: {} }]);
     },
     canGoBack: stack.length > 1,
     screen: current.screen,
@@ -200,10 +230,42 @@ function AppShell() {
       return false;
     },
     paywallOpen,
-  }), [current.screen, current.params, stack.length, isPro, user, userState.loading, homeVideosState.items, homeVideosState.loading, homeVideosState.hasMore, shortsPlayer, inviteAccess, paywallOpen]);
+  }), [current.screen, current.params, stack.length, isPro, user, userState.loading, homeVideosState.items, homeVideosState.loading, homeVideosState.hasMore, shortsPlayer, inviteAccess, paywallOpen, videoSession, videoMinimized]);
 
-  const renderScreen = SCREENS[current.screen] || SCREENS.home;
-  const view = renderScreen({ accent, density, params: current.params });
+  const background = current.screen === 'video'
+    ? [...stack].reverse().find(entry => entry.screen !== 'video') || { screen: 'home', params: {} }
+    : current;
+  const renderScreen = SCREENS[background.screen] || SCREENS.home;
+  const backgroundNav = { ...nav, screen: background.screen, params: background.params,
+    activeTab: SCREEN_TO_TAB[background.screen] || '' };
+  const view = renderScreen({ accent, density, params: background.params });
+
+  React.useLayoutEffect(() => {
+    const root = stageRef.current;
+    if (!root) return;
+    const footer = [...root.querySelectorAll('[data-bottom-nav]')]
+      .find(element => getComputedStyle(element).visibility !== 'hidden' && element.getBoundingClientRect().height > 0);
+    const measure = () => {
+      const safeBottom = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tg-safe-bottom')) || 0;
+      const bottom = footer ? root.getBoundingClientRect().bottom - footer.getBoundingClientRect().top : safeBottom;
+      setPlayerBottom(Math.max(0, bottom));
+      setHasPlayerFooter(!!footer);
+    };
+    measure();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    observer?.observe(root);
+    if (footer) observer?.observe(footer);
+    window.addEventListener('resize', measure);
+    return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
+  }, [background.screen, videoMinimized]);
+
+  React.useEffect(() => {
+    if (!userState.loading && !playbackAuthorized && videoSession) {
+      setVideoSession(null);
+      setStack(s => s.filter(entry => entry.screen !== 'video').length
+        ? s.filter(entry => entry.screen !== 'video') : [{ screen: 'home', params: {} }]);
+    }
+  }, [playbackAuthorized, userState.loading, videoSession]);
 
   // TweaksPanel only when ?tweaks=1.
   const showTweaks = React.useMemo(() => {
@@ -313,18 +375,37 @@ function AppShell() {
       <PhoneStage>
         {/* Warm only the first four previews after Home is ready. Keep the
             visited grid mounted so returning never resets its order. */}
-        <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          {(shortsPreviewsReady || shortsMounted || current.screen === 'shorts') && <div style={{
+        <div ref={stageRef} className="playback-stage" style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <NavContext.Provider value={backgroundNav}>
+          {(shortsPreviewsReady || shortsMounted || background.screen === 'shorts') && <div
+            aria-hidden={current.screen === 'video' || background.screen !== 'shorts'}
+            inert={current.screen === 'video' || background.screen !== 'shorts' ? '' : undefined} style={{
             position: 'absolute', inset: 0,
             display: 'flex', flexDirection: 'column',
-            visibility: current.screen === 'shorts' ? 'visible' : 'hidden',
-            pointerEvents: current.screen === 'shorts' ? 'auto' : 'none',
+            visibility: background.screen === 'shorts' ? 'visible' : 'hidden',
+            pointerEvents: background.screen === 'shorts' ? 'auto' : 'none',
           }}>
-            <window.ShortsTab accent={accent} active={current.screen === 'shorts'} />
+            <window.ShortsTab accent={accent} active={background.screen === 'shorts' && current.screen !== 'video'}
+              onPlaybackChange={setLocalShortsPlaying} />
           </div>}
-          {current.screen !== 'shorts' && (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
+          {background.screen !== 'shorts' && (
+            <div aria-hidden={current.screen === 'video'} inert={current.screen === 'video' ? '' : undefined}
+              style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+                paddingBottom: videoMinimized && !hasPlayerFooter ? 84 + playerBottom : 0 }}>
               {view}
+            </div>
+          )}
+          </NavContext.Provider>
+          {videoSession && playbackAuthorized && (
+            <div data-persistent-player data-minimized={videoMinimized ? 'true' : 'false'} style={{
+              position: 'absolute', left: 0, right: 0,
+              top: videoMinimized ? 'auto' : 0, bottom: videoMinimized ? playerBottom : 0,
+              height: videoMinimized ? 84 : undefined, zIndex: videoMinimized ? 20 : 40,
+            }}>
+              <NavContext.Provider value={{ ...nav, params: videoSession, isPro: playbackAuthorized,
+                videoSuspended: !!shortsPlayer || localShortsPlaying }}>
+                <window.VideoPage accent={accent} density={density} />
+              </NavContext.Provider>
             </div>
           )}
         </div>
@@ -496,6 +577,13 @@ if (typeof document !== 'undefined' && !document.getElementById('phone-fill-styl
   const s = document.createElement('style');
   s.id = 'phone-fill-styles';
   s.textContent = `
+    .playback-stage { width: 390px; height: 844px; }
+    .phone-fill .playback-stage { width: 100%; height: 100%; }
+    [data-persistent-player][data-minimized="true"] [data-phone] {
+      width: 100% !important; height: 84px !important;
+      border: none !important; border-radius: 0 !important;
+      box-shadow: none !important;
+    }
     .phone-fill [data-phone],
     .phone-fill > div {
       width: 100% !important;

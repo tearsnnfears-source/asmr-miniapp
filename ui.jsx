@@ -79,6 +79,7 @@ const Ico = {
   external: (props={}) => <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M14 4h6v6"/><path d="m20 4-9 9"/><path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"/></svg>,
   close: (props={}) => <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...props}><path d="m6 6 12 12M18 6 6 18"/></svg>,
   play: (props={}) => <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" {...props}><path d="M8 5v14l11-7z"/></svg>,
+  pause: (props={}) => <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" {...props}><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>,
   heart: (props={}) => <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg>,
   heartFilled: (props={}) => <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" {...props}><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg>,
   bookmark: (props={}) => <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}><path d="M6 4h12v17l-6-4-6 4z"/></svg>,
@@ -362,7 +363,9 @@ function BottomNav({ active, centerMode, accent = C.pink, subAccent = C.lime }) 
   ];
 
   return (
-    <div style={{
+    <React.Fragment>
+    {nav.videoMinimized && <div aria-hidden="true" style={{ height: 84, flexShrink: 0 }} />}
+    <div data-bottom-nav style={{
       flexShrink: 0,
       background: C.dark2,
       borderTop: `1px solid ${C.border}`,
@@ -373,6 +376,7 @@ function BottomNav({ active, centerMode, accent = C.pink, subAccent = C.lime }) 
       display: 'grid',
       gridTemplateColumns: 'repeat(5, 1fr)',
       position: 'relative',
+      zIndex: 30,
     }}>
       {tabs.map(t => {
         if (t.center) {
@@ -411,8 +415,8 @@ function BottomNav({ active, centerMode, accent = C.pink, subAccent = C.lime }) 
             : u.isInfinite ? 'LIFETIME' : tier.toUpperCase();
           return (
             <div key={t.id} style={{ height: 44, display: 'flex', justifyContent: 'center' }}>
-              <button onClick={() => nav.onTab('center')} style={{
-                marginTop: -24, position: 'relative',
+              <button aria-label="Your profile" onClick={() => nav.onTab('center')} style={{
+                marginTop: -24, position: 'relative', zIndex: 2,
                 width: 68, height: 70,
                 background: 'transparent', border: 'none',
                 cursor: 'pointer', padding: 0,
@@ -455,6 +459,7 @@ function BottomNav({ active, centerMode, accent = C.pink, subAccent = C.lime }) 
         );
       })}
     </div>
+    </React.Fragment>
   );
 }
 

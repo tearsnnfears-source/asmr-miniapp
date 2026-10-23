@@ -441,7 +441,7 @@ function useVideo(contentId) {
   return useFetch(
     `video:${contentId}`,
     async () => {
-      if (contentId == null) throw new Error('no id');
+      if (contentId == null) return null;
       const data = await apiGet(`/miniapp/video/${encodeURIComponent(contentId)}`);
       return normalizeVideo(data, 0);
     },

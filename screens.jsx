@@ -7,7 +7,7 @@
 // reload when the user dismisses the player. AppShell additionally keeps
 // the whole ShortsTab mounted across tab switches (via visibility:hidden)
 // so the loaded video elements aren't blown away by Home/Saved tab clicks.
-function ShortsTab({ accent = C.pink, active = true }) {
+function ShortsTab({ accent = C.pink, active = true, onPlaybackChange }) {
   const nav = window.useNav();
   const [filter, setFilter] = React.useState(null);
   const [visible, setVisible] = React.useState(20);
@@ -35,6 +35,10 @@ function ShortsTab({ accent = C.pink, active = true }) {
   // playOrder  = array of allShorts indices to walk through. null = use sequential.
   const [playingPos, setPlayingPos] = React.useState(null);
   const [playOrder, setPlayOrder] = React.useState(null);
+  React.useEffect(() => {
+    onPlaybackChange?.(active && playingPos != null);
+    return () => onPlaybackChange?.(false);
+  }, [active, playingPos != null, onPlaybackChange]);
 
   // While the overlay is open, swap the Telegram BackButton + history entry
   // so back/swipe closes the player instead of leaving the Shorts tab.
@@ -205,6 +209,7 @@ function ShortsTab({ accent = C.pink, active = true }) {
       {playingPos != null && playOrder && (
         <ShortsPlayer
           accent={accent}
+          active={active}
           allShorts={allShorts}
           order={playOrder}
           pos={playingPos}
@@ -293,7 +298,7 @@ function ShortsTile({ s, idx, accent, fresh, onOpen, previewEnabled = true, eage
 // Two call shapes are supported so the same component drives both the
 // ShortsTab overlay (uses `allShorts + order + pos`) and the global
 // AppShell overlay (uses a self-contained `items + pos`).
-function ShortsPlayer({ accent = C.pink, allShorts, order, items, pos, setPos, onClose }) {
+function ShortsPlayer({ accent = C.pink, allShorts, order, items, pos, setPos, onClose, active = true }) {
   // Resolve a single `list` array regardless of call shape.
   const list = items || (order ? order.map(i => (allShorts || [])[i]) : (allShorts || []));
   const total = list.length;
@@ -436,7 +441,7 @@ function ShortsPlayer({ accent = C.pink, allShorts, order, items, pos, setPos, o
         {/* Real player fills the whole bleed; key on video.id forces a fresh
             instance per short so swiping actually changes what plays. */}
         <div style={{ position: 'absolute', inset: 0 }}>
-          <window.VideoPlayer key={s.id} video={s} accent={accent} fillParent vertical />
+          <window.VideoPlayer key={s.id} video={s} accent={accent} fillParent vertical suspended={!active} />
         </div>
         {/* Bottom scrim for readable overlay text */}
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, transparent 25%, transparent 55%, rgba(0,0,0,0.85) 100%)', pointerEvents: 'none' }} />
@@ -524,13 +529,17 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
   const proGateRef = React.useRef(false);
   React.useEffect(() => {
     if (proGateRef.current) return;
-    if (!nav.isPro) {
+    if (!nav.isPro && !nav.userLoading) {
       proGateRef.current = true;
       nav.openPaywall && nav.openPaywall();
       nav.replace && nav.replace('home');
     }
-  }, [nav.isPro]);
-  if (!nav.isPro) return null;
+  }, [nav.isPro, nav.userLoading]);
+  return nav.isPro ? <VideoPageContent accent={accent} density={density} /> : null;
+}
+
+function VideoPageContent({ accent, density }) {
+  const nav = window.useNav();
   const passed = nav.params?.video;
   const requestedId = nav.params?.id;
   // Queue context — set when the user came from a playlist or Play-all.
@@ -540,7 +549,9 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
   const liteState = window.useVideos(30);
   const list = liteState.data || [];
   const fetchedState = window.useVideo(passed ? null : requestedId);
-  const v = passed || fetchedState.data || list.find(x => String(x.id) === String(requestedId)) || list[0] || VIDEOS[0];
+  const matchingVideo = String(fetchedState.data?.id) === String(requestedId) ? fetchedState.data : null;
+  const v = passed || matchingVideo || list.find(x => String(x.id) === String(requestedId))
+    || (requestedId == null ? list[0] || VIDEOS[0] : null);
 
   // Recommendation rail — always fetched (Up Next shows beneath the queue,
   // not instead of it). Limit big enough to feed Load-more cycles.
@@ -599,6 +610,7 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
 // outer fallback resolution noisy. Re-mounts when v.id changes via key.
 function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queueIdx }) {
   const nav = window.useNav();
+  const minimized = !!nav.videoMinimized;
   // Pull the live artist record so we get the real photo + counts (not the
   // bare {name, handle, 0, 0} stub embedded on each video row).
   const artistsState = window.useArtists();
@@ -633,6 +645,9 @@ function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queu
     try { localStorage.setItem('vp_autoplay', autoplay ? '1' : '0'); } catch (_) {}
   }, [autoplay]);
   const [showPlaylistPicker, setShowPlaylistPicker] = React.useState(false);
+  React.useEffect(() => {
+    setLocalLike(null); setLocalSaved(null); setLocalFollow(null); setShowPlaylistPicker(false);
+  }, [contentId]);
   const isLiked = localLike != null ? localLike : serverHearted;
   const isSaved = localSaved != null ? localSaved : !!favStatus.favorited;
   const heartCount = serverHeartCount + (
@@ -706,7 +721,7 @@ function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queu
   }, [autoplay, replay, queue, queueIdx, queueRest, recItems, nav]);
 
   return (
-    <div style={SCROLL_BODY}>
+    <div style={minimized ? { height: 84, flexShrink: 0 } : SCROLL_BODY}>
       {/* Player. loop = replay; autoStart begins playback on mount so
           autoplay-chained videos don't require an extra tap. onEnded
           drives chaining. The translucent back button is overlaid on
@@ -714,8 +729,9 @@ function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queu
           player enters fullscreen because the .vp-immersive layer
           covers the whole viewport at z-index 9500. */}
       <div style={{ position: 'relative' }}>
-        <window.VideoPlayer key={v.id} video={v} accent={accent} loop={replay} onEnded={onEnded} autoStart />
-        <button
+        <window.VideoPlayer key={v.id} video={v} accent={accent} loop={replay} onEnded={onEnded} autoStart
+          compact={minimized} suspended={nav.videoSuspended} onRestore={nav.restoreVideo} onClose={nav.closeVideo} />
+        {!minimized && <button
           onClick={() => nav.back()}
           aria-label="Back"
           style={{
@@ -736,9 +752,21 @@ function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queu
             fontFamily: 'inherit',
             boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
           }}
-        ><Ico.chevL /></button>
+        ><Ico.chevL /></button>}
+        {!minimized && <button
+          onClick={nav.minimizeVideo}
+          aria-label="Minimize player"
+          title="Minimize player"
+          style={{
+            position: 'absolute', top: 10, right: 10, width: 38, height: 38,
+            borderRadius: 8, border: '1px solid rgba(255,255,255,0.18)',
+            background: 'rgba(0,0,0,0.6)', color: '#fff', cursor: 'pointer',
+            display: 'grid', placeItems: 'center', zIndex: 10,
+          }}
+        ><Ico.chevL style={{ transform: 'rotate(-90deg)' }} /></button>}
       </div>
 
+      <div hidden={minimized}>
       {/* Title row — kept clean: just the title, no prev/next arrows. */}
       <div style={{ padding: '14px 14px 6px' }}>
         <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.3 }}>{v.title}</div>
@@ -845,6 +873,7 @@ function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queu
           onClose={() => setShowPlaylistPicker(false)}
         />
       )}
+      </div>
     </div>
   );
 }
