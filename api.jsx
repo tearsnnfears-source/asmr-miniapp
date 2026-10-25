@@ -1254,45 +1254,46 @@ function usePaginatedShorts(pageSize = SHORTS_PAGE_SIZE, { enabled = true, order
   return { ...state, loading: state.loading || (enabled && !entry.started), loadMore };
 }
 
-async function actionPrepareBundleCheckout(tier, bundleTarget) {
-  const initData = getInitData();
-  if (!initData) {
-    return { ok: false, reason: 'no-tg', message: 'Open from Telegram to subscribe' };
+// Temporary checkout pause applies only to this Mini App, not provider webhooks.
+const CARD_PAYMENT_NOTICE_COPY = {
+  "en": {
+    "title": "Pay with Telegram Stars",
+    "body": "Card and SBP payments are temporarily unavailable. You can still subscribe with Telegram Stars.",
+    "topUp": "You can buy Stars with a bank card via App Store, Google Play or @PremiumBot. Available payment methods depend on your country and device.",
+    "choose": "Choose Stars"
+  },
+  "ru": {
+    "title": "Оплата Telegram Stars",
+    "body": "Оплата картой и СБП временно недоступна. Сейчас подписку можно оплатить Telegram Stars.",
+    "topUp": "Stars можно купить банковской картой через App Store, Google Play или @PremiumBot. Доступные способы зависят от страны и устройства.",
+    "choose": "Выбрать Stars"
+  },
+  "es": {
+    "title": "Paga con Telegram Stars",
+    "body": "Los pagos con tarjeta y SBP no están disponibles temporalmente. Puedes suscribirte con Telegram Stars.",
+    "topUp": "Puedes comprar Stars con tarjeta en App Store, Google Play o @PremiumBot. Los métodos disponibles dependen de tu país y dispositivo.",
+    "choose": "Elegir Stars"
   }
+};
+function actionShowCardPaymentNotice(language = 'en') {
+  const text = CARD_PAYMENT_NOTICE_COPY[language] || CARD_PAYMENT_NOTICE_COPY.en;
+  const message = [text.body, text.topUp].filter(Boolean).join('\n\n');
   try {
-    const data = await apiPost('/miniapp/prepare_bundle_checkout', {
-      initData,
-      tier,
-      bundle_target: bundleTarget,
-    });
-    return { ok: true, ...data };
-  } catch (e) {
-    return { ok: false, error: e.message, message: 'Could not prepare bundle checkout. Try again.' };
-  }
+    const tg = window.Telegram?.WebApp;
+    if (typeof tg?.showAlert === 'function') tg.showAlert(message);
+    else window.alert?.(message);
+  } catch (_) { window.alert?.(message); }
+  return { ok: false, reason: 'card-unavailable', message };
+}
+Object.assign(window, { CARD_PAYMENT_NOTICE_COPY, actionShowCardPaymentNotice });
+
+async function actionPrepareBundleCheckout(tier, bundleTarget) {
+  return { ok: false, reason: 'card-unavailable', message: CARD_PAYMENT_NOTICE_COPY.en.body };
 }
 
-// Tribute checkout - open the bot-provided URL and poll for the invite link.
+// Retain the legacy action name so old screens cannot launch Tribute.
 function actionOpenTribute(url, onLink, onTimeout) {
-  if (!url) return { ok: false, message: 'No Tribute URL configured' };
-  const tg = window.Telegram?.WebApp;
-  try {
-    // Tribute is itself a Telegram Mini App. openLink() treats the URL as an
-    // external website on iOS and sends the user through Safari; using
-    // openTelegramLink() lets Telegram resolve the direct Mini App link and
-    // open it over this app without closing our current WebView.
-    if (tg && typeof tg.openTelegramLink === 'function') tg.openTelegramLink(url);
-    else if (tg && typeof tg.openLink === 'function') tg.openLink(url);
-    else window.open(url, '_blank', 'noopener');
-  } catch (_) {
-    try {
-      if (tg && typeof tg.openLink === 'function') tg.openLink(url);
-      else window.open(url, '_blank', 'noopener');
-    } catch (_) {
-      return { ok: false, message: 'Could not open Tribute' };
-    }
-  }
-  startInvitePolling(onLink, onTimeout);
-  return { ok: true };
+  return actionShowCardPaymentNotice();
 }
 
 let _invitePollerId = null;

@@ -346,12 +346,13 @@ const CHECKOUT_NOTICE_COPY = {
   },
 };
 
-function CheckoutNoticeModal({ initialLanguage = 'en', preferenceKey, plan, method, accent, busy, onClose, onPay }) {
+function CheckoutNoticeModal({ initialLanguage = 'en', preferenceKey, plan, method, accent, busy, onClose, onPay, cardUnavailable = false, onChooseStars }) {
   const [hidden, setHidden] = React.useState(() => isCheckoutNoticeHidden(preferenceKey));
   const [language, setLanguage] = React.useState(
     CHECKOUT_NOTICE_COPY[initialLanguage] ? initialLanguage : 'en',
   );
   const text = CHECKOUT_NOTICE_COPY[language];
+  const cardText = window.CARD_PAYMENT_NOTICE_COPY[language];
   const panelRef = React.useRef(null);
   const busyRef = React.useRef(busy);
   busyRef.current = busy;
@@ -404,9 +405,12 @@ function CheckoutNoticeModal({ initialLanguage = 'en', preferenceKey, plan, meth
           <button type="button" onClick={onClose} disabled={busy} aria-label={text.close}
             title={text.close} style={{ ...iconBtn, flexShrink: 0 }}><Ico.close /></button>
         </div>
-        <h2 id={titleId} style={{ fontSize: 21, lineHeight: 1.25, margin: '22px 0 18px', letterSpacing: 0 }}>{text.title}</h2>
+        <h2 id={titleId} style={{ fontSize: 21, lineHeight: 1.25, margin: '22px 0 18px', letterSpacing: 0 }}>{cardUnavailable ? cardText.title : text.title}</h2>
         <div id={bodyId} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {[[text.returnTitle, text.returnText], [text.linksTitle, text.linksText]].map(([title, body], index) => (
+          {cardUnavailable ? <>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}>{cardText.body}</p>
+            <p style={{ margin: 0, fontSize: 12, lineHeight: 1.65, color: C.muted2 }}>{cardText.topUp}</p>
+          </> : [[text.returnTitle, text.returnText], [text.linksTitle, text.linksText]].map(([title, body], index) => (
             <div key={index} style={{ display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr)', gap: 10 }}>
               <span style={{ color: accent, fontSize: 12, fontWeight: 800, paddingTop: 2 }}>0{index + 1}</span>
               <div><div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.4 }}>{title}</div>
@@ -414,7 +418,7 @@ function CheckoutNoticeModal({ initialLanguage = 'en', preferenceKey, plan, meth
             </div>
           ))}
         </div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 18,
+        {!cardUnavailable && <><label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 18,
           color: C.muted2, fontSize: 11, lineHeight: 1.4, cursor: 'pointer' }}>
           <input type="checkbox" checked={hidden} onChange={event => {
             setHidden(event.target.checked);
@@ -432,12 +436,13 @@ function CheckoutNoticeModal({ initialLanguage = 'en', preferenceKey, plan, meth
             <div style={{ fontSize: 10, marginTop: 3, color: C.muted, fontWeight: 500, textAlign: 'right' }}>/{text.month}</div>
           </div>
         </div>
-        <button type="button" onClick={onPay} disabled={busy} style={{
+        </>}
+        <button type="button" onClick={cardUnavailable ? onChooseStars : onPay} disabled={busy} style={{
           marginTop: 18, width: '100%', minHeight: 46, border: 'none', borderRadius: 6,
           background: accent, color: '#000', fontSize: 13, fontWeight: 800,
           display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8,
           opacity: busy ? 0.6 : 1, cursor: busy ? 'wait' : 'pointer',
-        }}>{busy ? text.busy : <>{text.pay}<Ico.external /></>}</button>
+        }}>{busy ? text.busy : cardUnavailable ? cardText.choose : <>{text.pay}<Ico.external /></>}</button>
       </div>
     </div>, document.body,
   );
@@ -455,10 +460,12 @@ function SubscriptionPage({ accent = C.pink }) {
   const [tier, setTier] = React.useState('plus');
   const [eliteTarget, setEliteTarget] = React.useState('privateleaks');
   // Payment method: 0=Card 1=Stars 2=SBP 3=Crypto
-  const [method, setMethod] = React.useState(0);
+  const [method, setMethod] = React.useState(1);
   const [busy, setBusy] = React.useState(false);
   const [checkoutNotice, setCheckoutNotice] = React.useState(false);
   const closeCheckoutNotice = React.useCallback(() => setCheckoutNotice(false), []);
+  const [cardPaymentNotice, setCardPaymentNotice] = React.useState(false);
+  const closeCardPaymentNotice = React.useCallback(() => setCardPaymentNotice(false), []);
   const payingRef = React.useRef(false);
   const noticePreferenceKey = `asmrleaks.checkout-notice.v1:${user.telegramId || 'guest'}`;
 
@@ -502,15 +509,6 @@ function SubscriptionPage({ accent = C.pink }) {
     }
   };
 
-  // Match live miniapp's per-tier Tribute URLs (provided via /miniapp/profile).
-  const tributeUrl = tier === 'king'
-    ? (user.tributeKingUrl || 'https://t.me/tribute/app?startapp=s10Vq')
-    : tier === 'elite'
-      ? (user.tributeEliteUrl || 'https://t.me/tribute/app?startapp=sT5E')
-    : tier === 'pro'
-      ? (user.tributeProUrl || 'https://t.me/tribute/app?startapp=sT5D')
-      : (user.tributePlusUrl || 'https://t.me/tribute/app?startapp=sQSn');
-
   const planDays = 31;
   const tierMeta = {
     plus: {
@@ -543,6 +541,11 @@ function SubscriptionPage({ accent = C.pink }) {
   const onPay = async () => {
     if (busy || payingRef.current) return;
     if (!isTierAvailable) return;
+    if (method === 0 || method === 2) {
+      setCheckoutNotice(false);
+      setCardPaymentNotice(true);
+      return;
+    }
     // Preview-mode (outside Telegram): just flip Pro locally.
     if (!isInsideTg) {
       nav.setPro(true); nav.reset('home'); return;
@@ -550,34 +553,6 @@ function SubscriptionPage({ accent = C.pink }) {
     payingRef.current = true;
     setBusy(true);
     try {
-      // ── Card / SBP via Tribute ──────────────────────────────
-      if (method === 0 || method === 2) {
-        let promoForPay = appliedPromo;
-        if (!promoForPay && promo.trim()) promoForPay = await applyPromo();
-        if (promo.trim() && !promoForPay) return;
-        if (tier === 'elite' || tier === 'king') {
-          const prepared = await window.actionPrepareBundleCheckout?.(tier, bundleTarget);
-          if (!prepared?.ok) {
-            alert(prepared?.message || 'Could not prepare bundle checkout');
-            return;
-          }
-        }
-        const r = window.actionOpenTribute(tributeUrl,
-          (access) => {
-            // Bot issued the invite — pop the modal and reset caches.
-            nav.openInvite?.(access);
-            window.refreshSubscriptionAccess?.();
-          },
-          () => { /* timeout — silent; user can re-open via bell */ },
-        );
-        if (!r.ok) { alert(r.message || 'Could not open Tribute'); return; }
-        setCheckoutNotice(false);
-        // Drop back to home so the polling overlay isn't sitting on a
-        // dead subscription screen. The invite modal will surface when
-        // the bot finishes.
-        nav.reset('home');
-        return;
-      }
       // ── TG Stars ────────────────────────────────────────────
       if (method === 1) {
         let promoForPay = appliedPromo;
@@ -833,24 +808,29 @@ function SubscriptionPage({ accent = C.pink }) {
             <div style={{ fontSize: 9.5, color: C.muted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Payment method</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[
-                { i: 0, icon: '💳', name: 'Card',     desc: 'via Tribute' },
+                { i: 0, icon: '💳', name: 'Card',     desc: 'Temporarily unavailable' },
                 { i: 1, icon: '⭐', name: 'TG Stars', desc: 'Telegram Stars' },
-                { i: 2, icon: '🏦', name: 'СБП',      desc: 'Russian banks · Tribute' },
+                { i: 2, icon: '🏦', name: 'СБП',      desc: 'Temporarily unavailable' },
                 { i: 3, icon: '₿',  name: 'Crypto',   desc: 'Manual via admin' },
               ].map((m) => {
                 const active = method === m.i;
                 return (
-                  <div key={m.i} onClick={() => setMethod(m.i)} style={{
+                  <button key={m.i} type="button" disabled={busy} aria-pressed={active}
+                    onClick={() => {
+                      if (m.i === 0 || m.i === 2) setCardPaymentNotice(true);
+                      else setMethod(m.i);
+                    }} style={{
+                    width: '100%', color: C.text, textAlign: 'left', fontFamily: 'inherit',
                     background: active ? `${cur.color}14` : C.dark2,
                     border: `1.5px solid ${active ? cur.color : C.border}`,
-                    borderRadius: 12, padding: '10px 12px',
+                    borderRadius: 8, padding: '10px 12px',
                     display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
                   }}>
                     <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>{m.icon}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>{m.name}</div>
-                      <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{m.desc}</div>
-                    </div>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 13, fontWeight: 700 }}>{m.name}</span>
+                      <span style={{ display: 'block', fontSize: 11, color: C.muted, marginTop: 1 }}>{m.desc}</span>
+                    </span>
                     <span style={{
                       width: 18, height: 18, borderRadius: '50%',
                       border: `2px solid ${active ? cur.color : C.border2}`,
@@ -859,7 +839,7 @@ function SubscriptionPage({ accent = C.pink }) {
                     }}>
                       {active && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#000' }} />}
                     </span>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -919,11 +899,11 @@ function SubscriptionPage({ accent = C.pink }) {
             cursor: busy || !isTierAvailable ? 'default' : 'pointer',
             boxShadow: 'none',
           }}>
-            {busy ? 'PROCESSING…' : isTierAvailable ? `SUBSCRIBE — ${cur.name} €${price}/MO →` : `${cur.name} €${price}/MO — COMING SOON`}
+            {busy ? 'PROCESSING…' : isTierAvailable ? `SUBSCRIBE — ${cur.name} ${method === 1 ? `${selectedPlan.stars} Stars` : `€${price}`}/MO →` : `${cur.name} €${price}/MO — COMING SOON`}
           </button>
           <div style={{ textAlign: 'center', fontSize: 10, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>
             {isTierAvailable
-              ? 'Cancel anytime · Card via Tribute · Crypto via admin'
+              ? '31 days of access · Telegram Stars · Crypto via support'
               : `31 days · ${selectedPlan.stars} Stars · ${cur.access.toLowerCase()}`}
           </div>
         </div>
@@ -934,6 +914,11 @@ function SubscriptionPage({ accent = C.pink }) {
         preferenceKey={noticePreferenceKey}
         plan={{ name: cur.name, eur: price, stars: selectedPlan.stars }} method={method}
         accent={cur.color} busy={busy} onClose={closeCheckoutNotice} onPay={onPay}
+      />}
+      {cardPaymentNotice && <CheckoutNoticeModal
+        initialLanguage={user.lang || 'en'} cardUnavailable
+        accent={cur.color} busy={busy} onClose={closeCardPaymentNotice}
+        onChooseStars={() => { setMethod(1); setCardPaymentNotice(false); }}
       />}
     </Phone>
   );

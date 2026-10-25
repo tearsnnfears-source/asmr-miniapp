@@ -68,6 +68,7 @@ function checkoutRuntime(method, tier, overrides = {}) {
     appliedPromo: null, promo: '', planDays: 31, tributeUrl: 'https://example.test/selected-tier',
     applyPromo: async () => null, alert: message => calls.push(['alert', message]),
     setBusy: value => calls.push(['busy', value]), setCheckoutNotice: value => calls.push(['modal', value]),
+    setCardPaymentNotice: value => calls.push(['card-notice', value]),
     nav: { reset: value => calls.push(['reset', value]), openInvite: value => calls.push(['invite', value]) },
     window: {
       actionPrepareBundleCheckout: async (...args) => { calls.push(['prepare', ...args]); return { ok: true }; },
@@ -84,7 +85,7 @@ function checkoutRuntime(method, tier, overrides = {}) {
   return { context, calls };
 }
 
-for (const method of [0, 1, 2, 3]) {
+for (const method of [1, 3]) {
   test(`PAY preserves selected method ${method} and bundle target`, async () => {
     const { context, calls } = checkoutRuntime(method, 'elite');
     await context.onPay();
@@ -97,17 +98,32 @@ for (const method of [0, 1, 2, 3]) {
   });
 }
 
-test('checkout preparation errors keep the notice open and never launch payment', async () => {
-  const { context, calls } = checkoutRuntime(0, 'king');
-  context.window.actionPrepareBundleCheckout = async () => ({ ok: false, message: 'retry' });
-  await context.onPay();
-  assert.equal(calls.some(call => call[0] === 'tribute'), false);
-  assert.equal(calls.some(call => call[0] === 'modal'), false);
-  assert.equal(context.payingRef.current, false);
-});
+for (const method of [0, 2]) {
+  test(`Card/SBP method ${method} only shows the notice, even with a promo or outside Telegram`, async () => {
+    for (const isInsideTg of [true, false]) {
+      const { context, calls } = checkoutRuntime(method, 'king', { isInsideTg, promo: 'FIXTURE',
+        applyPromo: async () => { throw Error('promo must not be applied'); } });
+      await context.onPay();
+      assert.deepEqual(calls, [['modal', false], ['card-notice', true]]);
+      assert.equal(context.payingRef.current, false);
+    }
+  });
+}
 
 test('rapid repeated PAY clicks open checkout only once', async () => {
   const { context, calls } = checkoutRuntime(1, 'pro');
   await Promise.all([context.onPay(), context.onPay()]);
   assert.equal(calls.filter(call => call[0] === 'stars').length, 1);
 });
+
+for (const tier of ['plus', 'pro', 'elite', 'king']) {
+  test(`Stars keeps the existing ${tier} plan and target`, async () => {
+    const bundleTarget = tier === 'king' ? 'all' : tier === 'elite' ? 'asianleaks' : '';
+    const { context, calls } = checkoutRuntime(1, tier, { appliedPromo: { code: 'FIXTURE_PROMO' }, bundleTarget });
+    await context.onPay();
+    const request = calls.find(call => call[0] === 'stars');
+    assert.deepEqual(Array.from(request), ['stars', 31, tier, 'FIXTURE_PROMO',
+      bundleTarget]);
+    assert.equal(calls.filter(call => call[0] === 'invoice').length, 1);
+  });
+}
