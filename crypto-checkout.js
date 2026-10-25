@@ -23,7 +23,7 @@
     }
     let config;
     try {
-      config = await post('/miniapp/crypto/config', {});
+      config = await post('/miniapp/crypto/config', { tier: options.tier });
       if (config.provider === 'manual') { active = null; return options.manual(); }
       if (config.provider !== 'plisio' || !config.ready) throw Error('Crypto payments are temporarily unavailable.');
     } catch (error) { config = { methods: [], error: error.message || 'Could not load payment options.' }; }
@@ -65,6 +65,7 @@
       option.textContent = method.asset + ' / ' + method.network;
       select.appendChild(option);
     });
+    if (config.test_only && config.price_cents === 600) status.textContent = 'Private test: ASMR PLUS / EUR 6.00';
     function setBusy(value) {
       busy = value;
       overlay.querySelectorAll('button:not(.crypto-checkout-close),select').forEach(el => { el.disabled = value; });
