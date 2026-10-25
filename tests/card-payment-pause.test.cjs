@@ -47,3 +47,12 @@ test('notice supports all saved languages and handles unavailable Telegram popup
   assert.ok(calls.at(-1)[1].includes(context.window.CARD_PAYMENT_NOTICE_COPY.en.body));
 });
 
+test('top-up explanation uses the approved sentence and no store names', () => {
+  const { context } = runtime();
+  const copy = context.window.CARD_PAYMENT_NOTICE_COPY;
+  assert.equal(copy.ru.topUp, 'Stars можно удобно купить банковской картой прямо в Telegram.');
+  for (const language of ['en', 'ru', 'es']) {
+    assert.doesNotMatch(copy[language].topUp, /App Store|Google Play|Apple Pay|Google Pay|@PremiumBot/);
+  }
+});
+

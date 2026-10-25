@@ -1259,19 +1259,19 @@ const CARD_PAYMENT_NOTICE_COPY = {
   "en": {
     "title": "Pay with Telegram Stars",
     "body": "Card and SBP payments are temporarily unavailable. You can still subscribe with Telegram Stars.",
-    "topUp": "You can buy Stars with a bank card via App Store, Google Play or @PremiumBot. Available payment methods depend on your country and device.",
+    "topUp": "You can easily buy Stars with a bank card right in Telegram.",
     "choose": "Choose Stars"
   },
   "ru": {
     "title": "Оплата Telegram Stars",
     "body": "Оплата картой и СБП временно недоступна. Сейчас подписку можно оплатить Telegram Stars.",
-    "topUp": "Stars можно купить банковской картой через App Store, Google Play или @PremiumBot. Доступные способы зависят от страны и устройства.",
+    "topUp": "Stars можно удобно купить банковской картой прямо в Telegram.",
     "choose": "Выбрать Stars"
   },
   "es": {
     "title": "Paga con Telegram Stars",
     "body": "Los pagos con tarjeta y SBP no están disponibles temporalmente. Puedes suscribirte con Telegram Stars.",
-    "topUp": "Puedes comprar Stars con tarjeta en App Store, Google Play o @PremiumBot. Los métodos disponibles dependen de tu país y dispositivo.",
+    "topUp": "Puedes comprar Stars cómodamente con tu tarjeta bancaria directamente en Telegram.",
     "choose": "Elegir Stars"
   }
 };
