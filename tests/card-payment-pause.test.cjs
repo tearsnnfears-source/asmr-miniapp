@@ -19,20 +19,26 @@ function runtime() {
   return { context, calls };
 }
 
-test('legacy Tribute action shows a notice without links, invoices or polling', () => {
+test('retired or foreign checkout links cannot open a payment', () => {
   const { context, calls } = runtime();
   const result = context.actionOpenTribute('https://example.test/old-provider');
   assert.equal(result.ok, false);
-  assert.equal(result.reason, 'card-unavailable');
-  assert.deepEqual(calls.map(call => call[0]), ['notice']);
+  assert.deepEqual(calls, []);
 });
 
-test('Card bundle preparation is paused before any request is made', async () => {
+test('bundle preparation uses an authenticated backend request and fails closed on network errors', async () => {
   const { context, calls } = runtime();
   const result = await context.actionPrepareBundleCheckout('king', 'all');
   assert.equal(result.ok, false);
-  assert.equal(result.reason, 'card-unavailable');
-  assert.deepEqual(calls, []);
+  assert.ok(calls.every(call=>call[0]==='fetch'));
+});
+
+test('only a new Tribute product can open in Telegram without creating a Stars invoice', () => {
+  const {context,calls}=runtime();
+  assert.equal(context.actionOpenTribute('https://t.me/tribute/app?startapp=s1ajK').ok,true);
+  assert.deepEqual(calls.map(c=>c[0]),['external']);
+  assert.equal(context.actionOpenTribute('https://t.me/tribute/app?startapp=sQSn').ok,false);
+  assert.equal(calls.length,1);
 });
 
 test('notice supports all saved languages and handles unavailable Telegram popup API', () => {

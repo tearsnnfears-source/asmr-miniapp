@@ -71,6 +71,7 @@ function checkoutRuntime(method, tier, overrides = {}) {
     setCardPaymentNotice: value => calls.push(['card-notice', value]),
     nav: { reset: value => calls.push(['reset', value]), openInvite: value => calls.push(['invite', value]) },
     window: {
+      actionCreateTributeCheckout: async (...args) => { calls.push(['prepare', ...args]); return { ok: true, url: 'https://t.me/tribute/app?startapp=s1ajS' }; },
       actionPrepareBundleCheckout: async (...args) => { calls.push(['prepare', ...args]); return { ok: true }; },
       actionOpenTribute: url => { calls.push(['tribute', url]); return { ok: true }; },
       actionCreateStarsInvoice: async (...args) => { calls.push(['stars', ...args]); return { ok: true, invoice_link: 'fixture' }; },
@@ -99,14 +100,18 @@ for (const method of [1, 3]) {
 }
 
 for (const method of [0, 2]) {
-  test(`Card/SBP method ${method} only shows the notice, even with a promo or outside Telegram`, async () => {
-    for (const isInsideTg of [true, false]) {
-      const { context, calls } = checkoutRuntime(method, 'king', { isInsideTg, promo: 'FIXTURE',
-        applyPromo: async () => { throw Error('promo must not be applied'); } });
-      await context.onPay();
-      assert.deepEqual(calls, [['modal', false], ['card-notice', true]]);
-      assert.equal(context.payingRef.current, false);
-    }
+  test(`Card/SBP method ${method} prepares the chosen tier before opening Tribute`, async () => {
+    const { context, calls } = checkoutRuntime(method, 'king');
+    await context.onPay();
+    assert.deepEqual(Array.from(calls.find(c=>c[0]==='prepare')), ['prepare','king','all']);
+    assert.equal(calls.filter(c=>c[0]==='tribute').length,1);
+    assert.equal(calls.filter(c=>c[0]==='stars'||c[0]==='invoice'||c[0]==='card-notice').length,0);
+    assert.equal(context.payingRef.current,false);
+  });
+  test(`Card/SBP method ${method} cannot open payment outside Telegram`, async () => {
+    const { context,calls }=checkoutRuntime(method,'plus',{isInsideTg:false});
+    await context.onPay();
+    assert.deepEqual(calls,[['alert','Open in Telegram to pay.']]);
   });
 }
 
@@ -114,6 +119,12 @@ test('rapid repeated PAY clicks open checkout only once', async () => {
   const { context, calls } = checkoutRuntime(1, 'pro');
   await Promise.all([context.onPay(), context.onPay()]);
   assert.equal(calls.filter(call => call[0] === 'stars').length, 1);
+});
+
+test('Card validates a typed promo before preparing checkout', async () => {
+  const {context,calls}=checkoutRuntime(0,'plus',{promo:'INVALID',applyPromo:async()=>null});
+  await context.onPay();
+  assert.equal(calls.some(c=>c[0]==='prepare'||c[0]==='tribute'),false);
 });
 
 for (const tier of ['plus', 'pro', 'elite', 'king']) {

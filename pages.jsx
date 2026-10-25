@@ -460,12 +460,10 @@ function SubscriptionPage({ accent = C.pink }) {
   const [tier, setTier] = React.useState('plus');
   const [eliteTarget, setEliteTarget] = React.useState('privateleaks');
   // Payment method: 0=Card 1=Stars 2=SBP 3=Crypto
-  const [method, setMethod] = React.useState(1);
+  const [method, setMethod] = React.useState(0);
   const [busy, setBusy] = React.useState(false);
   const [checkoutNotice, setCheckoutNotice] = React.useState(false);
   const closeCheckoutNotice = React.useCallback(() => setCheckoutNotice(false), []);
-  const [cardPaymentNotice, setCardPaymentNotice] = React.useState(false);
-  const closeCardPaymentNotice = React.useCallback(() => setCardPaymentNotice(false), []);
   const payingRef = React.useRef(false);
   const noticePreferenceKey = `asmrleaks.checkout-notice.v1:${user.telegramId || 'guest'}`;
 
@@ -541,18 +539,25 @@ function SubscriptionPage({ accent = C.pink }) {
   const onPay = async () => {
     if (busy || payingRef.current) return;
     if (!isTierAvailable) return;
-    if (method === 0 || method === 2) {
-      setCheckoutNotice(false);
-      setCardPaymentNotice(true);
-      return;
-    }
     // Preview-mode (outside Telegram): just flip Pro locally.
     if (!isInsideTg) {
+      if (method === 0 || method === 2) { alert('Open in Telegram to pay.'); return; }
       nav.setPro(true); nav.reset('home'); return;
     }
     payingRef.current = true;
     setBusy(true);
     try {
+      if (method === 0 || method === 2) {
+        let promoForPay = appliedPromo;
+        if (!promoForPay && promo.trim()) promoForPay = await applyPromo();
+        if (promo.trim() && !promoForPay) return;
+        const checkout = await window.actionCreateTributeCheckout(tier, bundleTarget);
+        if (!checkout.ok) { alert(checkout.message || 'Could not prepare checkout'); return; }
+        const opened = window.actionOpenTribute(checkout.url);
+        if (!opened.ok) { alert(opened.message); return; }
+        setCheckoutNotice(false);
+        return;
+      }
       // ── TG Stars ────────────────────────────────────────────
       if (method === 1) {
         let promoForPay = appliedPromo;
@@ -808,18 +813,15 @@ function SubscriptionPage({ accent = C.pink }) {
             <div style={{ fontSize: 9.5, color: C.muted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Payment method</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[
-                { i: 0, icon: '💳', name: 'Card',     desc: 'Temporarily unavailable' },
+                { i: 0, icon: '💳', name: 'Card',     desc: 'via Tribute' },
                 { i: 1, icon: '⭐', name: 'TG Stars', desc: 'Telegram Stars' },
-                { i: 2, icon: '🏦', name: 'СБП',      desc: 'Temporarily unavailable' },
+                { i: 2, icon: '🏦', name: 'СБП',      desc: 'via Tribute' },
                 { i: 3, icon: '₿',  name: 'Crypto',   desc: 'Manual via admin' },
               ].map((m) => {
                 const active = method === m.i;
                 return (
                   <button key={m.i} type="button" disabled={busy} aria-pressed={active}
-                    onClick={() => {
-                      if (m.i === 0 || m.i === 2) setCardPaymentNotice(true);
-                      else setMethod(m.i);
-                    }} style={{
+                    onClick={() => setMethod(m.i)} style={{
                     width: '100%', color: C.text, textAlign: 'left', fontFamily: 'inherit',
                     background: active ? `${cur.color}14` : C.dark2,
                     border: `1.5px solid ${active ? cur.color : C.border}`,
@@ -903,7 +905,7 @@ function SubscriptionPage({ accent = C.pink }) {
           </button>
           <div style={{ textAlign: 'center', fontSize: 10, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>
             {isTierAvailable
-              ? '31 days of access · Telegram Stars · Crypto via support'
+              ? '31 days of access · Card / SBP · Telegram Stars · Crypto via support'
               : `31 days · ${selectedPlan.stars} Stars · ${cur.access.toLowerCase()}`}
           </div>
         </div>
@@ -914,11 +916,6 @@ function SubscriptionPage({ accent = C.pink }) {
         preferenceKey={noticePreferenceKey}
         plan={{ name: cur.name, eur: price, stars: selectedPlan.stars }} method={method}
         accent={cur.color} busy={busy} onClose={closeCheckoutNotice} onPay={onPay}
-      />}
-      {cardPaymentNotice && <CheckoutNoticeModal
-        initialLanguage={user.lang || 'en'} cardUnavailable
-        accent={cur.color} busy={busy} onClose={closeCardPaymentNotice}
-        onChooseStars={() => { setMethod(1); setCardPaymentNotice(false); }}
       />}
     </Phone>
   );

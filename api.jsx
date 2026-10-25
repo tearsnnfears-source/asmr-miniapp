@@ -1288,12 +1288,39 @@ function actionShowCardPaymentNotice(language = 'en') {
 Object.assign(window, { CARD_PAYMENT_NOTICE_COPY, actionShowCardPaymentNotice });
 
 async function actionPrepareBundleCheckout(tier, bundleTarget) {
-  return { ok: false, reason: 'card-unavailable', message: CARD_PAYMENT_NOTICE_COPY.en.body };
+  return actionCreateTributeCheckout(tier, bundleTarget);
 }
 
-// Retain the legacy action name so old screens cannot launch Tribute.
+async function actionCreateTributeCheckout(tier, bundleTarget = '') {
+  const initData = getInitData();
+  if (!initData) return { ok: false, reason: 'no-tg', message: 'Open in Telegram to pay.' };
+  try {
+    const response = await apiPost('/miniapp/tribute_checkout', {
+      initData, tier, bundle_target: bundleTarget,
+    });
+    return { ...response, ok: !!response.url };
+  } catch (error) {
+    let body = {};
+    try { body = JSON.parse(error.body || '{}'); } catch (_) {}
+    return { ok: false, message: body.error || 'Card checkout is unavailable. Please try again.' };
+  }
+}
+Object.assign(window, { actionCreateTributeCheckout });
+
 function actionOpenTribute(url, onLink, onTimeout) {
-  return actionShowCardPaymentNotice();
+  try {
+    const target = new URL(url);
+    const allowed = new Set(['s1ajK','s1ajL','s1ajN','s1ajP','s1ajR','s1ajS','s1ajU']);
+    if (target.origin !== 'https://t.me' || target.pathname !== '/tribute/app'
+        || !allowed.has(target.searchParams.get('startapp'))) throw new Error('Invalid checkout');
+    const tg = window.Telegram?.WebApp;
+    if (typeof tg?.openTelegramLink !== 'function') return { ok: false, message: 'Open in Telegram to pay.' };
+    tg.openTelegramLink(url);
+    if (onLink) startInvitePolling(onLink, onTimeout);
+    return { ok: true };
+  } catch (_) {
+    return { ok: false, message: 'Card checkout is unavailable. Please try again.' };
+  }
 }
 
 let _invitePollerId = null;
