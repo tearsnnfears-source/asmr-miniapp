@@ -75,7 +75,7 @@ function checkoutRuntime(method, tier, overrides = {}) {
       actionPrepareBundleCheckout: async (...args) => { calls.push(['prepare', ...args]); return { ok: true }; },
       actionOpenTribute: url => { calls.push(['tribute', url]); return { ok: true }; },
       actionCreateStarsInvoice: async (...args) => { calls.push(['stars', ...args]); return { ok: true, invoice_link: 'fixture' }; },
-      actionOpenCryptoSupport: async value => { calls.push(['crypto', value]); return { ok: true }; },
+      actionOpenCryptoCheckout: async value => { calls.push(['crypto', value]); return { ok: true }; },
       Telegram: { WebApp: { openInvoice: url => calls.push(['invoice', url]) } },
     }, ...overrides,
   });

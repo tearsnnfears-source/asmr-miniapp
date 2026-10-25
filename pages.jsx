@@ -588,13 +588,14 @@ function SubscriptionPage({ accent = C.pink }) {
         }
         return;
       }
-      // ── Crypto via admin chat ───────────────────────────────
+      // Provider selection is server-owned; manual support stays available.
       if (method === 3) {
-        const promoForChat = appliedPromo?.code || promo.trim().toUpperCase();
-        const r = await window.actionOpenCryptoSupport?.({ tier, promoCode: promoForChat, bundleTarget });
-        if (!r?.ok) { alert(r?.displayMessage || 'Could not open Telegram chat'); return; }
+        let promoForPay = appliedPromo;
+        if (!promoForPay && promo.trim()) promoForPay = await applyPromo();
+        if (promo.trim() && !promoForPay) return;
+        const r = await window.actionOpenCryptoCheckout?.({ tier, promoCode: promoForPay?.code || '', bundleTarget });
+        if (!r?.ok) { alert(r?.message || 'Could not open crypto payment'); return; }
         setCheckoutNotice(false);
-        nav.reset('home');
         return;
       }
     } finally {
@@ -816,7 +817,7 @@ function SubscriptionPage({ accent = C.pink }) {
                 { i: 0, icon: '💳', name: 'Card',     desc: 'via Tribute' },
                 { i: 1, icon: '⭐', name: 'TG Stars', desc: 'Telegram Stars' },
                 { i: 2, icon: '🏦', name: 'СБП',      desc: 'via Tribute' },
-                { i: 3, icon: '₿',  name: 'Crypto',   desc: 'Manual via admin' },
+                { i: 3, icon: '₿',  name: 'Crypto',   desc: 'USDT, BTC, TON and more' },
               ].map((m) => {
                 const active = method === m.i;
                 return (
@@ -905,7 +906,7 @@ function SubscriptionPage({ accent = C.pink }) {
           </button>
           <div style={{ textAlign: 'center', fontSize: 10, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>
             {isTierAvailable
-              ? '31 days of access · Card / SBP · Telegram Stars · Crypto via support'
+              ? '31 days of access · Card / SBP · Telegram Stars · Crypto'
               : `31 days · ${selectedPlan.stars} Stars · ${cur.access.toLowerCase()}`}
           </div>
         </div>

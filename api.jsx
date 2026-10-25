@@ -1164,6 +1164,32 @@ async function actionOpenCryptoSupport({ tier = 'plus', promoCode = '', bundleTa
   }
 }
 
+async function actionOpenCryptoCheckout(options = {}) {
+  const initData = getInitData();
+  if (!initData) return { ok: false, message: 'Open from Telegram to pay' };
+  if (!window.CryptoCheckout) return { ok: false, message: 'Reload the Mini App to update payment options' };
+  await window.CryptoCheckout.open({
+    ...options,
+    post: async (path, body) => {
+      try { return await apiPost(path, { ...body, initData }); }
+      catch (error) {
+        let message = 'Could not process crypto payment';
+        try { message = JSON.parse(error.body || '{}').error || message; } catch (_) {}
+        throw new Error(message);
+      }
+    },
+    manual: () => actionOpenCryptoSupport(options),
+    openLink: url => {
+      const tg = window.Telegram?.WebApp;
+      if (tg?.openLink) tg.openLink(url);
+      else window.open(url, '_blank', 'noopener,noreferrer');
+    },
+    onPaid: () => { window.refreshSubscriptionAccess?.(); window.invalidate?.('my_invite'); },
+  });
+  return { ok: true };
+}
+window.actionOpenCryptoCheckout = actionOpenCryptoCheckout;
+
 // Telegram Stars invoice - POST /miniapp/create_stars_invoice
 async function actionCreateStarsInvoice(days = 31, tier = 'plus', promoCode = '', bundleTarget = '') {
   const initData = getInitData();
