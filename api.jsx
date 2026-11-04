@@ -64,7 +64,11 @@ function initTelegram() {
     tg.expand();
   } catch (_) {}
   // Fullscreen — guarded because older Telegram clients don't have it.
-  try { tg.requestFullscreen && tg.requestFullscreen(); } catch (_) {}
+  // Redesign testers (asmr.ui = v2, see app.jsx) get the expanded window
+  // with Telegram's own header instead.
+  if (wantsFullscreen()) {
+    try { tg.requestFullscreen && tg.requestFullscreen(); } catch (_) {}
+  }
   // Disable the swipe-down-to-close gesture so users don't accidentally
   // dismiss the app when scrolling. With BackButton wired up they still
   // have an explicit way out.
@@ -90,6 +94,13 @@ function initTelegram() {
 // (not max — they're stacked, not overlapping) and enforce a per-platform
 // floor because some TG clients return 0 right after requestFullscreen()
 // even though the chrome is still painting on top of the WebView.
+function wantsFullscreen() {
+  try {
+    const forced = new URLSearchParams(location.search).get('ui');
+    if (forced) return forced !== 'v2';
+    return localStorage.getItem('asmr.ui') !== 'v2';
+  } catch (_) { return true; }
+}
 function applySafeAreaVars(tg) {
   const safe    = tg?.safeAreaInset        || { top: 0, bottom: 0, left: 0, right: 0 };
   const content = tg?.contentSafeAreaInset || { top: 0, bottom: 0, left: 0, right: 0 };
@@ -107,7 +118,9 @@ function applySafeAreaVars(tg) {
   else if (platform === 'macos')      topFloor = 48;
   // tdesktop / weba / webk / web / unknown → 0 (native TG chrome lives
   // outside the WebView on desktop, so we don't need to reserve space).
-  if (tg && top < topFloor) top = topFloor;
+  // The floor is for fullscreen only: in the expanded window Telegram's
+  // header sits outside the WebView.
+  if (tg && (tg.isFullscreen || wantsFullscreen()) && top < topFloor) top = topFloor;
   const root = document.documentElement;
   if (!root) return;
   root.style.setProperty('--tg-safe-top',    top    + 'px');

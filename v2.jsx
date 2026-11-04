@@ -44,8 +44,35 @@ if (!document.getElementById('v2-styles')) {
     .v2-skel { background: linear-gradient(90deg, #161617 0%, #1E1E20 50%, #161617 100%); background-size: 200% 100%; animation: v2-skel 1.2s linear infinite; }
     @keyframes v2-skel { from { background-position: 200% 0; } to { background-position: -200% 0; } }
     @keyframes v2-sheet { from { transform: translateY(100%); } to { transform: none; } }
+    @keyframes v2-fade { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes v2-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    @keyframes v2-push { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+    @keyframes v2-pop { 0% { transform: scale(0.82); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+    @keyframes v2-open { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
+    @keyframes v2-dock { from { opacity: 0; transform: translateY(24px) scale(0.96); } to { opacity: 1; transform: none; } }
     /* Older screens shown inside the redesign scroll under the floating bar too. */
     .v2-on [data-phone] > div[style*="overflow-y: auto"] { padding-bottom: ${V2_NAV_SPACE} !important; }
+    /* Screens arrive softly: tabs rise in, pages pushed on top slide in. */
+    .v2-scroll { animation: v2-enter 0.34s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    .v2-scroll.v2-push { animation-name: v2-push; }
+    .v2-img { opacity: 0; transition: opacity 0.4s ease; }
+    .v2-img.v2-loaded { opacity: 1; }
+    .v2-chip, .v2-follow, .v2-choice { transition: background-color 0.22s ease, color 0.22s ease, border-color 0.22s ease, box-shadow 0.25s ease, transform 0.15s ease; }
+    .v2-chip:active, .v2-follow:active, .v2-choice:active { transform: scale(0.96); }
+    .v2-tab-icon { display: flex; }
+    .v2-tab-icon.on { animation: v2-pop 0.38s cubic-bezier(0.34, 1.4, 0.64, 1); }
+    .v2-backdrop { animation: v2-fade 0.25s ease both; }
+    /* The minimised video docks as a card right above the floating bar. */
+    .v2-on [data-persistent-player][data-minimized="true"] {
+      left: 14px !important; right: 14px !important; z-index: 31 !important;
+      bottom: calc(86px + ${V2_SAFE_BOTTOM}) !important;
+      border-radius: 18px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 14px 34px rgba(0,0,0,0.55); animation: v2-dock 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+    .v2-on [data-persistent-player][data-minimized="false"] { animation: v2-open 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    .v2-on.v2-mini .v2-scroll,
+    .v2-on.v2-mini [data-phone] > div[style*="overflow-y: auto"] { padding-bottom: calc(206px + ${V2_SAFE_BOTTOM}) !important; }
+    .v2-on .shorts-overlay { animation: v2-open 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
   `;
   document.head.appendChild(style);
 }
@@ -84,6 +111,16 @@ const V2I = {
 };
 
 // ── Small building blocks ───────────────────────────────────────
+function V2Img({ src, style }) {
+  const markLoaded = (el) => el && el.classList.add('v2-loaded');
+  return (
+    <img src={src} alt="" loading="lazy" decoding="async" className="v2-img"
+      ref={el => { if (el && el.complete) markLoaded(el); }}
+      onLoad={e => markLoaded(e.currentTarget)} onError={e => markLoaded(e.currentTarget)}
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', ...style }} />
+  );
+}
+
 const v2IconBtn = {
   position: 'relative', width: 44, height: 44, padding: 0, border: 'none', background: 'transparent',
   color: V2C.text, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
@@ -125,7 +162,7 @@ function V2Chips({ items, value, onPick, leading }) {
       {items.map(it => {
         const on = it.id === value;
         return (
-          <button key={it.id} type="button" aria-pressed={on} onClick={() => onPick(it)} style={{
+          <button key={it.id} type="button" className="v2-chip" aria-pressed={on} onClick={() => onPick(it)} style={{
             flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px',
             border: 'none', borderRadius: 10, cursor: 'pointer', whiteSpace: 'nowrap',
             background: on ? V2C.text : V2C.chip, color: on ? V2C.bg : V2C.text,
@@ -156,7 +193,7 @@ function V2Cover({ v, radius = 16, height, aspect = '16 / 9', children }) {
   const src = v?.thumb?.src;
   return (
     <span style={{ position: 'relative', display: 'block', width: '100%', height, aspectRatio: height ? undefined : aspect, borderRadius: radius, overflow: 'hidden', background: src ? V2C.surface : (v?.thumb?.bg || V2C.surface) }}>
-      {src && <img src={src} alt="" loading="lazy" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+      {src && <V2Img src={src} />}
       {children}
     </span>
   );
@@ -207,46 +244,109 @@ function v2OpenVideo(nav, v, extra = {}) {
 }
 
 // ── Floating bottom bar ─────────────────────────────────────────
+// Every screen renders its own bar (the Shorts tab keeps a hidden one
+// mounted), so the highlight remembers where the visible bar left it
+// and glides from there to the new tab.
+let v2NavLast = null;
+const V2_FLOW = 'transform 0.46s cubic-bezier(0.34, 1.25, 0.64, 1), width 0.46s cubic-bezier(0.34, 1.25, 0.64, 1), height 0.3s ease, opacity 0.25s ease';
+
+function useV2NavPill(navRef, pillRef, current) {
+  const state = React.useRef({ placed: null, shown: false });
+  const place = (pill, p) => {
+    pill.style.width = `${p.w}px`;
+    pill.style.height = `${p.h}px`;
+    pill.style.transform = `translate(${p.x}px, -50%)`;
+    pill.style.opacity = '1';
+  };
+  React.useLayoutEffect(() => {
+    const bar = navRef.current;
+    const pill = pillRef.current;
+    if (!bar || !pill) return;
+    const st = state.current;
+    const shown = getComputedStyle(bar).visibility !== 'hidden';
+    const justShown = shown && !st.shown;
+    st.shown = shown;
+    const button = bar.querySelector(`[data-v2-tab="${current}"]`);
+    if (!button || !button.offsetWidth) {
+      pill.style.transition = V2_FLOW;
+      pill.style.opacity = '0';
+      st.placed = null;
+      return;
+    }
+    const target = { x: button.offsetLeft, w: button.offsetWidth, h: button.offsetHeight };
+    const same = (a, b) => a && a.x === b.x && a.w === b.w && a.h === b.h;
+    const from = (justShown || !st.placed) ? (v2NavLast || st.placed || target) : st.placed;
+    if (!(st.placed && !justShown && same(st.placed, target))) {
+      pill.style.transition = 'none';
+      place(pill, from);
+      if (!same(from, target)) {
+        pill.getBoundingClientRect(); // commit the start position before animating
+        pill.style.transition = V2_FLOW;
+        place(pill, target);
+      }
+      st.placed = target;
+    }
+    if (shown) v2NavLast = target;
+  });
+  // A rotated or resized phone moves the buttons; snap the pill to them.
+  React.useEffect(() => {
+    const onResize = () => {
+      const pill = pillRef.current;
+      const button = navRef.current?.querySelector(`[data-v2-tab="${current}"]`);
+      if (!pill || !button) return;
+      const target = { x: button.offsetLeft, w: button.offsetWidth, h: button.offsetHeight };
+      pill.style.transition = 'none';
+      place(pill, target);
+      state.current.placed = target;
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [current]);
+}
+
 function V2BottomNav({ active }) {
   const nav = window.useNav();
   const tab = active != null ? active : nav.activeTab;
   const user = nav.user || {};
   const onCenter = tab === '' && (nav.screen === 'profile' || nav.screen === 'subscription');
+  const current = onCenter ? 'center' : tab;
   const tier = String(user.tier || '').toLowerCase();
   const ring = user.isGrace ? '#FF9800' : ((window.TIER_COLORS || {})[tier] || V2C.lime);
+  const navRef = React.useRef(null);
+  const pillRef = React.useRef(null);
+  useV2NavPill(navRef, pillRef, current);
   const item = (id, label, icon) => {
     const on = tab === id;
     return (
-      <button key={id} type="button" aria-label={label} aria-current={on ? 'page' : undefined} onClick={() => nav.onTab(id)} style={{
-        width: 56, height: 48, padding: 0, border: 'none', borderRadius: 24, cursor: 'pointer',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        background: on ? 'rgba(255,255,255,0.14)' : 'transparent', color: V2C.text,
-      }}>{icon(on)}</button>
+      <button key={id} type="button" data-v2-tab={id} aria-label={label} aria-current={on ? 'page' : undefined} onClick={() => nav.onTab(id)} style={{
+        position: 'relative', zIndex: 1, width: 56, height: 48, padding: 0, border: 'none', borderRadius: 24, cursor: 'pointer',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', color: V2C.text,
+      }}><span className={`v2-tab-icon${on ? ' on' : ''}`}>{icon(on)}</span></button>
     );
   };
   return (
     <React.Fragment>
-      <div aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `calc(118px + ${V2_SAFE_BOTTOM})`, background: 'linear-gradient(rgba(14,14,15,0), #0E0E0F 72%)', pointerEvents: 'none', zIndex: 29 }} />
-      <nav data-bottom-nav aria-label="Main" style={{
+      <div aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `calc(${nav.videoMinimized ? 200 : 118}px + ${V2_SAFE_BOTTOM})`, background: 'linear-gradient(rgba(14,14,15,0), #0E0E0F 72%)', pointerEvents: 'none', zIndex: 29, transition: 'height 0.3s ease' }} />
+      <nav ref={navRef} data-bottom-nav aria-label="Main" style={{
         position: 'absolute', left: 14, right: 14, bottom: `calc(14px + ${V2_SAFE_BOTTOM})`, zIndex: 30,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64, padding: '0 8px', boxSizing: 'border-box',
         borderRadius: 32, background: 'rgba(33,33,35,0.94)', border: `1px solid ${V2C.line}`,
         boxShadow: '0 12px 32px rgba(0,0,0,0.5)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
       }}>
+        <span ref={pillRef} aria-hidden="true" style={{ position: 'absolute', left: 0, top: '50%', width: 0, height: 0, opacity: 0, borderRadius: 999, background: 'rgba(255,255,255,0.14)', pointerEvents: 'none' }} />
         {item('home', 'Home', V2I.home)}
         {item('shorts', 'Shorts', V2I.shorts)}
         {nav.isPro
-          ? <button type="button" aria-label="Profile" aria-current={onCenter ? 'page' : undefined} onClick={() => nav.onTab('center')} style={{
-              width: 60, height: 56, padding: 0, border: 'none', borderRadius: 28, cursor: 'pointer',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              background: onCenter ? 'rgba(255,255,255,0.14)' : 'transparent',
+          ? <button type="button" data-v2-tab="center" aria-label="Profile" aria-current={onCenter ? 'page' : undefined} onClick={() => nav.onTab('center')} style={{
+              position: 'relative', zIndex: 1, width: 60, height: 56, padding: 0, border: 'none', borderRadius: 28, cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent',
             }}>
-              <span style={{ display: 'flex', borderRadius: '50%', boxShadow: onCenter ? `0 0 16px ${ring}77` : 'none' }}>
+              <span className={`v2-tab-icon${onCenter ? ' on' : ''}`} style={{ borderRadius: '50%', boxShadow: onCenter ? `0 0 16px ${ring}77` : 'none', transition: 'box-shadow 0.3s ease' }}>
                 <V2Avatar artist={{ name: user.name, photo: user.photo }} size={44} ring={ring} />
               </span>
             </button>
-          : <button type="button" onClick={() => nav.onTab('center')} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6, height: 46, padding: '0 16px', border: 'none', borderRadius: 23, cursor: 'pointer',
+          : <button type="button" className="v2-chip" onClick={() => nav.onTab('center')} style={{
+              position: 'relative', zIndex: 1, display: 'inline-flex', alignItems: 'center', gap: 6, height: 46, padding: '0 16px', border: 'none', borderRadius: 23, cursor: 'pointer',
               background: `linear-gradient(135deg, ${V2C.pink}, ${V2C.purple})`, color: V2C.bg,
               fontSize: 14, fontWeight: 800, letterSpacing: 0.4, whiteSpace: 'nowrap', boxShadow: '0 6px 20px rgba(255,126,200,0.4)',
             }}>{V2I.crown}GET PRO</button>}
@@ -361,7 +461,7 @@ function V2ShortsShelf({ items, start, all, accent }) {
             position: 'relative', flexShrink: 0, width: 150, height: 266, padding: 0, border: 'none', borderRadius: 14, overflow: 'hidden', cursor: 'pointer',
             background: s.thumb?.src ? V2C.surface : (s.thumb?.bg || V2C.surface), color: V2C.text, textAlign: 'left',
           }}>
-            {s.thumb?.src && <img src={s.thumb.src} alt="" loading="lazy" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+            {s.thumb?.src && <V2Img src={s.thumb.src} />}
             {(s.label || s.artist?.name) && <span className="v2-clamp2" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '40px 10px 10px', background: 'linear-gradient(transparent, rgba(0,0,0,0.85))', fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>{s.label || s.artist?.name}</span>}
           </button>
         ))}
@@ -381,7 +481,7 @@ function V2TriggersShelf({ tags, total }) {
           <button key={t.id} type="button" className="v2-press" onClick={() => nav.go('search', { q: t.label, mode: 'tag' })} style={{
             position: 'relative', flexShrink: 0, width: 132, height: 165, padding: 0, border: 'none', borderRadius: 14, overflow: 'hidden', cursor: 'pointer', background: V2C.surface, color: V2C.text, textAlign: 'left',
           }}>
-            <img src={`${V2_SITE}/category-covers/${v2CoverSlug(t.label)}.webp`} alt="" loading="lazy" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            <V2Img src={`${V2_SITE}/category-covers/${v2CoverSlug(t.label)}.webp`} />
             <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', gap: 2, padding: '34px 10px 10px', background: 'linear-gradient(transparent, rgba(0,0,0,0.88))' }}>
               <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, letterSpacing: 0.8, lineHeight: 1 }}>{v2Label(t.label)}</span>
               {t.count > 0 && <span style={{ fontSize: 11, color: V2C.soft }}>{v2Num(t.count)} videos</span>}
@@ -500,7 +600,7 @@ function V2FollowButton({ name, compact }) {
     });
   };
   return (
-    <button type="button" onClick={toggle} aria-pressed={following} style={{
+    <button type="button" className="v2-follow" onClick={toggle} aria-pressed={following} style={{
       flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
       height: compact ? 32 : 42, padding: compact ? '0 12px' : '0 18px', border: 'none', borderRadius: 999, cursor: 'pointer',
       background: following ? V2C.chip : V2C.text, color: following ? V2C.text : V2C.bg,
@@ -566,7 +666,7 @@ function V2Artists({ accent = V2C.pink }) {
                   position: 'relative', display: 'block', height: 214, padding: 0, border: 'none', borderRadius: 16, overflow: 'hidden', cursor: 'pointer',
                   background: photo ? V2C.surface : `linear-gradient(165deg, #6B3A55, #2A1A24)`,
                 }}>
-                  {photo && <img src={photo} alt="" loading="lazy" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                  {photo && <V2Img src={photo} />}
                   <span style={{ position: 'absolute', left: 10, top: 10, display: 'flex', gap: 6 }}>
                     {a.fresh && <span style={{ height: 22, padding: '0 8px', borderRadius: 999, background: V2C.pink, color: V2C.bg, fontSize: 10, fontWeight: 700, letterSpacing: 0.8, lineHeight: '22px' }}>NEW</span>}
                     {a.hot && <span style={{ height: 22, padding: '0 8px', borderRadius: 999, background: V2C.lime, color: V2C.bg, fontSize: 10, fontWeight: 700, letterSpacing: 0.8, lineHeight: '22px' }}>HOT</span>}
@@ -627,14 +727,13 @@ function V2ArtistPage({ accent = V2C.pink }) {
   );
   return (
     <Phone>
-      <div className="v2-scroll" style={{ paddingBottom: V2_NAV_SPACE }}>
+      <div className="v2-scroll v2-push" style={{ paddingBottom: V2_NAV_SPACE }}>
         <div style={{ position: 'relative', height: 150, background: banner ? V2C.surface : 'linear-gradient(135deg, #6B3A55, #171117)', overflow: 'hidden' }}>
-          {banner && <img src={banner} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(2px) brightness(0.7)', transform: 'scale(1.05)' }} />}
+          {banner && <V2Img src={banner} style={{ filter: 'blur(2px) brightness(0.7)', transform: 'scale(1.05)' }} />}
           <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(rgba(14,14,15,0) 40%, rgba(14,14,15,0.85))' }} />
-          <button type="button" aria-label="Back" onClick={() => nav.back()} style={{ position: 'absolute', left: 10, top: 10, width: 40, height: 40, border: 'none', borderRadius: '50%', background: 'rgba(14,14,15,0.6)', color: V2C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>{V2I.back}</button>
         </div>
         <section style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '0 16px' }}>
-          <div style={{ marginTop: -36 }}><V2Avatar artist={a} size={84} ring={accent} /></div>
+          <div style={{ position: 'relative', zIndex: 1, marginTop: -42 }}><V2Avatar artist={a} size={84} ring={accent} /></div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, lineHeight: 1.1, color: V2C.text }}>{a.name}</h1>
             <span style={{ fontSize: 13, color: V2C.muted }}>{a.handle}</span>
@@ -685,7 +784,7 @@ function V2ArtistPage({ accent = V2C.pink }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, padding: '12px 12px 0' }}>
               {shorts.items.map((s, i) => (
                 <button key={s.id || i} type="button" onClick={() => nav.openShorts(shorts.items, i)} style={{ position: 'relative', aspectRatio: '9 / 16', padding: 0, border: 'none', borderRadius: 10, overflow: 'hidden', background: V2C.surface, cursor: 'pointer' }}>
-                  {s.thumb?.src && <img src={s.thumb.src} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                  {s.thumb?.src && <V2Img src={s.thumb.src} />}
                 </button>
               ))}
             </div>
@@ -697,7 +796,7 @@ function V2ArtistPage({ accent = V2C.pink }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, padding: '12px 12px 0' }}>
               {photos.items.map((p, i) => (
                 <button key={p.id || i} type="button" onClick={() => (nav.isPro ? setLightbox(i) : nav.openPaywall())} style={{ position: 'relative', aspectRatio: '1', padding: 0, border: 'none', borderRadius: 8, overflow: 'hidden', background: V2C.surface, cursor: 'pointer' }}>
-                  {p.thumb?.src && <img src={p.thumb.src} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: nav.isPro ? 'none' : 'blur(10px)' }} />}
+                  {p.thumb?.src && <V2Img src={p.thumb.src} style={{ filter: nav.isPro ? 'none' : 'blur(10px)' }} />}
                 </button>
               ))}
             </div>
@@ -985,7 +1084,7 @@ function V2Plans({ accent = V2C.pink }) {
         <h1 style={{ flex: 1, margin: 0, textAlign: 'center', fontSize: 17, fontWeight: 700, color: V2C.text }}>{user.isPro ? 'Subscription' : 'Get PRO'}</h1>
         <span style={{ width: 44 }} />
       </header>
-      <div className="v2-scroll" style={{ padding: '6px 16px 0', paddingBottom: `calc(140px + ${V2_SAFE_BOTTOM})` }}>
+      <div className="v2-scroll v2-push" style={{ padding: '6px 16px 0', paddingBottom: `calc(140px + ${V2_SAFE_BOTTOM})` }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 22 }}>
           <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 38, letterSpacing: 1, lineHeight: 0.95, color: V2C.text }}>
             {user.isPro ? <>You're <span style={{ color: accent }}>subscribed</span></> : <>Unlock the <span style={{ color: accent }}>full archive</span></>}
@@ -1003,7 +1102,7 @@ function V2Plans({ accent = V2C.pink }) {
             const p = TIER_PRICES[id];
             const on = id === tier;
             return (
-              <button key={id} type="button" role="radio" aria-checked={on} onClick={() => setTier(id)} style={{
+              <button key={id} type="button" className="v2-choice" role="radio" aria-checked={on} onClick={() => setTier(id)} style={{
                 position: 'relative', display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderRadius: 18, cursor: 'pointer', textAlign: 'left',
                 background: on ? `radial-gradient(120% 140% at 0% 0%, ${t.color}2E, ${t.color}00 60%), ${V2C.surface}` : V2C.surface,
                 border: on ? `2px solid ${t.color}` : `1px solid ${V2C.line2}`, boxShadow: on ? `0 10px 30px ${t.color}2E` : 'none', color: V2C.text,
@@ -1029,7 +1128,7 @@ function V2Plans({ accent = V2C.pink }) {
           <div role="radiogroup" aria-label="Second page" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, padding: 5, marginBottom: 12, borderRadius: 12, background: V2C.surface, border: `1px solid ${V2C.line}` }}>
             {ELITE_TARGETS.map(item => {
               const on = item.id === eliteTarget;
-              return <button key={item.id} type="button" role="radio" aria-checked={on} onClick={() => setEliteTarget(item.id)} style={{ height: 38, border: `1px solid ${on ? meta.color : 'transparent'}`, borderRadius: 8, background: on ? `${meta.color}22` : 'transparent', color: on ? meta.color : V2C.soft, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{item.label}</button>;
+              return <button key={item.id} type="button" className="v2-choice" role="radio" aria-checked={on} onClick={() => setEliteTarget(item.id)} style={{ height: 38, border: `1px solid ${on ? meta.color : 'transparent'}`, borderRadius: 8, background: on ? `${meta.color}22` : 'transparent', color: on ? meta.color : V2C.soft, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{item.label}</button>;
             })}
           </div>
         )}
@@ -1039,7 +1138,7 @@ function V2Plans({ accent = V2C.pink }) {
           {methods.map(m => {
             const on = m.i === method;
             return (
-              <button key={m.i} type="button" role="radio" aria-checked={on} disabled={busy} onClick={() => setMethod(m.i)} style={{
+              <button key={m.i} type="button" className="v2-choice" role="radio" aria-checked={on} disabled={busy} onClick={() => setMethod(m.i)} style={{
                 display: 'flex', alignItems: 'center', gap: 12, minHeight: 64, padding: '0 14px', borderRadius: 16, cursor: 'pointer', textAlign: 'left',
                 background: V2C.raised, border: on ? `2px solid ${V2C.text}` : `1px solid ${V2C.line}`, color: V2C.text,
               }}>
@@ -1103,7 +1202,7 @@ function V2PaywallSheet({ accent = V2C.pink, onClose }) {
     </li>
   );
   return ReactDOM.createPortal(
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9650, background: 'rgba(5,5,6,0.66)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+    <div className="v2-backdrop" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9650, background: 'rgba(5,5,6,0.66)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <section role="dialog" aria-modal="true" aria-labelledby="v2LockedTitle" onClick={e => e.stopPropagation()} style={{
         width: '100%', maxWidth: 480, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18,
         padding: `12px 20px calc(22px + ${V2_SAFE_BOTTOM})`, borderRadius: '28px 28px 0 0', fontFamily: "'DM Sans', system-ui, sans-serif", color: V2C.text,
