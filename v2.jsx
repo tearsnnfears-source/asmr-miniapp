@@ -70,9 +70,17 @@ if (!document.getElementById('v2-styles')) {
       border-radius: 18px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);
       box-shadow: 0 14px 34px rgba(0,0,0,0.55); animation: v2-dock 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both;
     }
+    /* The card hugs its content: no 24px strip the old full-width bar kept for its footer. */
+    .v2-on [data-persistent-player][data-minimized="true"],
+    .v2-on [data-persistent-player][data-minimized="true"] [data-phone],
+    .v2-on [data-persistent-player][data-minimized="true"] [data-phone] > div { height: 61px !important; }
+    .v2-on [data-persistent-player][data-minimized="true"] [data-video-player][data-compact="true"] {
+      height: 61px !important; box-sizing: border-box; padding: 8px 6px 8px 8px !important;
+      align-items: center !important; border-top: none !important;
+    }
     .v2-on [data-persistent-player][data-minimized="false"] { animation: v2-open 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
     .v2-on.v2-mini .v2-scroll,
-    .v2-on.v2-mini [data-phone] > div[style*="overflow-y: auto"] { padding-bottom: calc(206px + ${V2_SAFE_BOTTOM}) !important; }
+    .v2-on.v2-mini [data-phone] > div[style*="overflow-y: auto"] { padding-bottom: calc(172px + ${V2_SAFE_BOTTOM}) !important; }
     .v2-on .shorts-overlay { animation: v2-open 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
   `;
   document.head.appendChild(style);
@@ -333,7 +341,7 @@ function V2BottomNav({ active }) {
   };
   return (
     <React.Fragment>
-      <div aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `calc(${nav.videoMinimized ? 200 : 118}px + ${V2_SAFE_BOTTOM})`, background: 'linear-gradient(rgba(14,14,15,0), #0E0E0F 72%)', pointerEvents: 'none', zIndex: 29, transition: 'height 0.3s ease' }} />
+      <div aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `calc(${nav.videoMinimized ? 172 : 118}px + ${V2_SAFE_BOTTOM})`, background: 'linear-gradient(rgba(14,14,15,0), #0E0E0F 72%)', pointerEvents: 'none', zIndex: 29, transition: 'height 0.3s ease' }} />
       <nav ref={navRef} data-bottom-nav aria-label="Main" style={{
         position: 'absolute', left: 14, right: 14, bottom: `calc(14px + ${V2_SAFE_BOTTOM})`, zIndex: 30,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64, padding: '0 8px', boxSizing: 'border-box',
