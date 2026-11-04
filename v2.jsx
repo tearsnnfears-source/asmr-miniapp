@@ -536,7 +536,7 @@ function V2Home({ accent = V2C.pink }) {
   const pool = React.useMemo(() => page.items.filter(v => !pickIds.has(String(v.id))), [page.items, pickIds]);
   const PER_CYCLE = 4; // one big card + three videos
   const SHORTS_PER_CYCLE = 8;
-  const TAGS_PER_CYCLE = 8;
+  const TAGS_SHOWN = 8;
 
   // Keep the feed endless: add a cycle when the sentinel shows, fetching more videos first if needed.
   React.useEffect(() => {
@@ -572,11 +572,8 @@ function V2Home({ accent = V2C.pink }) {
         onOpen={() => v2OpenVideo(nav, v)} onArtist={() => nav.go('artist', { id: v.artist?.id })} />);
     }
     cursor += 3;
-    if (tags.length) {
-      const from = (k * TAGS_PER_CYCLE) % tags.length;
-      const slice = [...tags.slice(from), ...tags.slice(0, from)].slice(0, TAGS_PER_CYCLE);
-      blocks.push(<V2TriggersShelf key={`tags-${k}`} tags={slice} total={tags.length} />);
-    }
+    // Triggers appear once, fourth in the first cycle; later cycles repeat pick, shorts, videos.
+    if (k === 0 && tags.length) blocks.push(<V2TriggersShelf key="tags" tags={tags.slice(0, TAGS_SHOWN)} total={tags.length} />);
   }
 
   const chips = [
