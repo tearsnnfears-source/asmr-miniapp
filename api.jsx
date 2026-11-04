@@ -64,8 +64,8 @@ function initTelegram() {
     tg.expand();
   } catch (_) {}
   // Fullscreen — guarded because older Telegram clients don't have it.
-  // Redesign testers (asmr.ui = v2, see app.jsx) get the expanded window
-  // with Telegram's own header instead.
+  // The redesign uses the expanded window with Telegram's own header
+  // instead; only the old design (?ui=v1) still asks for fullscreen.
   if (wantsFullscreen()) {
     try { tg.requestFullscreen && tg.requestFullscreen(); } catch (_) {}
   }
@@ -96,10 +96,8 @@ function initTelegram() {
 // even though the chrome is still painting on top of the WebView.
 function wantsFullscreen() {
   try {
-    const forced = new URLSearchParams(location.search).get('ui');
-    if (forced) return forced !== 'v2';
-    return localStorage.getItem('asmr.ui') !== 'v2';
-  } catch (_) { return true; }
+    return new URLSearchParams(location.search).get('ui') === 'v1';
+  } catch (_) { return false; }
 }
 function applySafeAreaVars(tg) {
   const safe    = tg?.safeAreaInset        || { top: 0, bottom: 0, left: 0, right: 0 };
@@ -999,8 +997,6 @@ function useUser() {
         tributePlusUrl: p.tribute_plus_url || '',
         tributeEliteUrl: p.tribute_elite_url || '',
         tributeKingUrl: p.tribute_king_url || '',
-        // Mini app redesign beta (bot BETA_TESTER_IDS); app.jsx loads v2.jsx for these users.
-        beta: !!p.beta,
         raw: p,
       };
     },

@@ -1,6 +1,6 @@
-// Redesign beta — YouTube-style screens for the ASMR.LEAKS mini app.
-// app.jsx loads this file only for testers (bot BETA_TESTER_IDS → profile.beta,
-// or ?ui=v2) and swaps these screens in; the shell, player, shorts overlay,
+// Redesign — YouTube-style screens for the ASMR.LEAKS mini app.
+// app.jsx loads this file for everyone (except ?ui=v1) and swaps these
+// screens in; the shell, player, shorts overlay,
 // invites and payments stay the shared ones. Everything top-level is prefixed
 // V2 so nothing collides with the globals the other scripts declare.
 
