@@ -22,6 +22,7 @@ const V2_SITE = 'https://asmrleaks.tv';
 const V2_SAFE_BOTTOM = 'var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))';
 // Room the floating bar takes over scrolling content.
 const V2_NAV_SPACE = `calc(112px + ${V2_SAFE_BOTTOM})`;
+const V2_ARTISTS_PAGE = 24; // artist cards mounted per scroll step
 // Trigger covers that exist on the site (public/category-covers/<slug>.webp).
 const V2_COVERS = new Set(['ahegao', 'blowing', 'blowjob', 'bodyplay', 'camshow', 'dancing', 'feet', 'free', 'handjob',
   'handsounds', 'kisses', 'lenslicking', 'licking', 'lipping', 'massage', 'masturbating', 'mouthsounds', 'pumping',
@@ -45,16 +46,16 @@ if (!document.getElementById('v2-styles')) {
     @keyframes v2-skel { from { background-position: 200% 0; } to { background-position: -200% 0; } }
     @keyframes v2-sheet { from { transform: translateY(100%); } to { transform: none; } }
     @keyframes v2-fade { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes v2-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    @keyframes v2-enter { from { opacity: 0.35; } to { opacity: 1; } }
     @keyframes v2-push { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
     @keyframes v2-pop { 0% { transform: scale(0.82); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
     @keyframes v2-open { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
     @keyframes v2-dock { from { opacity: 0; transform: translateY(24px) scale(0.96); } to { opacity: 1; transform: none; } }
     /* Older screens shown inside the redesign scroll under the floating bar too. */
     .v2-on [data-phone] > div[style*="overflow-y: auto"] { padding-bottom: ${V2_NAV_SPACE} !important; }
-    /* Screens arrive softly: tabs rise in, pages pushed on top slide in. */
-    .v2-scroll { animation: v2-enter 0.34s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-    .v2-scroll.v2-push { animation-name: v2-push; }
+    /* Screens arrive softly: tabs fade in (cheap, no transform on long lists), pages slide in. */
+    .v2-scroll { animation: v2-enter 0.2s ease-out both; }
+    .v2-scroll.v2-push { animation: v2-push 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
     .v2-img { opacity: 0; transition: opacity 0.4s ease; }
     .v2-img.v2-loaded { opacity: 1; }
     .v2-chip, .v2-follow, .v2-choice { transition: background-color 0.22s ease, color 0.22s ease, border-color 0.22s ease, box-shadow 0.25s ease, transform 0.15s ease; }
@@ -69,9 +70,17 @@ if (!document.getElementById('v2-styles')) {
       border-radius: 18px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);
       box-shadow: 0 14px 34px rgba(0,0,0,0.55); animation: v2-dock 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both;
     }
+    /* The card hugs its content: no 24px strip the old full-width bar kept for its footer. */
+    .v2-on [data-persistent-player][data-minimized="true"],
+    .v2-on [data-persistent-player][data-minimized="true"] [data-phone],
+    .v2-on [data-persistent-player][data-minimized="true"] [data-phone] > div { height: 61px !important; }
+    .v2-on [data-persistent-player][data-minimized="true"] [data-video-player][data-compact="true"] {
+      height: 61px !important; box-sizing: border-box; padding: 8px 6px 8px 8px !important;
+      align-items: center !important; border-top: none !important;
+    }
     .v2-on [data-persistent-player][data-minimized="false"] { animation: v2-open 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
     .v2-on.v2-mini .v2-scroll,
-    .v2-on.v2-mini [data-phone] > div[style*="overflow-y: auto"] { padding-bottom: calc(206px + ${V2_SAFE_BOTTOM}) !important; }
+    .v2-on.v2-mini [data-phone] > div[style*="overflow-y: auto"] { padding-bottom: calc(172px + ${V2_SAFE_BOTTOM}) !important; }
     .v2-on .shorts-overlay { animation: v2-open 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
   `;
   document.head.appendChild(style);
@@ -233,14 +242,20 @@ function useV2ArtistIndex() {
 }
 
 function useV2EditorPicks() {
-  return window.useFetch('v2_editor_picks', async () => {
-    const data = await window.apiGet('/miniapp/editor_picks');
-    return (data.items || []).map((it, i) => window.normalizeVideo(it, i));
-  }, [], []);
+  // app.jsx starts this fetch while v2.jsx is still downloading.
+  return window.useFetch('v2_editor_picks', window.fetchEditorPicks, [], []);
 }
 
 function v2OpenVideo(nav, v, extra = {}) {
   nav.gate(() => nav.go('video', { id: v.id, video: v, ...extra }));
+}
+
+// Editor's picks are free: without a subscription they play as a queue of
+// the picks only (the bot's /content/play allows exactly these ids).
+function v2OpenPick(nav, v, picks) {
+  if (nav.isPro) return nav.go('video', { id: v.id, video: v });
+  const queueIdx = picks.findIndex(p => String(p.id) === String(v.id));
+  nav.go('video', { id: v.id, video: v, queue: picks, queueIdx, free: true });
 }
 
 // ── Floating bottom bar ─────────────────────────────────────────
@@ -326,7 +341,7 @@ function V2BottomNav({ active }) {
   };
   return (
     <React.Fragment>
-      <div aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `calc(${nav.videoMinimized ? 200 : 118}px + ${V2_SAFE_BOTTOM})`, background: 'linear-gradient(rgba(14,14,15,0), #0E0E0F 72%)', pointerEvents: 'none', zIndex: 29, transition: 'height 0.3s ease' }} />
+      <div aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `calc(${nav.videoMinimized ? 172 : 118}px + ${V2_SAFE_BOTTOM})`, background: 'linear-gradient(rgba(14,14,15,0), #0E0E0F 72%)', pointerEvents: 'none', zIndex: 29, transition: 'height 0.3s ease' }} />
       <nav ref={navRef} data-bottom-nav aria-label="Main" style={{
         position: 'absolute', left: 14, right: 14, bottom: `calc(14px + ${V2_SAFE_BOTTOM})`, zIndex: 30,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64, padding: '0 8px', boxSizing: 'border-box',
@@ -358,13 +373,13 @@ function V2BottomNav({ active }) {
 }
 
 // ── Home ────────────────────────────────────────────────────────
-function V2VideoCard({ v, artist, pick, onOpen, onArtist }) {
+function V2VideoCard({ v, artist, pick, onOpen, onArtist, style }) {
   const tag = v2Tag(v);
   return (
-    <article style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 12px' }}>
+    <article style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 12px', ...style }}>
       <button type="button" className="v2-press" onClick={onOpen} aria-label={`Play ${v.title}`} style={{ display: 'block', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
         <V2Cover v={v} radius={16}>
-          {pick && <span style={{ position: 'absolute', left: 12, top: 12, height: 24, padding: '0 10px', borderRadius: 999, background: V2C.pink, color: V2C.bg, fontSize: 10, fontWeight: 700, letterSpacing: 1, lineHeight: '24px' }}>EDITOR'S PICK</span>}
+          {pick && <span style={{ position: 'absolute', left: 12, top: 12, height: 24, padding: '0 11px', borderRadius: 999, background: V2C.lime, color: V2C.bg, fontSize: 11, fontWeight: 800, letterSpacing: 1.4, lineHeight: '24px', boxShadow: '0 4px 14px rgba(200,255,68,0.35)' }}>FREE</span>}
           {pick && pick.total > 1 && <span style={{ position: 'absolute', right: 12, top: 12, height: 24, padding: '0 9px', borderRadius: 999, background: 'rgba(14,14,15,0.72)', color: V2C.text, fontSize: 12, fontWeight: 600, lineHeight: '24px' }}>{pick.index + 1}/{pick.total}</span>}
           <V2Duration text={v.duration} />
         </V2Cover>
@@ -379,6 +394,33 @@ function V2VideoCard({ v, artist, pick, onOpen, onArtist }) {
         </button>
       </div>
     </article>
+  );
+}
+
+// Today's three Editor's picks, free for everyone, as a swipeable carousel.
+function V2PickCarousel({ picks, artistIndex }) {
+  const nav = window.useNav();
+  const [index, setIndex] = React.useState(0);
+  const many = picks.length > 1;
+  return (
+    <section aria-label="Free picks" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="v2-row v2-snap" onScroll={e => {
+        const el = e.currentTarget;
+        const w = el.firstChild?.getBoundingClientRect().width || 1;
+        setIndex(Math.min(picks.length - 1, Math.round(el.scrollLeft / (w + 10))));
+      }} style={{ gap: 10, padding: '0 12px', scrollPaddingLeft: 12 }}>
+        {picks.map((v, i) => (
+          <V2VideoCard key={v.id} v={v} artist={artistIndex.get(v.artist?.name)} pick={{ index: i, total: picks.length }}
+            style={{ flexShrink: 0, width: many ? 'calc(100% - 34px)' : '100%', padding: 0 }}
+            onOpen={() => v2OpenPick(nav, v, picks)} onArtist={() => nav.go('artist', { id: v.artist?.id })} />
+        ))}
+      </div>
+      {many && (
+        <span aria-hidden="true" style={{ display: 'flex', justifyContent: 'center', gap: 5 }}>
+          {picks.map((_, i) => <span key={i} style={{ width: i === index ? 16 : 4, height: 4, borderRadius: 2, background: i === index ? V2C.lime : 'rgba(241,241,241,0.35)', transition: 'width 0.2s' }} />)}
+        </span>
+      )}
+    </section>
   );
 }
 
@@ -524,7 +566,8 @@ function V2TriggersShelf({ tags, total }) {
 function V2Home({ accent = V2C.pink }) {
   const nav = window.useNav();
   const page = nav.homeVideos || { items: [], hasMore: false, loading: false, loadMore: () => {} };
-  const picks = useV2EditorPicks().data || [];
+  const picksState = useV2EditorPicks();
+  const picks = picksState.data || [];
   const shorts = window.usePaginatedShorts(window.SHORTS_PAGE_SIZE, { enabled: true });
   const tags = window.useTags().data || [];
   const artistIndex = useV2ArtistIndex();
@@ -554,15 +597,35 @@ function V2Home({ accent = V2C.pink }) {
     if (shorts.items.length < (cycles + 1) * SHORTS_PER_CYCLE && shorts.hasMore && !shorts.loading) shorts.loadMore();
   }, [cycles, pool.length, page.hasMore, page.loading, shorts.items.length, shorts.hasMore, shorts.loading]);
 
+  // Hold the loading screen until the top of Home has its data and first
+  // pictures: the pick (or first video) cover and the first shorts.
+  const homeReadyRef = React.useRef(false);
+  const shortsSettled = shorts.items.length > 0 || !!shorts.error || (!shorts.loading && !shorts.hasMore);
+  const topCover = (picks[0] || pool[0])?.thumb?.src;
+  const topShorts = shorts.items.slice(0, 3).map(s => s.thumb?.src).join('|');
+  React.useEffect(() => {
+    if (homeReadyRef.current || picksState.loading || !shortsSettled || !(picks.length || pool.length)) return;
+    homeReadyRef.current = true;
+    const load = (src) => new Promise(done => {
+      if (!src) return done();
+      const img = new Image();
+      img.onload = img.onerror = () => done();
+      img.src = src;
+    });
+    Promise.all([topCover, ...topShorts.split('|')].map(load)).then(() => nav.markHomeReady?.());
+  }, [picksState.loading, shortsSettled, picks.length, pool.length, topCover, topShorts]);
+
   const blocks = [];
   let cursor = 0;
   for (let k = 0; k < cycles; k += 1) {
-    const pick = picks[k];
-    const hero = pick || pool[cursor++];
-    if (!hero) break;
-    blocks.push(<V2VideoCard key={`hero-${k}-${hero.id}`} v={hero} artist={artistIndex.get(hero.artist?.name)}
-      pick={pick ? { index: k, total: picks.length } : null}
-      onOpen={() => v2OpenVideo(nav, hero)} onArtist={() => nav.go('artist', { id: hero.artist?.id })} />);
+    if (k === 0 && picks.length) {
+      blocks.push(<V2PickCarousel key="picks" picks={picks} artistIndex={artistIndex} />);
+    } else {
+      const hero = pool[cursor++];
+      if (!hero) break;
+      blocks.push(<V2VideoCard key={`hero-${k}-${hero.id}`} v={hero} artist={artistIndex.get(hero.artist?.name)}
+        onOpen={() => v2OpenVideo(nav, hero)} onArtist={() => nav.go('artist', { id: hero.artist?.id })} />);
+    }
     if (k === 0) blocks.push(<V2StatsSlider key="stats" accent={accent} />);
     const shortStart = k * SHORTS_PER_CYCLE;
     const shortSlice = shorts.items.slice(shortStart, shortStart + SHORTS_PER_CYCLE);
@@ -642,6 +705,19 @@ function V2Artists({ accent = V2C.pink }) {
   const [query, setQuery] = React.useState('');
   const [searching, setSearching] = React.useState(false);
   const all = state.data || [];
+  const scrollRef = React.useRef(null);
+  const sentinelRef = React.useRef(null);
+  const [shown, setShown] = React.useState(V2_ARTISTS_PAGE);
+  React.useEffect(() => { setShown(V2_ARTISTS_PAGE); }, [filter, query]);
+  React.useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) setShown(n => n + V2_ARTISTS_PAGE);
+    }, { root: scrollRef.current, rootMargin: '800px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   const list = React.useMemo(() => {
     let out = all.slice();
     const q = query.trim().toLowerCase();
@@ -661,7 +737,7 @@ function V2Artists({ accent = V2C.pink }) {
       <V2Header title="Artists" badge={all.length || null}>
         <button type="button" aria-label="Search artists" aria-expanded={searching} onClick={() => setSearching(s => !s)} style={v2IconBtn}>{V2I.search}</button>
       </V2Header>
-      <div className="v2-scroll" style={{ paddingBottom: V2_NAV_SPACE }}>
+      <div ref={scrollRef} className="v2-scroll" style={{ paddingBottom: V2_NAV_SPACE }}>
         {searching && (
           <div style={{ padding: '0 14px 12px' }}>
             <input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Search artists" aria-label="Search artists" style={{
@@ -682,7 +758,7 @@ function V2Artists({ accent = V2C.pink }) {
           </p>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px 10px', padding: '0 12px' }}>
-          {list.map(a => {
+          {list.slice(0, shown).map(a => {
             const photo = a.photo || a.profilePhoto;
             const meta = [a.videos ? `${a.videos} videos` : '', a.shorts ? `${a.shorts} shorts` : (a.photos ? `${v2Num(a.photos)} photos` : '')].filter(Boolean).join(' · ');
             return (
@@ -708,6 +784,7 @@ function V2Artists({ accent = V2C.pink }) {
             );
           })}
         </div>
+        <div ref={sentinelRef} style={{ height: 1 }} />
       </div>
       <V2BottomNav active="artists" />
     </Phone>
@@ -839,9 +916,13 @@ function V2ArtistPage({ accent = V2C.pink }) {
 function V2Saved({ accent = V2C.pink, initialTab = 'all' }) {
   const nav = window.useNav();
   const [tab, setTab] = React.useState(initialTab === 'videos' ? 'all' : initialTab);
-  const playlists = window.useUserPlaylists().data?.playlists || [];
-  const favs = window.useFavorites().data || { videos: [] };
+  const playlistsState = window.useUserPlaylists();
+  const favsState = window.useFavorites();
+  const playlists = playlistsState.data?.playlists || [];
+  const favs = favsState.data || { videos: [] };
   const liked = favs.videos || [];
+  const playlistsLoading = playlistsState.loading && !playlists.length;
+  const likedLoading = favsState.loading && !liked.length;
   const chips = [
     { id: 'all', label: 'All' }, { id: 'videos', label: 'Videos' }, { id: 'shorts', label: 'Shorts' },
     { id: 'playlists', label: 'Playlists' }, { id: 'photos', label: 'Photos' },
@@ -861,6 +942,12 @@ function V2Saved({ accent = V2C.pink, initialTab = 'all' }) {
             <section aria-label="Playlists" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <V2SectionHead title="Playlists" action={playlists.length ? 'See all' : ''} onAction={() => setTab('playlists')} />
               <div className="v2-row" style={{ gap: 12, padding: '0 16px' }}>
+                {playlistsLoading && [0, 1].map(i => (
+                  <span key={`sk-${i}`} aria-hidden="true" style={{ flexShrink: 0, width: 160, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <span className="v2-skel" style={{ height: 92, marginTop: 8, borderRadius: 10 }} />
+                    <span className="v2-skel" style={{ height: 14, width: '70%', borderRadius: 7 }} />
+                  </span>
+                ))}
                 {playlists.map(p => (
                   <button key={p.id} type="button" className="v2-press" onClick={() => nav.go('playlist', { id: p.id, name: p.name })} style={{ flexShrink: 0, width: 160, display: 'flex', flexDirection: 'column', gap: 8, padding: 0, border: 'none', background: 'transparent', color: V2C.text, textAlign: 'left', cursor: 'pointer' }}>
                     <span style={{ position: 'relative', display: 'block', height: 100 }}>
@@ -884,7 +971,21 @@ function V2Saved({ accent = V2C.pink, initialTab = 'all' }) {
                 <span style={{ flex: 1 }} />
                 {liked.length > 0 && <button type="button" onClick={playAll} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', border: 'none', borderRadius: 999, background: V2C.text, color: V2C.bg, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{V2I.play}Play all</button>}
               </div>
-              {!liked.length && <p style={{ margin: 0, padding: '8px 16px', color: V2C.muted, fontSize: 14 }}>Tap Save on any video to keep it here.</p>}
+              {likedLoading && (
+                <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 16px' }}>
+                  {[0, 1, 2].map(i => (
+                    <span key={i} style={{ display: 'flex', gap: 12 }}>
+                      <span className="v2-skel" style={{ flexShrink: 0, width: 152, aspectRatio: '16 / 9', borderRadius: 10 }} />
+                      <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 2 }}>
+                        <span className="v2-skel" style={{ height: 13, width: '90%', borderRadius: 6 }} />
+                        <span className="v2-skel" style={{ height: 13, width: '60%', borderRadius: 6 }} />
+                        <span className="v2-skel" style={{ height: 11, width: '40%', borderRadius: 6 }} />
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {!liked.length && !likedLoading && <p style={{ margin: 0, padding: '8px 16px', color: V2C.muted, fontSize: 14 }}>Tap Save on any video to keep it here.</p>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 16px' }}>
                 {liked.slice(0, 20).map((v, i) => (
                   <button key={v.id || i} type="button" className="v2-press" onClick={() => v2OpenVideo(nav, v, { queue: liked, queueIdx: i })} style={{ display: 'flex', gap: 12, padding: 0, border: 'none', background: 'transparent', color: V2C.text, textAlign: 'left', cursor: 'pointer' }}>

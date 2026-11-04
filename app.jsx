@@ -80,14 +80,29 @@ const TAB_TO_SCREEN = {
 const UI_OVERRIDE = (() => {
   try { return new URLSearchParams(window.location.search).get('ui') || ''; } catch (_) { return ''; }
 })();
+// The design a tester saw last launch: lets v2 assets and data start loading
+// before /profile confirms the beta flag.
+const V2_HINT = UI_OVERRIDE === 'v2' || (UI_OVERRIDE !== 'v1' && (() => {
+  try { return localStorage.getItem('asmr.ui') === 'v2'; } catch (_) { return false; }
+})());
+
+let v2Source = null;
+function loadV2Source() {
+  if (!v2Source) {
+    v2Source = fetch('v2.jsx', { cache: 'no-cache' })
+      .then(res => { if (!res.ok) throw new Error(`v2.jsx ${res.status}`); return res.text(); });
+    v2Source.catch(() => { v2Source = null; });
+  }
+  return v2Source;
+}
+if (V2_HINT) loadV2Source();
 
 function useRedesign(enabled) {
   const [state, setState] = React.useState(() => (window.V2_SCREENS ? 'ready' : 'idle'));
   React.useEffect(() => {
     if (!enabled || state !== 'idle') return;
     setState('loading');
-    fetch('v2.jsx', { cache: 'no-cache' })
-      .then(res => { if (!res.ok) throw new Error(`v2.jsx ${res.status}`); return res.text(); })
+    loadV2Source()
       .then(source => {
         // Same path text/babel scripts take: transform, then run as a classic script.
         const script = document.createElement('script');
@@ -135,6 +150,18 @@ function AppShell() {
   const wantsV2 = UI_OVERRIDE === 'v2' || (UI_OVERRIDE !== 'v1' && !!user?.beta);
   const v2State = useRedesign(wantsV2);
   const v2 = wantsV2 && v2State === 'ready';
+  // Testers' Home data (picks, shorts) loads alongside v2.jsx, not after it.
+  const v2Likely = wantsV2 || V2_HINT;
+  React.useEffect(() => {
+    if (v2Likely) window.primeFetch?.('v2_editor_picks', window.fetchEditorPicks, []);
+  }, [v2Likely]);
+  // The splash stays up until the top of the v2 Home has its pictures (capped).
+  const [homeTopReady, setHomeTopReady] = React.useState(false);
+  React.useEffect(() => {
+    if (!v2 || homeTopReady) return;
+    const timer = setTimeout(() => setHomeTopReady(true), 6000);
+    return () => clearTimeout(timer);
+  }, [v2, homeTopReady]);
   const screens = v2 ? { ...SCREENS, ...window.V2_SCREENS } : SCREENS;
   // A tester's first launch still asked for fullscreen; the redesign uses the expanded window.
   React.useEffect(() => {
@@ -277,6 +304,7 @@ function AppShell() {
       return false;
     },
     paywallOpen,
+    markHomeReady: () => setHomeTopReady(true),
   }), [current.screen, current.params, stack.length, isPro, user, userState.loading, homeVideosState.items, homeVideosState.loading, homeVideosState.hasMore, shortsPlayer, inviteAccess, paywallOpen, videoSession, videoMinimized, v2]);
 
   const background = current.screen === 'video'
@@ -307,7 +335,8 @@ function AppShell() {
   }, [background.screen, videoMinimized]);
 
   React.useEffect(() => {
-    if (!userState.loading && !playbackAuthorized && videoSession) {
+    // A free Editor's pick plays without a subscription (the bot checks it).
+    if (!userState.loading && !playbackAuthorized && videoSession && !videoSession.free) {
       setVideoSession(null);
       setStack(s => s.filter(entry => entry.screen !== 'video').length
         ? s.filter(entry => entry.screen !== 'video') : [{ screen: 'home', params: {} }]);
@@ -333,7 +362,8 @@ function AppShell() {
   const isTg = !!(window.isInsideTelegram && window.isInsideTelegram());
   const userReady = !isTg || hasReal('user');
   const dataReady = hasReal('artists') && homeVideosState.items.length > 0 && userReady
-    && (!wantsV2 || v2State === 'ready' || v2State === 'failed');
+    && (!wantsV2 || v2State === 'ready' || v2State === 'failed')
+    && (!v2 || current.screen !== 'home' || homeTopReady);
   // Remember the design so the next launch shows the matching splash at once.
   React.useEffect(() => {
     if (!userReady || userState.loading) return;
@@ -347,7 +377,7 @@ function AppShell() {
     return () => clearTimeout(timer);
   }, [dataReady]);
   const shortsState = window.usePaginatedShorts(window.SHORTS_PAGE_SIZE, {
-    enabled: warmShorts || current.screen === 'shorts',
+    enabled: warmShorts || current.screen === 'shorts' || v2Likely,
   });
   const firstShortIds = shortsState.items.slice(0, 4).map(s => s.id).join(',');
   React.useEffect(() => {
@@ -457,7 +487,7 @@ function AppShell() {
             </div>
           )}
           </NavContext.Provider>
-          {videoSession && playbackAuthorized && (
+          {videoSession && (playbackAuthorized || videoSession.free) && (
             <div data-persistent-player data-minimized={videoMinimized ? 'true' : 'false'} style={{
               position: 'absolute', left: 0, right: 0,
               top: videoMinimized ? 'auto' : 0, bottom: videoMinimized ? playerBottom : 0,

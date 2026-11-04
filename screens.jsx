@@ -526,16 +526,18 @@ function VideoPage({ accent = C.pink, density = 'comfortable' }) {
   // Non-Pro users get bounced back to home + paywall sheet. Every tile
   // tap already goes through nav.gate, so this is mostly a safety net
   // for direct nav (Telegram restoring last page, deep links etc).
+  // Free Editor's picks (params.free) play without a subscription.
+  const allowed = nav.isPro || !!nav.params?.free;
   const proGateRef = React.useRef(false);
   React.useEffect(() => {
     if (proGateRef.current) return;
-    if (!nav.isPro && !nav.userLoading) {
+    if (!allowed && !nav.userLoading) {
       proGateRef.current = true;
       nav.openPaywall && nav.openPaywall();
       nav.replace && nav.replace('home');
     }
-  }, [nav.isPro, nav.userLoading]);
-  return nav.isPro ? <VideoPageContent accent={accent} density={density} /> : null;
+  }, [allowed, nav.userLoading]);
+  return allowed ? <VideoPageContent accent={accent} density={density} /> : null;
 }
 
 function VideoPageContent({ accent, density }) {
@@ -700,6 +702,8 @@ function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queu
   //  - playlist queue → next item in the rotated queue (so even when the
   //    user starts on the last item, the rest of the playlist plays).
   //  - otherwise → first recommended.
+  // Without a subscription only the free picks queue can autoplay.
+  const freeOnly = !!nav.params?.free && !nav.isPro;
   const onEnded = React.useCallback(() => {
     if (!autoplay || replay) return;
     let next = null;
@@ -710,15 +714,16 @@ function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queu
       nextQueue = queue;
       // Find the index of `next` inside the original queue array.
       nextQueueIdx = queue.findIndex(x => String(x.id) === String(next.id));
-    } else if (recItems && recItems.length) {
+    } else if (recItems && recItems.length && !freeOnly) {
       next = recItems[0];
     }
     if (!next) return;
     nav.replace('video', {
       id: next.id, video: next,
       queue: nextQueue, queueIdx: nextQueueIdx,
+      ...(freeOnly ? { free: true } : {}),
     });
-  }, [autoplay, replay, queue, queueIdx, queueRest, recItems, nav]);
+  }, [autoplay, replay, queue, queueIdx, queueRest, recItems, nav, freeOnly]);
 
   return (
     <div style={minimized ? { height: 84, flexShrink: 0 } : SCROLL_BODY}>
@@ -846,7 +851,7 @@ function VideoPageBody({ v, queueRest, recItems, recLoading, accent, queue, queu
               const jumpIdx = queue.findIndex(x => String(x.id) === String(nv.id));
               return (
                 <div key={nv.id}
-                  onClick={() => nav.replace('video', { id: nv.id, video: nv, queue, queueIdx: jumpIdx })}
+                  onClick={() => nav.replace('video', { id: nv.id, video: nv, queue, queueIdx: jumpIdx, ...(freeOnly ? { free: true } : {}) })}
                   style={{ flexShrink: 0, width: 110, cursor: 'pointer' }}>
                   <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 8, overflow: 'hidden' }}>
                     <Thumb thumb={nv.thumb} duration={nv.duration} />
