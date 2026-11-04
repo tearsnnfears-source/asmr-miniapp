@@ -177,6 +177,8 @@ const TIER_COLORS = {
 // the header keeps the high-frequency actions visible at every width.
 function AppHeader({ accent = C.pink }) {
   const nav = useNav();
+  // Redesign beta: every screen that still uses this header gets the new one.
+  if (nav.v2 && window.V2Header) return <window.V2Header accent={accent} />;
   return (
     <div style={{
       minHeight: 56,
@@ -211,12 +213,22 @@ const iconBtn = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
 };
 
-function AppHeaderLinks({ accent = C.pink }) {
+function AppHeaderLinks({ accent = C.pink, buttonStyle, iconOnly = false }) {
   const [open, setOpen] = React.useState(false);
   const openLinks = () => {
     window.invalidate?.('access_links');
     setOpen(true);
   };
+  if (iconOnly) {
+    return (
+      <React.Fragment>
+        <button onClick={openLinks} title="Your group links" aria-label="Your group links" style={buttonStyle}>
+          <Ico.link width="22" height="22" />
+        </button>
+        {open && <LinksPanel accent={accent} onClose={() => setOpen(false)} />}
+      </React.Fragment>
+    );
+  }
   return (
     <React.Fragment>
       <button onClick={openLinks} title="Your group links" style={{
@@ -274,7 +286,7 @@ function _firstSeenAt(key) {
   return map[key];
 }
 
-function AppHeaderBell({ accent = C.pink }) {
+function AppHeaderBell({ accent = C.pink, buttonStyle, dotStyle }) {
   const myInvite = window.useMyInvite ? window.useMyInvite() : { data: { invite_link: null, access_links: [] } };
   const link = myInvite.data?.invite_link;
   const accessLinks = Array.isArray(myInvite.data?.access_links) ? myInvite.data.access_links : [];
@@ -328,10 +340,10 @@ function AppHeaderBell({ accent = C.pink }) {
 
   return (
     <React.Fragment>
-      <button onClick={onTap} style={iconBtn} title="Notifications">
-        <Ico.bell />
+      <button onClick={onTap} style={buttonStyle || iconBtn} title="Notifications" aria-label="Notifications">
+        <Ico.bell width={buttonStyle ? 23 : 20} height={buttonStyle ? 23 : 20} />
         {hasUnread && (
-          <span style={{
+          <span style={dotStyle || {
             position: 'absolute', top: 6, right: 7,
             width: 8, height: 8, borderRadius: '50%', background: accent,
           }} />
@@ -352,6 +364,8 @@ function AppHeaderBell({ accent = C.pink }) {
 // `active` / `centerMode` props from screens override; otherwise pulled from nav context.
 function BottomNav({ active, centerMode, accent = C.pink, subAccent = C.lime }) {
   const nav = useNav();
+  // Redesign beta: the floating bar replaces this one on every screen.
+  if (nav.v2 && window.V2BottomNav) return <window.V2BottomNav active={active} />;
   const activeTab = active != null ? active : nav.activeTab;
   const center = centerMode != null ? centerMode : nav.centerMode;
   const tabs = [
