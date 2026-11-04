@@ -106,7 +106,7 @@
   }
   @keyframes spl-spin { to { transform: rotate(360deg); } }
 
-  /* Redesign beta loading screen (asmr.ui = v2, set by app.jsx for testers). */
+  /* Redesign loading screen (everyone except ?ui=v1). */
   #static-splash.v2 {
     gap: 0;
     background:
@@ -174,11 +174,11 @@
   </div>
 </div>
 <script>
-  // Testers who saw the redesign last time get its loading screen right away.
+  // The redesign's loading screen; ?ui=v1 keeps the old one.
   (function () {
     try {
       var forced = new URLSearchParams(location.search).get('ui');
-      var v2 = forced === 'v2' || (forced !== 'v1' && localStorage.getItem('asmr.ui') === 'v2');
+      var v2 = forced !== 'v1';
       if (!v2) return;
       var el = document.getElementById('static-splash');
       var drop = '<svg viewBox="0 0 40 46" aria-hidden="true"><path d="M20 1 L32.38 24.47 A14 14 0 1 1 7.62 24.47 Z"/></svg>';

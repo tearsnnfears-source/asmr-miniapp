@@ -73,18 +73,14 @@ const TAB_TO_SCREEN = {
   favorites: 'saved',
 };
 
-// ── Redesign beta ───────────────────────────────────────────────
-// Testers (bot BETA_TESTER_IDS → profile.beta) get the YouTube-style design
-// from v2.jsx, loaded only for them so everyone else downloads nothing new.
-// ?ui=v2 / ?ui=v1 force it on or off for previews.
+// ── Redesign ────────────────────────────────────────────────────
+// Everyone gets the YouTube-style design from v2.jsx; its screens replace
+// the old ones. ?ui=v1 keeps the old design for comparisons, and the old
+// screens stay as the fallback if v2.jsx fails to load.
 const UI_OVERRIDE = (() => {
   try { return new URLSearchParams(window.location.search).get('ui') || ''; } catch (_) { return ''; }
 })();
-// The design a tester saw last launch: lets v2 assets and data start loading
-// before /profile confirms the beta flag.
-const V2_HINT = UI_OVERRIDE === 'v2' || (UI_OVERRIDE !== 'v1' && (() => {
-  try { return localStorage.getItem('asmr.ui') === 'v2'; } catch (_) { return false; }
-})());
+const V2_HINT = UI_OVERRIDE !== 'v1';
 
 let v2Source = null;
 function loadV2Source() {
@@ -147,11 +143,11 @@ function AppShell() {
   // Falls back to mock when not in Telegram (preview-URL browser testing).
   const userState = window.useUser();
   const user = userState.data;
-  const wantsV2 = UI_OVERRIDE === 'v2' || (UI_OVERRIDE !== 'v1' && !!user?.beta);
+  const wantsV2 = V2_HINT;
   const v2State = useRedesign(wantsV2);
   const v2 = wantsV2 && v2State === 'ready';
-  // Testers' Home data (picks, shorts) loads alongside v2.jsx, not after it.
-  const v2Likely = wantsV2 || V2_HINT;
+  // Home data (picks, shorts) loads alongside v2.jsx, not after it.
+  const v2Likely = wantsV2;
   React.useEffect(() => {
     if (v2Likely) window.primeFetch?.('v2_editor_picks', window.fetchEditorPicks, []);
   }, [v2Likely]);
@@ -163,7 +159,7 @@ function AppShell() {
     return () => clearTimeout(timer);
   }, [v2, homeTopReady]);
   const screens = v2 ? { ...SCREENS, ...window.V2_SCREENS } : SCREENS;
-  // A tester's first launch still asked for fullscreen; the redesign uses the expanded window.
+  // Telegram can keep fullscreen from an earlier launch; the redesign uses the expanded window.
   React.useEffect(() => {
     const tg = window.Telegram?.WebApp;
     if (v2 && tg?.isFullscreen) { try { tg.exitFullscreen?.(); } catch (_) {} }
@@ -364,11 +360,6 @@ function AppShell() {
   const dataReady = hasReal('artists') && homeVideosState.items.length > 0 && userReady
     && (!wantsV2 || v2State === 'ready' || v2State === 'failed')
     && (!v2 || current.screen !== 'home' || homeTopReady);
-  // Remember the design so the next launch shows the matching splash at once.
-  React.useEffect(() => {
-    if (!userReady || userState.loading) return;
-    try { localStorage.setItem('asmr.ui', wantsV2 ? 'v2' : 'v1'); } catch (_) {}
-  }, [userReady, userState.loading, wantsV2]);
   const [warmShorts, setWarmShorts] = React.useState(false);
   const [shortsPreviewsReady, setShortsPreviewsReady] = React.useState(false);
   React.useEffect(() => {
