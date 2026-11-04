@@ -101,6 +101,47 @@
   }
   @keyframes spl-spin { to { transform: rotate(360deg); } }
 
+  /* Redesign beta loading screen (asmr.ui = v2, set by app.jsx for testers). */
+  #static-splash.v2 {
+    gap: 0;
+    background:
+      radial-gradient(60% 40% at 50% 44%, rgba(255,126,200,0.16), rgba(255,126,200,0) 70%),
+      radial-gradient(70% 30% at 50% 100%, rgba(200,255,68,0.07), rgba(200,255,68,0) 70%),
+      #0E0E0F;
+  }
+  #static-splash .v2-mark { position: relative; width: 104px; height: 104px; }
+  #static-splash .v2-ripple {
+    position: absolute; left: 50%; top: 50%; width: 300px; height: 300px; border-radius: 50%;
+    border: 1.5px solid rgba(255,126,200,0.45); transform: translate(-50%, -50%) scale(0.55); opacity: 0;
+    animation: v2-ripple 2.4s cubic-bezier(0.2, 0.7, 0.3, 1) infinite;
+  }
+  #static-splash .v2-ripple:nth-child(2) { animation-delay: 0.8s; }
+  #static-splash .v2-ripple:nth-child(3) { animation-delay: 1.6s; }
+  #static-splash .v2-icon {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    border-radius: 30px; background: #161617; border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.6), 0 0 60px rgba(255,126,200,0.25);
+  }
+  #static-splash .v2-icon svg { width: 44px; height: 51px; fill: #FF7EC8; animation: v2-drop 2.4s ease-in-out infinite; }
+  #static-splash .v2-word {
+    display: flex; align-items: center; gap: 4px; margin-top: 34px; padding-top: 4px;
+    font-family: 'Bebas Neue', system-ui, sans-serif; font-size: 42px; letter-spacing: 3.5px; line-height: 1; color: #F1F1F1;
+  }
+  #static-splash .v2-word svg { width: 19px; height: 22px; margin: 0 2px 5px 0; fill: #FF7EC8; }
+  #static-splash .v2-tag { margin-top: 10px; font-size: 14px; color: #AAAAAA; }
+  #static-splash .v2-bar {
+    position: absolute; left: 50%; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); width: 140px; height: 4px;
+    margin-left: -70px; border-radius: 2px; overflow: hidden; background: rgba(255,255,255,0.1);
+  }
+  #static-splash .v2-bar span {
+    position: absolute; left: 0; top: 0; width: 40%; height: 100%; border-radius: 2px;
+    background: linear-gradient(90deg, #FF7EC8, #C8FF44); animation: v2-bar 1.4s ease-in-out infinite;
+  }
+  #static-splash.v2 .slow-load { margin-top: 28px; }
+  @keyframes v2-ripple { from { transform: translate(-50%, -50%) scale(0.55); opacity: 0.9; } to { transform: translate(-50%, -50%) scale(1.25); opacity: 0; } }
+  @keyframes v2-drop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  @keyframes v2-bar { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
   /* Immersive video — applied by player.jsx toggleFullscreen. Pin the
      player wrap to the whole viewport on top of the app chrome. Works
      even when the native Fullscreen API is blocked (iOS in Telegram). */
@@ -141,6 +182,24 @@
   </div>
 </div>
 <script>
+  // Testers who saw the redesign last time get its loading screen right away.
+  (function () {
+    try {
+      var forced = new URLSearchParams(location.search).get('ui');
+      var v2 = forced === 'v2' || (forced !== 'v1' && localStorage.getItem('asmr.ui') === 'v2');
+      if (!v2) return;
+      var el = document.getElementById('static-splash');
+      var drop = '<svg viewBox="0 0 40 46" aria-hidden="true"><path d="M20 1 L32.38 24.47 A14 14 0 1 1 7.62 24.47 Z"/></svg>';
+      var slow = el.querySelector('.slow-load');
+      el.classList.add('v2');
+      el.innerHTML = '<div class="v2-mark"><span class="v2-ripple"></span><span class="v2-ripple"></span><span class="v2-ripple"></span>'
+        + '<div class="v2-icon">' + drop + '</div></div>'
+        + '<div class="v2-word">ASMR' + drop + 'LEAKS</div>'
+        + '<div class="v2-tag">Exclusive ASMR archive</div>'
+        + '<div class="v2-bar"><span></span></div>';
+      if (slow) el.appendChild(slow);
+    } catch (_) {}
+  })();
   // Hide hook that AppShell calls once real data lands.
   window.__hideSplash = function () {
     var el = document.getElementById('static-splash');

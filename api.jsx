@@ -975,6 +975,8 @@ function useUser() {
         tributePlusUrl: p.tribute_plus_url || '',
         tributeEliteUrl: p.tribute_elite_url || '',
         tributeKingUrl: p.tribute_king_url || '',
+        // Mini app redesign beta (bot BETA_TESTER_IDS); app.jsx loads v2.jsx for these users.
+        beta: !!p.beta,
         raw: p,
       };
     },

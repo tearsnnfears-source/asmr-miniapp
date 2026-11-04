@@ -73,6 +73,36 @@ const TAB_TO_SCREEN = {
   favorites: 'saved',
 };
 
+// ── Redesign beta ───────────────────────────────────────────────
+// Testers (bot BETA_TESTER_IDS → profile.beta) get the YouTube-style design
+// from v2.jsx, loaded only for them so everyone else downloads nothing new.
+// ?ui=v2 / ?ui=v1 force it on or off for previews.
+const UI_OVERRIDE = (() => {
+  try { return new URLSearchParams(window.location.search).get('ui') || ''; } catch (_) { return ''; }
+})();
+
+function useRedesign(enabled) {
+  const [state, setState] = React.useState(() => (window.V2_SCREENS ? 'ready' : 'idle'));
+  React.useEffect(() => {
+    if (!enabled || state !== 'idle') return;
+    setState('loading');
+    fetch('v2.jsx', { cache: 'no-cache' })
+      .then(res => { if (!res.ok) throw new Error(`v2.jsx ${res.status}`); return res.text(); })
+      .then(source => {
+        // Same path text/babel scripts take: transform, then run as a classic script.
+        const script = document.createElement('script');
+        script.text = window.Babel.transform(source, { presets: ['react'], filename: 'v2.jsx' }).code;
+        document.head.appendChild(script);
+        setState(window.V2_SCREENS ? 'ready' : 'failed');
+      })
+      .catch(err => {
+        console.error('[v2] could not load the redesign', err);
+        setState('failed');
+      });
+  }, [enabled, state]);
+  return state;
+}
+
 const TWEAKS_DEFAULTS = /*EDITMODE-BEGIN*/{
   "accent": "#FF7EC8",
   "density": "comfortable",
@@ -102,6 +132,10 @@ function AppShell() {
   // Falls back to mock when not in Telegram (preview-URL browser testing).
   const userState = window.useUser();
   const user = userState.data;
+  const wantsV2 = UI_OVERRIDE === 'v2' || (UI_OVERRIDE !== 'v1' && !!user?.beta);
+  const v2State = useRedesign(wantsV2);
+  const v2 = wantsV2 && v2State === 'ready';
+  const screens = v2 ? { ...SCREENS, ...window.V2_SCREENS } : SCREENS;
   // Load only the data required by the first visible Home screen.
   const homeVideosState = window.usePaginatedVideos(30);
   const artistsState = window.useArtists();
@@ -177,6 +211,7 @@ function AppShell() {
         ? s.filter(entry => entry.screen !== 'video') : [{ screen: 'home', params: {} }]);
     },
     canGoBack: stack.length > 1,
+    v2,
     screen: current.screen,
     params: current.params,
     activeTab: SCREEN_TO_TAB[current.screen] || '',
@@ -230,12 +265,12 @@ function AppShell() {
       return false;
     },
     paywallOpen,
-  }), [current.screen, current.params, stack.length, isPro, user, userState.loading, homeVideosState.items, homeVideosState.loading, homeVideosState.hasMore, shortsPlayer, inviteAccess, paywallOpen, videoSession, videoMinimized]);
+  }), [current.screen, current.params, stack.length, isPro, user, userState.loading, homeVideosState.items, homeVideosState.loading, homeVideosState.hasMore, shortsPlayer, inviteAccess, paywallOpen, videoSession, videoMinimized, v2]);
 
   const background = current.screen === 'video'
     ? [...stack].reverse().find(entry => entry.screen !== 'video') || { screen: 'home', params: {} }
     : current;
-  const renderScreen = SCREENS[background.screen] || SCREENS.home;
+  const renderScreen = screens[background.screen] || screens.home;
   const backgroundNav = { ...nav, screen: background.screen, params: background.params,
     activeTab: SCREEN_TO_TAB[background.screen] || '' };
   const view = renderScreen({ accent, density, params: background.params });
@@ -285,7 +320,13 @@ function AppShell() {
   // tier badge appears). Outside Telegram there's no /profile to wait on.
   const isTg = !!(window.isInsideTelegram && window.isInsideTelegram());
   const userReady = !isTg || hasReal('user');
-  const dataReady = hasReal('artists') && homeVideosState.items.length > 0 && userReady;
+  const dataReady = hasReal('artists') && homeVideosState.items.length > 0 && userReady
+    && (!wantsV2 || v2State === 'ready' || v2State === 'failed');
+  // Remember the design so the next launch shows the matching splash at once.
+  React.useEffect(() => {
+    if (!userReady || userState.loading) return;
+    try { localStorage.setItem('asmr.ui', wantsV2 ? 'v2' : 'v1'); } catch (_) {}
+  }, [userReady, userState.loading, wantsV2]);
   const [warmShorts, setWarmShorts] = React.useState(false);
   const [shortsPreviewsReady, setShortsPreviewsReady] = React.useState(false);
   React.useEffect(() => {
@@ -439,12 +480,10 @@ function AppShell() {
         />
       )}
       {/* Paywall upsell — opened by nav.openPaywall / nav.gate. */}
-      {paywallOpen && (
-        <window.PaywallSheet
-          accent={accent}
-          onClose={() => setPaywallOpen(false)}
-        />
-      )}
+      {paywallOpen && React.createElement((v2 && window.V2PaywallSheet) || window.PaywallSheet, {
+        accent,
+        onClose: () => setPaywallOpen(false),
+      })}
       <window.DebugFab />
 
       {showTweaks && (
