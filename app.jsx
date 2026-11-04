@@ -136,6 +136,15 @@ function AppShell() {
   const v2State = useRedesign(wantsV2);
   const v2 = wantsV2 && v2State === 'ready';
   const screens = v2 ? { ...SCREENS, ...window.V2_SCREENS } : SCREENS;
+  // A tester's first launch still asked for fullscreen; the redesign uses the expanded window.
+  React.useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    if (v2 && tg?.isFullscreen) { try { tg.exitFullscreen?.(); } catch (_) {} }
+  }, [v2]);
+  // The redesign docks the minimised video as a card above its floating bar.
+  React.useEffect(() => {
+    document.body.classList.toggle('v2-mini', v2 && videoMinimized);
+  }, [v2, videoMinimized]);
   // Load only the data required by the first visible Home screen.
   const homeVideosState = window.usePaginatedVideos(30);
   const artistsState = window.useArtists();
@@ -151,6 +160,9 @@ function AppShell() {
   // Global shorts player overlay state. Any screen can call
   // nav.openShorts(items, idx) to pop the immersive player.
   const [shortsPlayer, setShortsPlayer] = React.useState(null); // { items, order, pos } | null
+  // Telegram's Back (and Android's) closes the shorts overlay before leaving a screen.
+  const shortsOpenRef = React.useRef(false);
+  shortsOpenRef.current = !!shortsPlayer;
 
   // Global access modal state. Set via nav.openInvite(linkOrBundle) — used by
   //   · the boot-time auto-show below (after returning from checkout)
@@ -360,7 +372,10 @@ function AppShell() {
   React.useEffect(() => {
     const tg = window.Telegram?.WebApp;
     if (!tg?.BackButton) return;
-    const handler = () => nav.back();
+    const handler = () => {
+      if (shortsOpenRef.current) { setShortsPlayer(null); return; }
+      nav.back();
+    };
     tg.BackButton.onClick(handler);
     return () => { try { tg.BackButton.offClick(handler); } catch (_) {} };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -368,9 +383,9 @@ function AppShell() {
   React.useEffect(() => {
     const tg = window.Telegram?.WebApp;
     if (!tg?.BackButton) return;
-    if (stack.length > 1) tg.BackButton.show();
+    if (stack.length > 1 || shortsPlayer) tg.BackButton.show();
     else tg.BackButton.hide();
-  }, [stack.length]);
+  }, [stack.length, !!shortsPlayer]);
 
   // Hardware/gesture back on Android — intercept popstate so we navigate
   // within the app instead of closing the miniapp.  We push a history
@@ -385,6 +400,11 @@ function AppShell() {
   }, [stack.length]);
   React.useEffect(() => {
     const onPop = (e) => {
+      if (shortsOpenRef.current) {
+        setShortsPlayer(null);
+        try { history.pushState({ stackLen: prevStackLengthRef.current }, ''); } catch (_) {}
+        return;
+      }
       // If we still have screens to pop, intercept and consume the back.
       // Re-push so the browser doesn't drift past zero (which would close
       // the miniapp on the next hardware back).
@@ -454,7 +474,7 @@ function AppShell() {
       {/* Global shorts overlay — opened from artist pages, search, etc.
           Lives above the BottomNav so it covers the whole viewport. */}
       {shortsPlayer && (
-        <div style={{
+        <div className="shorts-overlay" style={{
           position: 'fixed', inset: 0, zIndex: 200,
           background: '#000',
           // Reserve Telegram chrome + device notch so the player's own
