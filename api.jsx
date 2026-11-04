@@ -210,6 +210,11 @@ function _getOrFetch(key, fetcher, fallback) {
   return inflight;
 }
 
+// Start a keyed fetch early so a later useFetch(key) finds it in flight.
+function primeFetch(key, fetcher, fallback) {
+  _getOrFetch(key, fetcher, fallback).promise?.catch(() => {});
+}
+
 // Invalidate a key — next useFetch refetches.
 function invalidate(key) {
   _apiCache.delete(key);
@@ -375,6 +380,12 @@ function useVideos(limit = 500) {
     window.VIDEOS || [],
     [limit],
   );
+}
+
+// The website's current Editor's picks — free to watch in the redesign.
+async function fetchEditorPicks() {
+  const data = await apiGet('/miniapp/editor_picks');
+  return (data.items || []).map((it, i) => normalizeVideo(it, i));
 }
 
 // Incremental paged catalog — backed by /miniapp/videos?offset=N&limit=M.
@@ -1618,7 +1629,7 @@ initTelegram();
 Object.assign(window, {
   SHORTS_PAGE_SIZE,
   API_BASE, initTelegram, getInitData, getTelegramUser, isInsideTelegram,
-  apiGet, apiPost, useFetch, invalidate,
+  apiGet, apiPost, useFetch, invalidate, primeFetch, fetchEditorPicks,
   useVideos, useVideo, usePaginatedVideos, useShorts, usePaginatedShorts, useTags, useUser, useArtists, useStats, useFavorites, useReactions, useFavoriteStatus, useFollows, useFollowStatus, useArtistContent, useArtistContentList, useUserPlaylists, usePlaylistItems, useRecommended, useSearch, useMyInvite, useAccessLinks, useFollowedFeed, userFromTelegram,
   actionFavoriteToggle, actionFollow, actionReact, actionRegisterView, actionApplyPromo, actionOpenCryptoSupport, actionStartFreeTrial, actionCheckInvite, actionRefreshAccessLink, actionCreateStarsInvoice, actionPrepareBundleCheckout, actionOpenTribute, actionSetNotifyExpiry, actionSuggestArtist, startInvitePolling, stopInvitePolling, refreshSubscriptionAccess, watchInviteReturns,
   actionCreatePlaylist, actionAddToPlaylist, actionRemoveFromPlaylist, actionDeletePlaylist,

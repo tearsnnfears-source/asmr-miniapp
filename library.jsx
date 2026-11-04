@@ -483,7 +483,17 @@ function VideoPlaylists({ accent }) {
         marginBottom: 14, fontFamily: 'inherit',
       }}><Ico.plus /> {busy ? 'Creating…' : 'New playlist'}</button>
       {state.loading && !playlists.length && (
-        <div style={{ padding: '24px 6px', textAlign: 'center', color: C.muted, fontSize: 13 }}>Loading playlists…</div>
+        <div aria-label="Loading playlists" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div className="v2-skel" style={{ width: 120, aspectRatio: '16/9', borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.05)', flexShrink: 0 }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div className="v2-skel" style={{ height: 13, width: '70%', borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.06)' }} />
+                <div className="v2-skel" style={{ height: 11, width: '35%', borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.04)' }} />
+              </div>
+            </div>
+          ))}
+        </div>
       )}
       {!state.loading && !playlists.length && (
         <div style={{ padding: '32px 14px', textAlign: 'center', color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
