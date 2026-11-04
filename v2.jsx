@@ -391,6 +391,26 @@ function V2StatsSlider({ accent }) {
   const [sent, setSent] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const trial = !user.isPro && !user.trialUsed;
+  const [trialBusy, setTrialBusy] = React.useState(false);
+  const startTrial = async () => {
+    if (trialBusy) return;
+    setTrialBusy(true);
+    try {
+      const r = await window.actionStartFreeTrial();
+      if (r?.ok) {
+        if (r.invite_link) nav.openInvite?.(r.invite_link);
+        // Fresh tier, days and link: refetch so the header and bar update now.
+        window.invalidate?.('user');
+        window.invalidate?.('my_invite');
+        return;
+      }
+      if (r?.reason === 'trial-used') alert("You've already used your free trial.");
+      else if (r?.reason === 'no-tg') alert('Open from Telegram to activate trial');
+      else alert(r?.message || 'Could not activate trial. Try again.');
+    } finally {
+      setTrialBusy(false);
+    }
+  };
   const send = async () => {
     const trimmed = name.trim();
     if (!trimmed || busy) return;
@@ -424,15 +444,23 @@ function V2StatsSlider({ accent }) {
       }}>{busy ? '…' : 'Suggest'}</button>}
     </div>,
   ];
+  // Anyone who can still claim the trial sees it first: trial, numbers, suggest.
   if (trial) {
-    slides.push(
-      <button key="trial" type="button" onClick={() => nav.go('subscription')} style={{ ...slide, display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', border: '1px solid rgba(42,171,238,0.4)', background: 'rgba(42,171,238,0.1)', color: V2C.text, textAlign: 'left', cursor: 'pointer' }}>
-        <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <span style={{ fontSize: 15, fontWeight: 700 }}>Try 5 days free</span>
-          <span style={{ fontSize: 12, color: V2C.soft }}>Full library, no card needed</span>
+    slides.unshift(
+      <div key="trial" style={{ ...slide, display: 'flex', alignItems: 'center', gap: 12, padding: '14px 14px 14px 16px', border: '1px solid rgba(255,126,200,0.45)', background: `radial-gradient(120% 140% at 0% 0%, rgba(255,126,200,0.22), rgba(255,126,200,0) 60%), ${V2C.surface}` }}>
+        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.2, color: V2C.pink }}>LIMITED OFFER</span>
+            <span style={{ padding: '1px 5px', borderRadius: 4, background: V2C.lime, color: V2C.bg, fontSize: 9, fontWeight: 800, letterSpacing: 0.4 }}>NEW</span>
+          </span>
+          <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 26, lineHeight: 1, letterSpacing: 0.6, color: V2C.text }}>Try <span style={{ color: V2C.lime }}>5 days free</span></span>
+          <span style={{ fontSize: 11.5, color: V2C.soft }}>Full library access · no card required</span>
         </span>
-        <span style={{ height: 36, padding: '0 14px', borderRadius: 999, background: '#2AABEE', color: '#fff', fontSize: 13, fontWeight: 700, lineHeight: '36px' }}>Start</span>
-      </button>,
+        <button type="button" className="v2-follow" onClick={startTrial} disabled={trialBusy} style={{
+          flexShrink: 0, height: 38, padding: '0 16px', border: 'none', borderRadius: 999, cursor: trialBusy ? 'default' : 'pointer',
+          background: V2C.lime, color: V2C.bg, fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap', opacity: trialBusy ? 0.65 : 1,
+        }}>{trialBusy ? '…' : 'Get it →'}</button>
+      </div>,
     );
   }
   return (
